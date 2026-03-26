@@ -1,4 +1,3 @@
-import time
 import streamlit as st
 
 # -------------------------------------------------
@@ -13,192 +12,204 @@ st.set_page_config(
 
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
-TARGET_PAGE = "pages/1_Build_Your_Portfolio.py"  # update if your page name differs
+TARGET_PAGE = "pages/1_Build_Your_Portfolio.py"  # Change if your file name differs
 
 
 # -------------------------------------------------
-# Helpers
+# State
 # -------------------------------------------------
-def init_session_state() -> None:
-    defaults = {
-        "launch_screen_shown": False,
-    }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+def init_session_state():
+    if "entered_home" not in st.session_state:
+        st.session_state.entered_home = False
 
 
-def inject_css() -> None:
+def enter_home():
+    st.session_state.entered_home = True
+
+
+def go_to_builder():
+    try:
+        st.switch_page(TARGET_PAGE)
+    except Exception:
+        st.warning(
+            f"Create a page at '{TARGET_PAGE}' so this button can open your portfolio builder."
+        )
+
+
+# -------------------------------------------------
+# Styling
+# -------------------------------------------------
+def inject_css():
     st.markdown(
         """
         <style>
             :root {
-                --bg: #f5f9f8;
-                --bg-2: #eef5f3;
-                --card: rgba(255, 255, 255, 0.88);
-                --card-strong: rgba(255, 255, 255, 0.96);
+                --bg1: #f7fbfa;
+                --bg2: #eef6f4;
+                --card: rgba(255,255,255,0.84);
+                --card-strong: rgba(255,255,255,0.96);
                 --text: #0f172a;
                 --muted: #475569;
-                --line: rgba(15, 23, 42, 0.08);
+                --line: rgba(15,23,42,0.08);
                 --primary: #0f766e;
                 --primary-2: #14b8a6;
                 --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+                --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.05);
             }
 
             .stApp {
                 background:
-                    radial-gradient(circle at top left, rgba(20,184,166,0.08), transparent 28%),
-                    radial-gradient(circle at top right, rgba(15,118,110,0.06), transparent 22%),
-                    linear-gradient(180deg, #f8fcfb 0%, #f3f7fb 100%);
+                    radial-gradient(circle at top left, rgba(20,184,166,0.10), transparent 28%),
+                    radial-gradient(circle at top right, rgba(15,118,110,0.07), transparent 24%),
+                    linear-gradient(180deg, var(--bg1) 0%, #f3f7fb 100%);
             }
 
             .block-container {
                 max-width: 1180px;
-                padding-top: 1.4rem;
-                padding-bottom: 2.2rem;
+                padding-top: 1.3rem;
+                padding-bottom: 2rem;
             }
 
-            .brand-bar {
+            .brand-row {
                 display: flex;
                 align-items: center;
-                gap: 0.9rem;
-                margin-bottom: 1.25rem;
+                gap: 0.85rem;
+                margin-bottom: 1.2rem;
             }
 
-            .brand-mark {
+            .logo-box {
                 width: 52px;
                 height: 52px;
                 border-radius: 16px;
                 background: linear-gradient(135deg, var(--primary), var(--primary-2));
+                color: white;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: white;
-                font-weight: 800;
                 font-size: 1.1rem;
-                box-shadow: 0 12px 30px rgba(15,118,110,0.22);
+                font-weight: 900;
+                box-shadow: 0 14px 34px rgba(15,118,110,0.22);
             }
 
-            .brand-name {
-                font-size: 1.05rem;
-                font-weight: 800;
-                color: var(--text);
+            .brand-title {
                 margin: 0;
+                color: var(--text);
+                font-weight: 850;
+                font-size: 1.04rem;
                 letter-spacing: -0.02em;
             }
 
-            .brand-sub {
-                margin: 0.1rem 0 0 0;
+            .brand-subtitle {
+                margin: 0.12rem 0 0 0;
                 color: var(--muted);
                 font-size: 0.92rem;
             }
 
             .hero {
                 background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78));
-                border: 1px solid rgba(255,255,255,0.65);
+                border: 1px solid rgba(255,255,255,0.68);
                 border-radius: 28px;
-                padding: 2.4rem 2.2rem;
+                padding: 2.35rem 2.2rem;
                 box-shadow: var(--shadow);
                 backdrop-filter: blur(8px);
             }
 
-            .hero-badge {
+            .badge {
                 display: inline-block;
+                padding: 0.42rem 0.78rem;
+                border-radius: 999px;
                 background: rgba(15,118,110,0.09);
                 color: var(--primary);
-                border: 1px solid rgba(15,118,110,0.12);
-                border-radius: 999px;
-                padding: 0.4rem 0.8rem;
+                border: 1px solid rgba(15,118,110,0.13);
                 font-size: 0.82rem;
                 font-weight: 800;
-                letter-spacing: 0.02em;
                 margin-bottom: 0.95rem;
             }
 
             .hero h1 {
+                margin: 0 0 0.95rem 0;
                 color: var(--text);
-                font-size: 3.15rem;
+                font-size: 3.1rem;
                 line-height: 1.02;
                 letter-spacing: -0.05em;
-                font-weight: 850;
-                margin: 0 0 0.95rem 0;
-                max-width: 720px;
+                font-weight: 900;
+                max-width: 760px;
             }
 
             .hero p {
+                margin: 0;
                 color: #334155;
                 font-size: 1.08rem;
                 line-height: 1.65;
                 max-width: 760px;
-                margin: 0;
             }
 
-            .hero-pills {
+            .pill-row {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 0.6rem;
-                margin-top: 1.15rem;
+                gap: 0.55rem;
+                margin-top: 1.1rem;
             }
 
             .pill {
-                padding: 0.45rem 0.82rem;
+                padding: 0.45rem 0.8rem;
                 border-radius: 999px;
-                background: rgba(255,255,255,0.82);
+                background: rgba(255,255,255,0.90);
                 border: 1px solid var(--line);
                 color: var(--text);
                 font-size: 0.88rem;
                 font-weight: 700;
             }
 
-            .glass-card {
-                background: var(--card);
-                border: 1px solid rgba(255,255,255,0.7);
-                border-radius: 22px;
-                padding: 1.15rem;
-                box-shadow: var(--shadow);
-                backdrop-filter: blur(8px);
-                height: 100%;
-            }
-
-            .glass-card h3 {
-                color: var(--text);
-                font-size: 1.05rem;
-                font-weight: 800;
-                margin: 0 0 0.35rem 0;
-            }
-
-            .glass-card p {
-                color: var(--muted);
-                font-size: 0.96rem;
-                line-height: 1.55;
-                margin: 0;
-            }
-
             .section-label {
+                color: var(--primary);
                 font-size: 0.82rem;
                 font-weight: 800;
                 letter-spacing: 0.08em;
                 text-transform: uppercase;
-                color: var(--primary);
                 margin-bottom: 0.35rem;
             }
 
             .section-title {
                 color: var(--text);
                 font-size: 1.85rem;
-                letter-spacing: -0.03em;
                 font-weight: 850;
+                letter-spacing: -0.03em;
                 margin-bottom: 0.35rem;
             }
 
-            .section-subtitle {
+            .section-copy {
                 color: var(--muted);
                 margin-bottom: 1rem;
             }
 
+            .card {
+                background: var(--card);
+                border: 1px solid rgba(255,255,255,0.7);
+                border-radius: 22px;
+                padding: 1.15rem;
+                box-shadow: var(--shadow-soft);
+                backdrop-filter: blur(8px);
+                height: 100%;
+            }
+
+            .card h3 {
+                margin: 0 0 0.35rem 0;
+                color: var(--text);
+                font-size: 1.05rem;
+                font-weight: 800;
+            }
+
+            .card p {
+                margin: 0;
+                color: var(--muted);
+                font-size: 0.96rem;
+                line-height: 1.55;
+            }
+
             .cta-panel {
                 background: linear-gradient(135deg, rgba(15,118,110,0.12), rgba(20,184,166,0.07));
-                border: 1px solid rgba(15,118,110,0.12);
+                border: 1px solid rgba(15,118,110,0.13);
                 border-radius: 28px;
                 padding: 1.5rem;
                 box-shadow: var(--shadow);
@@ -209,7 +220,7 @@ def inject_css() -> None:
                 font-size: 1.65rem;
                 font-weight: 850;
                 letter-spacing: -0.03em;
-                margin: 0 0 0.4rem 0;
+                margin: 0 0 0.35rem 0;
             }
 
             .cta-copy {
@@ -219,36 +230,41 @@ def inject_css() -> None:
                 margin: 0;
             }
 
-            .mini-stat {
+            .stat {
                 background: var(--card-strong);
                 border: 1px solid var(--line);
                 border-radius: 18px;
                 padding: 0.95rem 1rem;
-                box-shadow: var(--shadow);
+                box-shadow: var(--shadow-soft);
             }
 
-            .mini-stat-value {
+            .stat-value {
                 color: var(--text);
                 font-size: 1.45rem;
                 font-weight: 850;
                 margin: 0;
             }
 
-            .mini-stat-label {
+            .stat-label {
                 color: var(--muted);
                 font-size: 0.9rem;
                 margin-top: 0.15rem;
             }
 
+            .spacer {
+                height: 0.65rem;
+            }
+
             div.stButton > button {
-                min-height: 3.15rem;
+                min-height: 3.2rem;
                 border-radius: 14px;
                 font-weight: 800;
                 font-size: 0.98rem;
                 border: none;
             }
 
-            .splash-wrap {
+            /* Splash */
+            .splash-shell {
                 min-height: 88vh;
                 display: flex;
                 align-items: center;
@@ -256,48 +272,69 @@ def inject_css() -> None:
             }
 
             .splash-card {
-                width: min(700px, 100%);
+                width: min(720px, 100%);
                 text-align: center;
-                background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78));
+                background: linear-gradient(135deg, rgba(255,255,255,0.93), rgba(255,255,255,0.80));
                 border: 1px solid rgba(255,255,255,0.72);
-                border-radius: 30px;
-                padding: 3rem 2rem;
+                border-radius: 32px;
+                padding: 3rem 2rem 2.3rem 2rem;
                 box-shadow: var(--shadow);
                 backdrop-filter: blur(10px);
+                animation: fadeUp 0.55s ease;
             }
 
             .splash-logo {
-                width: 92px;
-                height: 92px;
-                border-radius: 26px;
+                width: 96px;
+                height: 96px;
+                border-radius: 28px;
                 background: linear-gradient(135deg, var(--primary), var(--primary-2));
                 color: white;
-                margin: 0 auto 1.1rem auto;
+                margin: 0 auto 1.15rem auto;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-size: 2rem;
                 font-weight: 900;
-                box-shadow: 0 18px 40px rgba(15,118,110,0.24);
+                box-shadow: 0 18px 42px rgba(15,118,110,0.25);
             }
 
             .splash-title {
                 color: var(--text);
-                font-size: 2.4rem;
+                font-size: 2.6rem;
                 font-weight: 900;
-                letter-spacing: -0.04em;
+                letter-spacing: -0.05em;
                 margin: 0;
             }
 
             .splash-copy {
                 color: var(--muted);
                 font-size: 1.02rem;
-                margin-top: 0.55rem;
-                line-height: 1.6;
+                line-height: 1.65;
+                margin: 0.6rem auto 0 auto;
+                max-width: 520px;
             }
 
-            .divider-space {
-                height: 0.65rem;
+            .splash-tag {
+                display: inline-block;
+                margin-top: 1rem;
+                padding: 0.4rem 0.75rem;
+                border-radius: 999px;
+                background: rgba(15,118,110,0.08);
+                border: 1px solid rgba(15,118,110,0.12);
+                color: var(--primary);
+                font-size: 0.82rem;
+                font-weight: 800;
+            }
+
+            @keyframes fadeUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(12px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
             }
         </style>
         """,
@@ -305,176 +342,188 @@ def inject_css() -> None:
     )
 
 
-def show_splash_screen() -> None:
-    splash = st.empty()
-    with splash.container():
+# -------------------------------------------------
+# Reusable HTML blocks
+# -------------------------------------------------
+def render_stat(value, label):
+    st.markdown(
+        f"""
+        <div class="stat">
+            <div class="stat-value">{value}</div>
+            <div class="stat-label">{label}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_card(title, body):
+    st.markdown(
+        f"""
+        <div class="card">
+            <h3>{title}</h3>
+            <p>{body}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# -------------------------------------------------
+# Splash screen
+# -------------------------------------------------
+def render_splash():
+    st.markdown(
+        f"""
+        <div class="splash-shell">
+            <div class="splash-card">
+                <div class="splash-logo">VW</div>
+                <div class="splash-title">{APP_NAME}</div>
+                <div class="splash-copy">
+                    {APP_TAGLINE}<br>
+                    A streamlined sustainable finance experience for building portfolios
+                    around both risk appetite and ESG priorities.
+                </div>
+                <div class="splash-tag">Professional • Personalised • ESG-aware</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    left, centre, right = st.columns([1.2, 1, 1.2])
+    with centre:
+        st.button(
+            "Enter App",
+            type="primary",
+            use_container_width=True,
+            on_click=enter_home,
+        )
+
+    st.stop()
+
+
+# -------------------------------------------------
+# Homepage
+# -------------------------------------------------
+def render_home():
+    st.markdown(
+        f"""
+        <div class="brand-row">
+            <div class="logo-box">VW</div>
+            <div>
+                <p class="brand-title">{APP_NAME}</p>
+                <p class="brand-subtitle">{APP_TAGLINE}</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    left, right = st.columns([1.35, 0.65], gap="large")
+
+    with left:
         st.markdown(
-            f"""
-            <div class="splash-wrap">
-                <div class="splash-card">
-                    <div class="splash-logo">VW</div>
-                    <div class="splash-title">{APP_NAME}</div>
-                    <div class="splash-copy">{APP_TAGLINE}</div>
+            """
+            <div class="hero">
+                <div class="badge">Personalised sustainable investing</div>
+                <h1>Build an investment portfolio that reflects both financial goals and ESG values.</h1>
+                <p>
+                    This app gives users a clean, premium path into portfolio construction.
+                    The homepage stays focused on brand, trust, and clarity, while the next screen
+                    handles risk profiling and sustainability preferences.
+                </p>
+                <div class="pill-row">
+                    <span class="pill">Risk-aware design</span>
+                    <span class="pill">ESG-integrated approach</span>
+                    <span class="pill">Clear user flow</span>
+                    <span class="pill">Optimiser-ready structure</span>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-    time.sleep(1.6)
-    st.session_state["launch_screen_shown"] = True
-    st.rerun()
 
+    with right:
+        render_stat("Risk", "Aligned with investor profile")
+        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+        render_stat("ESG", "Reflects user priorities")
+        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+        render_stat("Build", "Dedicated next-step workflow")
 
-def navigate_to_builder() -> None:
-    try:
-        st.switch_page(TARGET_PAGE)
-    except Exception:
-        st.info(
-            f"Create a separate Streamlit page at `{TARGET_PAGE}` to enable direct navigation "
-            "from this homepage."
+    st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="section-label">Why this app</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">A homepage designed for trust, clarity, and momentum</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="section-copy">Keep the landing screen clean. Explain the product quickly. Then move the user straight into the portfolio-building journey.</div>',
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3, gap="large")
+    with c1:
+        render_card(
+            "Professional first impression",
+            "A polished launch experience that feels like a serious fintech product."
+        )
+    with c2:
+        render_card(
+            "Streamlined architecture",
+            "No forms or inputs on the homepage. All user preferences belong on the builder page."
+        )
+    with c3:
+        render_card(
+            "Clear transition to action",
+            "A single, prominent CTA sends users into the portfolio construction flow."
         )
 
+    st.markdown("<div style='height:1.4rem;'></div>", unsafe_allow_html=True)
 
-def info_card(title: str, body: str) -> str:
-    return f"""
-    <div class="glass-card">
-        <h3>{title}</h3>
-        <p>{body}</p>
-    </div>
-    """
+    cta_left, cta_right = st.columns([1.15, 0.85], gap="large")
 
+    with cta_left:
+        st.markdown(
+            """
+            <div class="cta-panel">
+                <div class="section-label">Build your portfolio</div>
+                <h2 class="cta-title">Start the guided portfolio creation journey</h2>
+                <p class="cta-copy">
+                    Continue to the next screen to enter investment goals, risk appetite,
+                    and ESG preferences in a dedicated, focused workflow.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-def mini_stat(value: str, label: str) -> str:
-    return f"""
-    <div class="mini-stat">
-        <div class="mini-stat-value">{value}</div>
-        <div class="mini-stat-label">{label}</div>
-    </div>
-    """
+    with cta_right:
+        st.write("")
+        st.write("")
+        if st.button("Build Your Portfolio", type="primary", use_container_width=True):
+            go_to_builder()
+
+        # Optional secondary link fallback
+        try:
+            st.page_link(
+                TARGET_PAGE,
+                label="Open portfolio builder",
+                icon="→",
+                use_container_width=True,
+            )
+        except Exception:
+            pass
 
 
 # -------------------------------------------------
-# App
+# Run
 # -------------------------------------------------
 init_session_state()
 inject_css()
 
-if not st.session_state["launch_screen_shown"]:
-    show_splash_screen()
+if not st.session_state.entered_home:
+    render_splash()
 
-# Top brand bar
-st.markdown(
-    f"""
-    <div class="brand-bar">
-        <div class="brand-mark">VW</div>
-        <div>
-            <p class="brand-name">{APP_NAME}</p>
-            <p class="brand-sub">{APP_TAGLINE}</p>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Hero section
-left, right = st.columns([1.35, 0.65], gap="large")
-
-with left:
-    st.markdown(
-        """
-        <div class="hero">
-            <div class="hero-badge">Personalised sustainable investing</div>
-            <h1>Build an investment portfolio that reflects both financial goals and ESG priorities.</h1>
-            <p>
-                A modern portfolio experience that helps users move from intention to action.
-                The app combines risk-aware portfolio construction with sustainability preferences,
-                delivering a more personal and transparent investment journey.
-            </p>
-            <div class="hero-pills">
-                <span class="pill">Risk-aware allocation</span>
-                <span class="pill">ESG-integrated design</span>
-                <span class="pill">Professional user flow</span>
-                <span class="pill">Optimiser-ready architecture</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with right:
-    st.markdown(mini_stat("Risk", "Tailored to user profile"), unsafe_allow_html=True)
-    st.markdown('<div class="divider-space"></div>', unsafe_allow_html=True)
-    st.markdown(mini_stat("ESG", "Aligned with user values"), unsafe_allow_html=True)
-    st.markdown('<div class="divider-space"></div>', unsafe_allow_html=True)
-    st.markdown(mini_stat("Flow", "Clear handoff to portfolio builder"), unsafe_allow_html=True)
-
-st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
-
-# Feature section
-st.markdown('<div class="section-label">Why this app</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-title">A homepage built for clarity, trust, and momentum</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-subtitle">The landing experience stays focused: explain the product, establish credibility, and move the user directly into the portfolio-building journey.</div>',
-    unsafe_allow_html=True,
-)
-
-c1, c2, c3 = st.columns(3, gap="large")
-with c1:
-    st.markdown(
-        info_card(
-            "Professional first impression",
-            "A polished, brand-led interface that feels like a real fintech product rather than a classroom prototype."
-        ),
-        unsafe_allow_html=True,
-    )
-with c2:
-    st.markdown(
-        info_card(
-            "Streamlined user journey",
-            "The homepage avoids clutter and keeps data entry off the landing screen, improving focus and usability."
-        ),
-        unsafe_allow_html=True,
-    )
-with c3:
-    st.markdown(
-        info_card(
-            "Clear transition to action",
-            "Users are guided into a dedicated portfolio builder screen where preferences and risk inputs can be collected cleanly."
-        ),
-        unsafe_allow_html=True,
-    )
-
-st.markdown("<div style='height: 1.4rem;'></div>", unsafe_allow_html=True)
-
-# Build your portfolio CTA
-cta_left, cta_right = st.columns([1.15, 0.85], gap="large")
-
-with cta_left:
-    st.markdown(
-        """
-        <div class="cta-panel">
-            <div class="section-label">Build your portfolio</div>
-            <h2 class="cta-title">Start the guided portfolio creation journey</h2>
-            <p class="cta-copy">
-                Continue to the next screen to define investment objectives, risk appetite,
-                and sustainability preferences. This keeps the homepage clean while preserving
-                a premium user experience.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with cta_right:
-    st.write("")
-    st.write("")
-    if st.button("Build Your Portfolio", type="primary", use_container_width=True):
-        navigate_to_builder()
-
-    st.caption("This button should open your separate portfolio-builder page.")
-
-# Optional subtle page link if supported by your Streamlit version
-try:
-    st.page_link(TARGET_PAGE, label="Open portfolio builder page", icon="→")
-except Exception:
-    pass
+render_home()
