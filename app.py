@@ -22,7 +22,7 @@ APP_TAGLINE = "Sustainable investing, built around you."
 def init_session_state() -> None:
     defaults = {
         "show_splash": True,
-        "current_view": "home",   # home | recommendation | builder
+        "current_view": "home",  # home | recommendation | builder
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -42,7 +42,7 @@ def open_recommendation() -> None:
 
 
 # -------------------------------------------------
-# Styling
+# Global styling
 # -------------------------------------------------
 def inject_css() -> None:
     st.markdown(
@@ -51,7 +51,7 @@ def inject_css() -> None:
             :root {
                 --bg1: #f7fbfa;
                 --bg2: #eef6f4;
-                --card: rgba(255,255,255,0.92);
+                --card: rgba(255,255,255,0.94);
                 --card-strong: rgba(255,255,255,0.98);
                 --text: #0f172a;
                 --muted: #475569;
@@ -115,7 +115,7 @@ def inject_css() -> None:
             }
 
             .hero {
-                background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.86));
+                background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88));
                 border: 1px solid rgba(255,255,255,0.7);
                 border-radius: 26px;
                 padding: 2.2rem 2rem;
@@ -273,91 +273,85 @@ def inject_css() -> None:
             }
 
             .builder-shell {
-                background: rgba(255,255,255,0.96);
+                background: rgba(255,255,255,0.98);
                 border: 1px solid rgba(15,23,42,0.06);
                 border-radius: 24px;
                 padding: 1.45rem;
                 box-shadow: var(--shadow-soft);
             }
 
-            .builder-heading {
+            .builder-title {
                 color: #000000;
                 font-size: 2rem;
                 font-weight: 850;
                 letter-spacing: -0.03em;
-                margin-bottom: 0.2rem;
+                margin: 0 0 0.2rem 0;
             }
 
-            .builder-subheading {
+            .builder-subtitle {
                 color: #000000;
                 font-size: 1rem;
-                margin-bottom: 1.2rem;
+                line-height: 1.6;
+                margin: 0 0 1.2rem 0;
+            }
+
+            .builder-section-label {
+                color: #0f766e;
+                font-size: 0.78rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                margin-bottom: 0.3rem;
             }
 
             .builder-section-title {
                 color: #000000;
-                font-size: 1.08rem;
+                font-size: 1.05rem;
                 font-weight: 800;
-                margin-top: 0.5rem;
-                margin-bottom: 0.75rem;
+                margin: 0.2rem 0 0.85rem 0;
             }
 
-            /* Make builder text clearly visible */
-            .builder-shell p,
-            .builder-shell h1,
-            .builder-shell h2,
-            .builder-shell h3,
-            .builder-shell h4,
-            .builder-shell h5,
-            .builder-shell h6,
-            .builder-shell label,
-            .builder-shell span,
-            .builder-shell div {
-                color: #000000;
-            }
-
-            .builder-shell [data-testid="stWidgetLabel"] p,
-            .builder-shell [data-testid="stMarkdownContainer"] p,
-            .builder-shell .stCaption,
-            .builder-shell .stRadio p,
-            .builder-shell .stSlider p {
-                color: #000000 !important;
-            }
-
-            .builder-shell input,
-            .builder-shell textarea {
-                color: #000000 !important;
-            }
-
-            .builder-shell .stNumberInput input,
-            .builder-shell .stTextInput input {
-                color: #000000 !important;
-            }
-
-            .minimal-divider {
+            .builder-divider {
                 height: 1px;
-                background: rgba(15,23,42,0.06);
-                margin: 1rem 0 1.2rem 0;
+                background: rgba(15, 23, 42, 0.08);
+                margin: 1.1rem 0 1.2rem 0;
                 border-radius: 999px;
             }
 
-            .metric-card {
-                background: #ffffff;
-                border: 1px solid rgba(15,23,42,0.06);
-                border-radius: 16px;
-                padding: 0.95rem 1rem;
+            .builder-note {
+                color: #334155;
+                font-size: 0.93rem;
+                line-height: 1.55;
+                margin-top: 0.25rem;
+                margin-bottom: 0.25rem;
             }
 
-            .metric-card-title {
+            .metric-tile {
+                background: #ffffff;
+                border: 1px solid rgba(15, 23, 42, 0.07);
+                border-radius: 16px;
+                padding: 0.95rem 1rem;
+                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+            }
+
+            .metric-tile-label {
                 color: #64748b;
-                font-size: 0.85rem;
+                font-size: 0.84rem;
                 margin-bottom: 0.3rem;
             }
 
-            .metric-card-value {
+            .metric-tile-value {
                 color: #000000;
-                font-weight: 800;
                 font-size: 1.2rem;
+                font-weight: 800;
+                line-height: 1.2;
+            }
+
+            .chart-title {
+                color: #000000;
+                font-size: 1rem;
+                font-weight: 800;
+                margin: 0.5rem 0 0.85rem 0;
             }
 
             .splash-overlay {
@@ -442,6 +436,115 @@ def inject_css() -> None:
                 0% { opacity: 1; visibility: visible; }
                 99% { opacity: 0; visibility: visible; }
                 100% { opacity: 0; visibility: hidden; }
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# -------------------------------------------------
+# Builder-specific black text CSS
+# -------------------------------------------------
+def inject_builder_black_text_css() -> None:
+    st.markdown(
+        """
+        <style>
+            /* Force all builder screen text to black */
+            .stApp,
+            .stApp p,
+            .stApp span,
+            .stApp label,
+            .stApp div,
+            .stApp h1,
+            .stApp h2,
+            .stApp h3,
+            .stApp h4,
+            .stApp h5,
+            .stApp h6,
+            .stApp li {
+                color: #000000;
+            }
+
+            [data-testid="stWidgetLabel"] p,
+            [data-testid="stWidgetLabel"] label,
+            .stRadio label,
+            .stSlider label,
+            .stTextInput label,
+            .stNumberInput label,
+            .stSelectbox label,
+            .stMultiSelect label,
+            .stCheckbox label,
+            .stMarkdown p,
+            .stCaption,
+            small {
+                color: #000000 !important;
+            }
+
+            .stRadio p,
+            .stSlider p,
+            .stRadio span,
+            .stSlider span {
+                color: #000000 !important;
+            }
+
+            input,
+            textarea,
+            [data-baseweb="input"] input,
+            [data-baseweb="textarea"] textarea {
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+            }
+
+            .stNumberInput input,
+            .stTextInput input {
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+            }
+
+            div[data-testid="stForm"] {
+                background: #ffffff;
+                border: 1px solid rgba(15, 23, 42, 0.08);
+                border-radius: 22px;
+                padding: 1.15rem 1.15rem 0.8rem 1.15rem;
+                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+            }
+
+            div[data-testid="stForm"] p,
+            div[data-testid="stForm"] span,
+            div[data-testid="stForm"] label,
+            div[data-testid="stForm"] div,
+            div[data-testid="stForm"] h1,
+            div[data-testid="stForm"] h2,
+            div[data-testid="stForm"] h3 {
+                color: #000000 !important;
+            }
+
+            [data-testid="stAlert"] *,
+            [data-testid="stNotification"] * {
+                color: #000000 !important;
+            }
+
+            [data-testid="metric-container"] *,
+            [data-testid="stMarkdownContainer"] * {
+                color: #000000;
+            }
+
+            div.stButton > button {
+                color: #000000 !important;
+                border: 1px solid rgba(15, 23, 42, 0.10) !important;
+                border-radius: 14px !important;
+                font-weight: 800 !important;
+                min-height: 3.05rem !important;
+            }
+
+            .builder-title,
+            .builder-subtitle,
+            .builder-section-title,
+            .metric-tile-label,
+            .metric-tile-value,
+            .chart-title {
+                color: #000000 !important;
             }
         </style>
         """,
@@ -616,20 +719,26 @@ def render_home() -> None:
 
 
 # -------------------------------------------------
-# Recommendation placeholder
+# Recommendation screen
 # -------------------------------------------------
 def render_recommendation_screen() -> None:
-    col_back, col_title = st.columns([0.16, 0.84])
+    col_back, col_main = st.columns([0.16, 0.84])
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
     st.markdown('<div class="builder-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="builder-heading">Portfolio Recommendation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="builder-section-label">Portfolio recommendation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="builder-title">Recommended portfolio workflow</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="builder-subheading">This area is ready for your recommended-public-companies workflow.</div>',
+        """
+        <div class="builder-subtitle">
+            This area is ready for your recommended public companies workflow.
+            You can connect a curated ESG-screened asset universe here.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
-    st.info("You can connect your recommendation engine here.")
+    st.info("Recommendation engine placeholder.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -637,46 +746,67 @@ def render_recommendation_screen() -> None:
 # Builder screen
 # -------------------------------------------------
 def render_builder_screen() -> None:
-    col_back, col_title = st.columns([0.16, 0.84])
+    inject_builder_black_text_css()
+
+    def result_tile(label: str, value: str) -> str:
+        return f"""
+        <div class="metric-tile">
+            <div class="metric-tile-label">{label}</div>
+            <div class="metric-tile-value">{value}</div>
+        </div>
+        """
+
+    col_back, col_main = st.columns([0.14, 0.86])
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
     st.markdown('<div class="builder-shell">', unsafe_allow_html=True)
-
+    st.markdown('<div class="builder-section-label">Portfolio builder</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="builder-heading">Build Your Portfolio Based on Your ESG Preferences</div>',
+        '<div class="builder-title">Build your portfolio based on your ESG preferences</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="builder-subheading">Enter your inputs below to generate a clean ESG-aware portfolio recommendation.</div>',
+        """
+        <div class="builder-subtitle">
+            Create a simple ESG-aware portfolio recommendation using your asset assumptions,
+            risk tolerance, and sustainability preferences.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     with st.form("portfolio_builder_form", clear_on_submit=False):
-        st.markdown('<div class="builder-section-title">Portfolio setup</div>', unsafe_allow_html=True)
+        st.markdown('<div class="builder-section-label">Step 1</div>', unsafe_allow_html=True)
+        st.markdown('<div class="builder-section-title">Choose your setup</div>', unsafe_allow_html=True)
 
-        asset_choice = st.radio(
-            "Asset selection method",
-            ["Input my own assets", "Use recommended public companies"],
-            horizontal=True,
-        )
+        top_left, top_right = st.columns(2)
 
-        investment_priority = st.radio(
-            "Investment priority",
-            [
-                "Balanced return and sustainability",
-                "Prioritise financial growth",
-                "Prioritise sustainability",
-            ],
-            horizontal=True,
-        )
+        with top_left:
+            asset_choice = st.radio(
+                "Asset selection method",
+                ["Input my own assets", "Use recommended public companies"],
+                horizontal=True,
+            )
 
-        st.markdown('<div class="minimal-divider"></div>', unsafe_allow_html=True)
+        with top_right:
+            investment_priority = st.radio(
+                "Investment priority",
+                [
+                    "Balanced return and sustainability",
+                    "Prioritise financial growth",
+                    "Prioritise sustainability",
+                ],
+                horizontal=True,
+            )
+
+        st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
 
         if asset_choice == "Input my own assets":
-            st.markdown('<div class="builder-section-title">Asset details</div>', unsafe_allow_html=True)
+            st.markdown('<div class="builder-section-label">Step 2</div>', unsafe_allow_html=True)
+            st.markdown('<div class="builder-section-title">Enter asset assumptions</div>', unsafe_allow_html=True)
 
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2, gap="large")
 
             with col1:
                 asset1 = st.text_input("Asset 1 name", value="Asset 1")
@@ -726,53 +856,68 @@ def render_builder_screen() -> None:
                     step=1.0,
                 )
 
-            st.markdown('<div class="minimal-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-title">Risk and ESG preferences</div>', unsafe_allow_html=True)
+            st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
 
-            correlation = st.slider(
-                f"Correlation between {asset1} and {asset2}",
-                min_value=-1.0,
-                max_value=1.0,
-                value=0.30,
-                step=0.01,
-            )
+            st.markdown('<div class="builder-section-label">Step 3</div>', unsafe_allow_html=True)
+            st.markdown('<div class="builder-section-title">Set portfolio preferences</div>', unsafe_allow_html=True)
 
-            risk_free_rate = st.number_input(
-                "Risk-free rate (%)",
-                min_value=0.0,
-                max_value=20.0,
-                value=4.84,
-                step=0.01,
-            )
+            pref_left, pref_right = st.columns(2, gap="large")
 
-            risk_tolerance = st.slider(
-                "Risk tolerance",
-                min_value=1,
-                max_value=10,
-                value=5,
-            )
+            with pref_left:
+                correlation = st.slider(
+                    f"Correlation between {asset1} and {asset2}",
+                    min_value=-1.0,
+                    max_value=1.0,
+                    value=0.30,
+                    step=0.01,
+                )
 
-            esg_preference_label = st.radio(
-                "How important is ESG when choosing investments?",
-                ["Not important", "Somewhat important", "Very important"],
-                horizontal=True,
-            )
+                risk_free_rate = st.number_input(
+                    "Risk-free rate (%)",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=4.84,
+                    step=0.01,
+                )
 
-            lambda_map = {
-                "Not important": 0.00,
-                "Somewhat important": 0.05,
-                "Very important": 0.10,
-            }
+                risk_tolerance = st.slider(
+                    "Risk tolerance",
+                    min_value=1,
+                    max_value=10,
+                    value=5,
+                )
 
-            default_lambda = lambda_map[esg_preference_label]
+            with pref_right:
+                esg_preference_label = st.radio(
+                    "How important is ESG when choosing investments?",
+                    ["Not important", "Somewhat important", "Very important"],
+                    horizontal=True,
+                )
 
-            esg_slider = st.slider(
-                "ESG preference weight",
-                min_value=0.00,
-                max_value=0.10,
-                value=float(default_lambda),
-                step=0.01,
-            )
+                lambda_map = {
+                    "Not important": 0.00,
+                    "Somewhat important": 0.05,
+                    "Very important": 0.10,
+                }
+                default_lambda = lambda_map[esg_preference_label]
+
+                esg_slider = st.slider(
+                    "ESG preference weight",
+                    min_value=0.00,
+                    max_value=0.10,
+                    value=float(default_lambda),
+                    step=0.01,
+                )
+
+                st.markdown(
+                    """
+                    <div class="builder-note">
+                        Higher ESG weight increases the influence of sustainability scores
+                        in the portfolio recommendation.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
             run_optimiser = st.form_submit_button(
                 "Generate portfolio recommendation",
@@ -781,12 +926,21 @@ def render_builder_screen() -> None:
             )
 
         else:
-            st.info("Recommended public companies mode can be connected to your curated ESG universe next.")
+            st.markdown(
+                """
+                <div class="builder-note">
+                    Recommended public companies mode can be connected next to a curated ESG-screened universe.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
             run_optimiser = st.form_submit_button(
                 "Continue",
                 type="primary",
                 use_container_width=True,
             )
+
             asset1 = asset2 = ""
             exp_return1 = exp_return2 = 0.0
             std_dev1 = std_dev2 = 0.0
@@ -809,7 +963,23 @@ def render_builder_screen() -> None:
         if s1 < 0 or s2 < 0:
             st.error("Standard deviations must be non-negative.")
         else:
-            gamma = 11 - risk_tolerance
+            base_gamma = 11 - risk_tolerance
+
+            priority_gamma_adjustment = {
+                "Balanced return and sustainability": 0,
+                "Prioritise financial growth": -2,
+                "Prioritise sustainability": 1,
+            }
+
+            priority_esg_adjustment = {
+                "Balanced return and sustainability": 0.00,
+                "Prioritise financial growth": 0.00,
+                "Prioritise sustainability": 0.03,
+            }
+
+            gamma = max(1, base_gamma + priority_gamma_adjustment[investment_priority])
+            effective_esg_weight = min(0.15, esg_slider + priority_esg_adjustment[investment_priority])
+
             weights = np.linspace(0, 1, 500)
 
             portfolio_returns = []
@@ -830,7 +1000,7 @@ def render_builder_screen() -> None:
                 port_risk = np.sqrt(max(port_variance, 0))
                 port_esg = w1 * esg1 + w2 * esg2
                 sharpe = (port_return - rf) / port_risk if port_risk > 0 else 0.0
-                utility = port_return - 0.5 * gamma * port_variance + esg_slider * port_esg
+                utility = port_return - 0.5 * gamma * port_variance + effective_esg_weight * port_esg
 
                 portfolio_returns.append(port_return)
                 portfolio_risks.append(port_risk)
@@ -847,80 +1017,33 @@ def render_builder_screen() -> None:
             max_sharpe_idx = np.argmax(portfolio_sharpes)
             optimal_idx = np.argmax(portfolio_utility)
 
-            st.markdown('<div class="minimal-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-title">Portfolio recommendation</div>', unsafe_allow_html=True)
-
             opt_w1 = weights[optimal_idx]
             opt_w2 = 1 - opt_w1
 
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-card-title">{asset1} weight</div>
-                        <div class="metric-card-value">{opt_w1:.2%}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with m2:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-card-title">{asset2} weight</div>
-                        <div class="metric-card-value">{opt_w2:.2%}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with m3:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-card-title">Sharpe ratio</div>
-                        <div class="metric-card-value">{portfolio_sharpes[optimal_idx]:.2f}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="builder-section-label">Recommendation</div>', unsafe_allow_html=True)
+            st.markdown('<div class="builder-section-title">Your ESG-aware portfolio outcome</div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+            row1_col1, row1_col2, row1_col3 = st.columns(3)
+            with row1_col1:
+                st.markdown(result_tile(f"{asset1} weight", f"{opt_w1:.2%}"), unsafe_allow_html=True)
+            with row1_col2:
+                st.markdown(result_tile(f"{asset2} weight", f"{opt_w2:.2%}"), unsafe_allow_html=True)
+            with row1_col3:
+                st.markdown(result_tile("Sharpe ratio", f"{portfolio_sharpes[optimal_idx]:.2f}"), unsafe_allow_html=True)
 
-            m4, m5, m6 = st.columns(3)
-            with m4:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-card-title">Expected return</div>
-                        <div class="metric-card-value">{portfolio_returns[optimal_idx]:.2%}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with m5:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-card-title">Portfolio risk</div>
-                        <div class="metric-card-value">{portfolio_risks[optimal_idx]:.2%}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with m6:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-card-title">Portfolio ESG score</div>
-                        <div class="metric-card-value">{portfolio_esg[optimal_idx] * 100:.2f}/100</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
 
-            st.markdown('<div class="minimal-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-title">Efficient frontier</div>', unsafe_allow_html=True)
+            row2_col1, row2_col2, row2_col3 = st.columns(3)
+            with row2_col1:
+                st.markdown(result_tile("Expected return", f"{portfolio_returns[optimal_idx]:.2%}"), unsafe_allow_html=True)
+            with row2_col2:
+                st.markdown(result_tile("Portfolio risk", f"{portfolio_risks[optimal_idx]:.2%}"), unsafe_allow_html=True)
+            with row2_col3:
+                st.markdown(result_tile("Portfolio ESG score", f"{portfolio_esg[optimal_idx] * 100:.2f}/100"), unsafe_allow_html=True)
+
+            st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">Efficient frontier</div>', unsafe_allow_html=True)
 
             fig, ax = plt.subplots(figsize=(10, 6))
             scatter = ax.scatter(
@@ -951,11 +1074,10 @@ def render_builder_screen() -> None:
 
             cbar = plt.colorbar(scatter, ax=ax)
             cbar.set_label("Portfolio ESG Score")
-
             st.pyplot(fig)
             plt.close(fig)
 
-            st.markdown('<div class="builder-section-title">Sensitivity to ESG preference</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">Sensitivity to ESG preference</div>', unsafe_allow_html=True)
 
             lambdas = np.linspace(0.00, 0.10, 50)
             optimal_w1_list = []
@@ -987,7 +1109,7 @@ def render_builder_screen() -> None:
 
 
 # -------------------------------------------------
-# Router
+# App router
 # -------------------------------------------------
 init_session_state()
 inject_css()
