@@ -1,4 +1,6 @@
 import streamlit as st
+import numpy as np
+import matplotlib.pyplot as plt
 
 # -------------------------------------------------
 # Page config
@@ -13,10 +15,6 @@ st.set_page_config(
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
 
-# Update these to match your actual Streamlit page filenames
-RECOMMENDATION_PAGE = "pages/1_Portfolio_Recommendation.py"
-BUILDER_PAGE = "pages/2_Build_Your_Portfolio.py"
-
 
 # -------------------------------------------------
 # Session state
@@ -24,31 +22,23 @@ BUILDER_PAGE = "pages/2_Build_Your_Portfolio.py"
 def init_session_state() -> None:
     defaults = {
         "show_splash": True,
+        "current_view": "home",   # home | recommendation | builder
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 
-# -------------------------------------------------
-# Navigation
-# -------------------------------------------------
-def go_to_recommendation() -> None:
-    try:
-        st.switch_page(RECOMMENDATION_PAGE)
-    except Exception:
-        st.warning(
-            f"Create a page at '{RECOMMENDATION_PAGE}' so this button can open your recommendation screen."
-        )
+def open_home() -> None:
+    st.session_state["current_view"] = "home"
 
 
-def go_to_builder() -> None:
-    try:
-        st.switch_page(BUILDER_PAGE)
-    except Exception:
-        st.warning(
-            f"Create a page at '{BUILDER_PAGE}' so this button can open your portfolio builder."
-        )
+def open_builder() -> None:
+    st.session_state["current_view"] = "builder"
+
+
+def open_recommendation() -> None:
+    st.session_state["current_view"] = "recommendation"
 
 
 # -------------------------------------------------
@@ -61,7 +51,7 @@ def inject_css() -> None:
             :root {
                 --bg1: #f7fbfa;
                 --bg2: #eef6f4;
-                --card: rgba(255,255,255,0.86);
+                --card: rgba(255,255,255,0.88);
                 --card-strong: rgba(255,255,255,0.96);
                 --text: #0f172a;
                 --muted: #475569;
@@ -283,6 +273,15 @@ def inject_css() -> None:
                 border: none;
             }
 
+            .builder-shell {
+                background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,255,255,0.84));
+                border: 1px solid rgba(255,255,255,0.68);
+                border-radius: 28px;
+                padding: 1.5rem;
+                box-shadow: var(--shadow);
+                backdrop-filter: blur(8px);
+            }
+
             .splash-overlay {
                 position: fixed;
                 inset: 0;
@@ -295,6 +294,7 @@ def inject_css() -> None:
                     radial-gradient(circle at top right, rgba(15,118,110,0.10), transparent 24%),
                     linear-gradient(180deg, #f7fbfa 0%, #f3f7fb 100%);
                 animation: overlayFadeOut 0.9s ease 2s forwards;
+                pointer-events: none;
             }
 
             .splash-card {
@@ -351,44 +351,19 @@ def inject_css() -> None:
             }
 
             @keyframes brandFadeOut {
-                0% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                    filter: blur(0px);
-                }
-                100% {
-                    opacity: 0;
-                    transform: translateY(-12px) scale(0.97);
-                    filter: blur(3px);
-                }
+                0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+                100% { opacity: 0; transform: translateY(-12px) scale(0.97); filter: blur(3px); }
             }
 
             @keyframes copyFadeOut {
-                0% {
-                    opacity: 1;
-                    transform: translateY(0);
-                    filter: blur(0px);
-                }
-                100% {
-                    opacity: 0;
-                    transform: translateY(-8px);
-                    filter: blur(2px);
-                }
+                0% { opacity: 1; transform: translateY(0); filter: blur(0px); }
+                100% { opacity: 0; transform: translateY(-8px); filter: blur(2px); }
             }
 
             @keyframes overlayFadeOut {
-                0% {
-                    opacity: 1;
-                    visibility: visible;
-                }
-                99% {
-                    opacity: 0;
-                    visibility: visible;
-                }
-                100% {
-                    opacity: 0;
-                    visibility: hidden;
-                }
+                0% { opacity: 1; visibility: visible; }
+                99% { opacity: 0; visibility: visible; }
+                100% { opacity: 0; visibility: hidden; }
             }
         </style>
         """,
@@ -397,8 +372,28 @@ def inject_css() -> None:
 
 
 # -------------------------------------------------
-# Reusable sections
+# Shared UI blocks
 # -------------------------------------------------
+def render_splash_overlay() -> None:
+    st.markdown(
+        f"""
+        <div class="splash-overlay">
+            <div class="splash-card">
+                <div class="splash-logo">VW</div>
+                <div class="splash-title">{APP_NAME}</div>
+                <div class="splash-copy">
+                    {APP_TAGLINE}<br>
+                    A streamlined sustainable finance experience built around
+                    financial risk and ESG priorities.
+                </div>
+                <div class="splash-tag">Professional • Personalised • ESG-aware</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_stat(value: str, label: str) -> None:
     st.markdown(
         f"""
@@ -417,26 +412,6 @@ def render_card(title: str, body: str) -> None:
         <div class="card">
             <h3>{title}</h3>
             <p>{body}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_splash_overlay() -> None:
-    st.markdown(
-        f"""
-        <div class="splash-overlay">
-            <div class="splash-card">
-                <div class="splash-logo">VW</div>
-                <div class="splash-title">{APP_NAME}</div>
-                <div class="splash-copy">
-                    {APP_TAGLINE}<br>
-                    A streamlined sustainable finance experience built around
-                    financial risk and ESG priorities.
-                </div>
-                <div class="splash-tag">Professional • Personalised • ESG-aware</div>
-            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -515,17 +490,17 @@ def render_home() -> None:
     with c1:
         render_card(
             "Environmental (E)",
-            "Environmental factors consider how investments interact with climate risk, carbon emissions, resource use, pollution, and wider ecological sustainability."
+            "Environmental factors consider climate risk, carbon emissions, resource use, pollution, and broader ecological sustainability."
         )
     with c2:
         render_card(
             "Social (S)",
-            "Social factors focus on how organisations treat people, including labour standards, diversity and inclusion, community impact, health, safety, and human rights."
+            "Social factors focus on how organisations treat people, including labour standards, diversity, community impact, health, safety, and human rights."
         )
     with c3:
         render_card(
             "Governance (G)",
-            "Governance factors examine how organisations are led, including board quality, executive accountability, shareholder rights, transparency, and ethical decision-making."
+            "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights."
         )
 
     st.markdown("<div style='height:1.4rem;'></div>", unsafe_allow_html=True)
@@ -548,21 +523,294 @@ def render_home() -> None:
         )
 
     with cta_right:
-        if st.button("Give me a portfolio recommendation", type="primary", use_container_width=True):
-            go_to_recommendation()
+        st.button(
+            "Give me a portfolio recommendation",
+            type="primary",
+            use_container_width=True,
+            on_click=open_recommendation,
+        )
 
         st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-        if st.button("Build your portfolio based on your ESG preferences", use_container_width=True):
-            go_to_builder()
+        st.button(
+            "Build your portfolio based on your ESG preferences",
+            use_container_width=True,
+            on_click=open_builder,
+        )
 
 
 # -------------------------------------------------
-# Run app
+# Recommendation placeholder
+# -------------------------------------------------
+def render_recommendation_screen() -> None:
+    top_left, top_right = st.columns([0.2, 0.8])
+    with top_left:
+        st.button("← Back", on_click=open_home, use_container_width=True)
+
+    st.markdown('<div class="builder-shell">', unsafe_allow_html=True)
+    st.title("Portfolio Recommendation")
+    st.info(
+        "This screen is ready for your recommended-public-companies workflow. "
+        "You can connect your recommendation engine here."
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# -------------------------------------------------
+# Builder screen with embedded optimiser
+# -------------------------------------------------
+def render_builder_screen() -> None:
+    top_left, top_right = st.columns([0.2, 0.8])
+    with top_left:
+        st.button("← Back", on_click=open_home, use_container_width=True)
+
+    st.markdown('<div class="builder-shell">', unsafe_allow_html=True)
+    st.title("Build Your Portfolio Based on Your ESG Preferences")
+    st.caption("Enter your assets and preferences to generate an ESG-aware portfolio recommendation.")
+
+    asset_choice = st.radio(
+        "Would you like to input your own assets or receive portfolio recommendations based on publicly listed companies?",
+        ["Input my own assets", "Use recommended public companies"],
+        horizontal=True,
+    )
+
+    st.subheader("Investment Priority")
+    investment_priority = st.radio(
+        "What is your investment priority?",
+        [
+            "Balanced return and sustainability",
+            "Prioritise financial growth",
+            "Prioritise sustainability",
+        ],
+        horizontal=True,
+    )
+
+    if asset_choice == "Input my own assets":
+        with st.form("portfolio_builder_form", clear_on_submit=False):
+            st.subheader("Enter Your Assets")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                asset1 = st.text_input("Asset 1 name", value="Asset 1")
+                exp_return1 = st.number_input(f"{asset1} Expected Return (%)", min_value=0.0, max_value=100.0, value=8.0, step=0.1)
+                std_dev1 = st.number_input(f"{asset1} Standard Deviation (%)", min_value=0.0, max_value=100.0, value=15.0, step=0.1)
+                esg_score1 = st.number_input(f"{asset1} ESG Score (0–100)", min_value=0.0, max_value=100.0, value=70.0, step=1.0)
+
+            with col2:
+                asset2 = st.text_input("Asset 2 name", value="Asset 2")
+                exp_return2 = st.number_input(f"{asset2} Expected Return (%)", min_value=0.0, max_value=100.0, value=12.0, step=0.1)
+                std_dev2 = st.number_input(f"{asset2} Standard Deviation (%)", min_value=0.0, max_value=100.0, value=20.0, step=0.1)
+                esg_score2 = st.number_input(f"{asset2} ESG Score (0–100)", min_value=0.0, max_value=100.0, value=55.0, step=1.0)
+
+            st.subheader("Portfolio Inputs")
+            correlation = st.slider(
+                f"Correlation between {asset1} and {asset2}",
+                min_value=-1.0,
+                max_value=1.0,
+                value=0.30,
+                step=0.01,
+            )
+
+            risk_free_rate = st.number_input(
+                "Risk-free rate (%)",
+                min_value=0.0,
+                max_value=20.0,
+                value=4.84,
+                step=0.01,
+            )
+
+            st.caption(
+                "Default risk-free rate is set at 4.84%, using the UK 10-year government bond yield "
+                "as a proxy for a safe, long-term alternative."
+            )
+
+            st.subheader("Risk Tolerance")
+            risk_tolerance = st.slider(
+                "How would you describe your risk tolerance?",
+                min_value=1,
+                max_value=10,
+                value=5,
+            )
+
+            st.subheader("ESG Preference")
+            esg_preference_label = st.radio(
+                "How important is ESG when choosing your investments?",
+                ["Not important", "Somewhat important", "Very important"],
+                horizontal=True,
+            )
+
+            lambda_map = {
+                "Not important": 0.00,
+                "Somewhat important": 0.05,
+                "Very important": 0.10,
+            }
+            default_lambda = lambda_map[esg_preference_label]
+
+            esg_slider = st.slider(
+                "Adjust ESG preference weight",
+                min_value=0.00,
+                max_value=0.10,
+                value=float(default_lambda),
+                step=0.01,
+            )
+
+            run_optimiser = st.form_submit_button(
+                "Generate ESG-Aware Portfolio",
+                type="primary",
+                use_container_width=True,
+            )
+
+        if run_optimiser:
+            # Convert percentages to decimals
+            r1 = exp_return1 / 100
+            r2 = exp_return2 / 100
+            s1 = std_dev1 / 100
+            s2 = std_dev2 / 100
+            rho = correlation
+            rf = risk_free_rate / 100
+            esg1 = esg_score1 / 100
+            esg2 = esg_score2 / 100
+
+            if s1 < 0 or s2 < 0:
+                st.error("Standard deviations must be non-negative.")
+            else:
+                gamma = 11 - risk_tolerance
+                weights = np.linspace(0, 1, 500)
+
+                portfolio_returns = []
+                portfolio_risks = []
+                portfolio_esg = []
+                portfolio_sharpes = []
+                portfolio_utility = []
+
+                for w1 in weights:
+                    w2 = 1 - w1
+
+                    port_return = w1 * r1 + w2 * r2
+                    port_variance = (
+                        (w1 ** 2) * (s1 ** 2)
+                        + (w2 ** 2) * (s2 ** 2)
+                        + 2 * w1 * w2 * s1 * s2 * rho
+                    )
+                    port_risk = np.sqrt(max(port_variance, 0))
+                    port_esg = w1 * esg1 + w2 * esg2
+                    sharpe = (port_return - rf) / port_risk if port_risk > 0 else 0.0
+                    utility = port_return - 0.5 * gamma * port_variance + esg_slider * port_esg
+
+                    portfolio_returns.append(port_return)
+                    portfolio_risks.append(port_risk)
+                    portfolio_esg.append(port_esg)
+                    portfolio_sharpes.append(sharpe)
+                    portfolio_utility.append(utility)
+
+                portfolio_returns = np.array(portfolio_returns)
+                portfolio_risks = np.array(portfolio_risks)
+                portfolio_esg = np.array(portfolio_esg)
+                portfolio_sharpes = np.array(portfolio_sharpes)
+                portfolio_utility = np.array(portfolio_utility)
+
+                max_sharpe_idx = np.argmax(portfolio_sharpes)
+                optimal_idx = np.argmax(portfolio_utility)
+
+                st.subheader("Optimal Portfolio Based on Risk Tolerance and ESG Preference")
+
+                opt_w1 = weights[optimal_idx]
+                opt_w2 = 1 - opt_w1
+
+                m1, m2, m3 = st.columns(3)
+                m1.metric(f"{asset1} weight", f"{opt_w1:.2%}")
+                m2.metric(f"{asset2} weight", f"{opt_w2:.2%}")
+                m3.metric("Sharpe ratio", f"{portfolio_sharpes[optimal_idx]:.2f}")
+
+                m4, m5, m6 = st.columns(3)
+                m4.metric("Expected portfolio return", f"{portfolio_returns[optimal_idx]:.2%}")
+                m5.metric("Portfolio risk", f"{portfolio_risks[optimal_idx]:.2%}")
+                m6.metric("Portfolio ESG score", f"{portfolio_esg[optimal_idx] * 100:.2f}/100")
+
+                st.subheader("Efficient Frontier")
+                fig, ax = plt.subplots(figsize=(10, 6))
+                scatter = ax.scatter(
+                    portfolio_risks,
+                    portfolio_returns,
+                    c=portfolio_esg,
+                    cmap="viridis",
+                    s=18,
+                )
+                ax.scatter(
+                    portfolio_risks[max_sharpe_idx],
+                    portfolio_returns[max_sharpe_idx],
+                    marker="*",
+                    s=250,
+                    label="Max Sharpe Portfolio",
+                )
+                ax.scatter(
+                    portfolio_risks[optimal_idx],
+                    portfolio_returns[optimal_idx],
+                    marker="X",
+                    s=220,
+                    label="Optimal ESG-Aware Portfolio",
+                )
+
+                ax.set_xlabel("Portfolio Risk (Standard Deviation)")
+                ax.set_ylabel("Portfolio Expected Return")
+                ax.set_title("Efficient Frontier")
+                ax.legend()
+
+                cbar = plt.colorbar(scatter, ax=ax)
+                cbar.set_label("Portfolio ESG Score")
+
+                st.pyplot(fig)
+                plt.close(fig)
+
+                st.subheader("How the Optimal Portfolio Changes with ESG Preference")
+
+                lambdas = np.linspace(0.00, 0.10, 50)
+                optimal_w1_list = []
+                optimal_w2_list = []
+
+                for lam in lambdas:
+                    utilities = []
+                    for i, w1 in enumerate(weights):
+                        port_variance = portfolio_risks[i] ** 2
+                        u = portfolio_returns[i] - 0.5 * gamma * port_variance + lam * portfolio_esg[i]
+                        utilities.append(u)
+
+                    best_idx = np.argmax(utilities)
+                    optimal_w1_list.append(weights[best_idx])
+                    optimal_w2_list.append(1 - weights[best_idx])
+
+                fig2, ax2 = plt.subplots(figsize=(10, 6))
+                ax2.plot(lambdas, optimal_w1_list, label=f"{asset1} Weight")
+                ax2.plot(lambdas, optimal_w2_list, label=f"{asset2} Weight")
+                ax2.set_xlabel("ESG Preference Weight")
+                ax2.set_ylabel("Optimal Portfolio Weight")
+                ax2.set_title("Optimal Portfolio Weights as ESG Preference Changes")
+                ax2.legend()
+
+                st.pyplot(fig2)
+                plt.close(fig2)
+
+    else:
+        st.info(
+            "You can add your recommended public companies workflow here. "
+            "For example: select from a curated ESG-screened universe and pass those assets into the same optimiser."
+        )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# -------------------------------------------------
+# App router
 # -------------------------------------------------
 init_session_state()
 inject_css()
-render_home()
+
+if st.session_state["current_view"] == "builder":
+    render_builder_screen()
+elif st.session_state["current_view"] == "recommendation":
+    render_recommendation_screen()
+else:
+    render_home()
 
 if st.session_state["show_splash"]:
     render_splash_overlay()
