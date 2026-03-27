@@ -12,22 +12,24 @@ st.set_page_config(
 
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
-TARGET_PAGE = "pages/1_Build_Your_Portfolio.py"  # Change if your file name differs
+TARGET_PAGE = "pages/1_Build_Your_Portfolio.py"  # Update if your page name differs
 
 
 # -------------------------------------------------
-# State
+# Session state
 # -------------------------------------------------
 def init_session_state() -> None:
     defaults = {
-        "splash_complete": False,
-        "splash_cycle_started": False,
+        "show_splash": True,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 
+# -------------------------------------------------
+# Navigation
+# -------------------------------------------------
 def go_to_builder() -> None:
     try:
         st.switch_page(TARGET_PAGE)
@@ -69,6 +71,11 @@ def inject_css() -> None:
                 max-width: 1180px;
                 padding-top: 1.3rem;
                 padding-bottom: 2rem;
+            }
+
+            /* Optional: hide default multipage sidebar nav for cleaner UX */
+            [data-testid="stSidebarNav"] {
+                display: none;
             }
 
             .brand-row {
@@ -265,28 +272,30 @@ def inject_css() -> None:
                 border: none;
             }
 
-            .splash-shell {
-                min-height: 88vh;
+            /* Splash overlay */
+            .splash-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 9999;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                background:
+                    radial-gradient(circle at top left, rgba(20,184,166,0.14), transparent 28%),
+                    radial-gradient(circle at top right, rgba(15,118,110,0.10), transparent 24%),
+                    linear-gradient(180deg, #f7fbfa 0%, #f3f7fb 100%);
+                animation: overlayFadeOut 0.9s ease 2s forwards;
             }
 
             .splash-card {
-                width: min(720px, 100%);
                 text-align: center;
-                background: linear-gradient(135deg, rgba(255,255,255,0.93), rgba(255,255,255,0.80));
-                border: 1px solid rgba(255,255,255,0.72);
-                border-radius: 32px;
-                padding: 3rem 2rem 2.3rem 2rem;
-                box-shadow: var(--shadow);
-                backdrop-filter: blur(10px);
-                animation: fadeUp 0.55s ease;
+                padding: 2.5rem 2rem;
+                width: min(720px, 92vw);
             }
 
             .splash-logo {
-                width: 96px;
-                height: 96px;
+                width: 100px;
+                height: 100px;
                 border-radius: 28px;
                 background: linear-gradient(135deg, var(--primary), var(--primary-2));
                 color: white;
@@ -297,22 +306,25 @@ def inject_css() -> None:
                 font-size: 2rem;
                 font-weight: 900;
                 box-shadow: 0 18px 42px rgba(15,118,110,0.25);
+                animation: brandFadeOut 0.8s ease 2s forwards;
             }
 
             .splash-title {
                 color: var(--text);
-                font-size: 2.6rem;
+                font-size: 2.7rem;
                 font-weight: 900;
                 letter-spacing: -0.05em;
                 margin: 0;
+                animation: brandFadeOut 0.8s ease 2s forwards;
             }
 
             .splash-copy {
                 color: var(--muted);
-                font-size: 1.02rem;
+                font-size: 1.03rem;
                 line-height: 1.65;
-                margin: 0.6rem auto 0 auto;
-                max-width: 520px;
+                margin: 0.7rem auto 0 auto;
+                max-width: 540px;
+                animation: copyFadeOut 0.7s ease 2.05s forwards;
             }
 
             .splash-tag {
@@ -325,16 +337,47 @@ def inject_css() -> None:
                 color: var(--primary);
                 font-size: 0.82rem;
                 font-weight: 800;
+                animation: copyFadeOut 0.7s ease 2.1s forwards;
             }
 
-            @keyframes fadeUp {
-                from {
-                    opacity: 0;
-                    transform: translateY(12px);
+            @keyframes brandFadeOut {
+                0% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                    filter: blur(0px);
                 }
-                to {
+                100% {
+                    opacity: 0;
+                    transform: translateY(-12px) scale(0.97);
+                    filter: blur(3px);
+                }
+            }
+
+            @keyframes copyFadeOut {
+                0% {
                     opacity: 1;
                     transform: translateY(0);
+                    filter: blur(0px);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translateY(-8px);
+                    filter: blur(2px);
+                }
+            }
+
+            @keyframes overlayFadeOut {
+                0% {
+                    opacity: 1;
+                    visibility: visible;
+                }
+                99% {
+                    opacity: 0;
+                    visibility: visible;
+                }
+                100% {
+                    opacity: 0;
+                    visibility: hidden;
                 }
             }
         </style>
@@ -344,7 +387,7 @@ def inject_css() -> None:
 
 
 # -------------------------------------------------
-# Reusable HTML blocks
+# Reusable sections
 # -------------------------------------------------
 def render_stat(value: str, label: str) -> None:
     st.markdown(
@@ -370,20 +413,17 @@ def render_card(title: str, body: str) -> None:
     )
 
 
-# -------------------------------------------------
-# Splash screen
-# -------------------------------------------------
-def splash_markup() -> None:
+def render_splash_overlay() -> None:
     st.markdown(
         f"""
-        <div class="splash-shell">
+        <div class="splash-overlay">
             <div class="splash-card">
                 <div class="splash-logo">VW</div>
                 <div class="splash-title">{APP_NAME}</div>
                 <div class="splash-copy">
                     {APP_TAGLINE}<br>
-                    A streamlined sustainable finance experience for building portfolios
-                    around both financial risk and ESG priorities.
+                    A streamlined sustainable finance experience built around
+                    financial risk and ESG priorities.
                 </div>
                 <div class="splash-tag">Professional • Personalised • ESG-aware</div>
             </div>
@@ -391,28 +431,6 @@ def splash_markup() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-if hasattr(st, "fragment"):
-    @st.fragment(run_every=2)
-    def auto_splash_fragment() -> None:
-        if not st.session_state["splash_cycle_started"]:
-            st.session_state["splash_cycle_started"] = True
-            splash_markup()
-        else:
-            st.session_state["splash_complete"] = True
-            st.rerun()
-else:
-    def auto_splash_fragment() -> None:
-        # Fallback for older Streamlit versions:
-        # skip the timed splash rather than breaking the app
-        st.session_state["splash_complete"] = True
-        st.rerun()
-
-
-def render_splash() -> None:
-    auto_splash_fragment()
-    st.stop()
 
 
 # -------------------------------------------------
@@ -474,9 +492,10 @@ def render_home() -> None:
         """
         <div class="section-copy">
             This app is designed to help users make confident investment decisions through a process
-            that feels both transparent and personalised. Trust comes from a clear sustainability-led
-            framework, clarity comes from a focused and intuitive journey, and optimisation comes from
-            transforming user preferences into a portfolio that better aligns with their financial and ESG objectives.
+            that feels both transparent and personalised. Trust comes from clearly connecting risk
+            preferences and sustainability priorities to portfolio outcomes, clarity comes from a
+            focused and intuitive workflow, and optimisation comes from turning user-specific inputs
+            into a portfolio that better aligns with both financial goals and ESG objectives.
         </div>
         """,
         unsafe_allow_html=True,
@@ -486,17 +505,17 @@ def render_home() -> None:
     with c1:
         render_card(
             "Trust through transparency",
-            "The app makes it easier for users to understand how risk and sustainability preferences shape portfolio decisions."
+            "The app helps users understand how financial risk and ESG preferences shape portfolio construction."
         )
     with c2:
         render_card(
             "Clarity through guided design",
-            "A structured flow keeps the experience simple and readable, reducing friction while improving decision quality."
+            "A structured journey reduces friction and keeps the investing experience intuitive and readable."
         )
     with c3:
         render_card(
             "Optimisation through personalisation",
-            "The portfolio-building process is designed to convert user-specific inputs into more relevant and targeted outcomes."
+            "The portfolio-building process is designed to convert user-specific inputs into more relevant outcomes."
         )
 
     st.markdown("<div style='height:1.4rem;'></div>", unsafe_allow_html=True)
@@ -524,28 +543,15 @@ def render_home() -> None:
         if st.button("Build Your Portfolio", type="primary", use_container_width=True):
             go_to_builder()
 
-        try:
-            st.page_link(
-                TARGET_PAGE,
-                label="Open portfolio builder",
-                icon="→",
-                use_container_width=True,
-            )
-        except Exception:
-            pass
-
 
 # -------------------------------------------------
 # Run app
 # -------------------------------------------------
 init_session_state()
 inject_css()
-
-if not st.session_state["splash_complete"]:
-    render_splash()
-
 render_home()
-if not st.session_state.entered_home:
-    render_splash()
 
-render_home()
+# Show splash only on the first render of this session.
+if st.session_state["show_splash"]:
+    render_splash_overlay()
+    st.session_state["show_splash"] = False
