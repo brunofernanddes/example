@@ -15,6 +15,89 @@ st.set_page_config(
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
 
+# -------------------------------------------------
+# Data for recommendation engine
+# -------------------------------------------------
+RECOMMENDATIONS = {
+    "1": {
+        "Low": {
+            "Environmental": ("Microsoft (MSFT)", "Exelon (EXC)"),
+            "Sustainability / Social": ("Microsoft (MSFT)", "Pinnacle West Capital (PNW)"),
+            "Governance": ("Regency Centers (REG)", "Amazon (AMZN)"),
+            "All Equal": ("Microsoft (MSFT)", "Exelon (EXC)"),
+        },
+        "Medium": {
+            "Environmental": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
+            "Sustainability / Social": ("ConocoPhillips (COP)", "Microsoft (MSFT)"),
+            "Governance": ("Amazon (AMZN)", "Microsoft (MSFT)"),
+            "All Equal": ("Microsoft (MSFT)", "ConocoPhillips (COP)"),
+        },
+        "High": {
+            "Environmental": ("Trane Technologies (TT)", "Amazon (AMZN)"),
+            "Sustainability / Social": ("ConocoPhillips (COP)", "Trane Technologies (TT)"),
+            "Governance": ("Amazon (AMZN)", "Raytheon Technologies (RTX)"),
+            "All Equal": ("ConocoPhillips (COP)", "Amazon (AMZN)"),
+        },
+    },
+    "2": {
+        "Low": {
+            "Environmental": ("Microsoft (MSFT)", "Exelon (EXC)"),
+            "Sustainability / Social": ("Microsoft (MSFT)", "Exelon (EXC)"),
+            "Governance": ("Regency Centers (REG)", "Amazon (AMZN)"),
+            "All Equal": ("Microsoft (MSFT)", "Exelon (EXC)"),
+        },
+        "Medium": {
+            "Environmental": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
+            "Sustainability / Social": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
+            "Governance": ("Amazon (AMZN)", "Microsoft (MSFT)"),
+            "All Equal": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
+        },
+        "High": {
+            "Environmental": ("Trane Technologies (TT)", "Amazon (AMZN)"),
+            "Sustainability / Social": ("Trane Technologies (TT)", "ConocoPhillips (COP)"),
+            "Governance": ("Amazon (AMZN)", "Trane Technologies (TT)"),
+            "All Equal": ("Trane Technologies (TT)", "Amazon (AMZN)"),
+        },
+    },
+    "3": {
+        "Low": {
+            "Environmental": ("Microsoft (MSFT)", "PepsiCo (PEP)"),
+            "Sustainability / Social": ("Microsoft (MSFT)", "Pinnacle West Capital (PNW)"),
+            "Governance": ("Regency Centers (REG)", "Amazon (AMZN)"),
+            "All Equal": ("Microsoft (MSFT)", "Exelon (EXC)"),
+        },
+        "Medium": {
+            "Environmental": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
+            "Sustainability / Social": ("ConocoPhillips (COP)", "Microsoft (MSFT)"),
+            "Governance": ("Amazon (AMZN)", "Microsoft (MSFT)"),
+            "All Equal": ("Microsoft (MSFT)", "ConocoPhillips (COP)"),
+        },
+        "High": {
+            "Environmental": ("Trane Technologies (TT)", "Amazon (AMZN)"),
+            "Sustainability / Social": ("ConocoPhillips (COP)", "Airbnb (ABNB)"),
+            "Governance": ("Amazon (AMZN)", "Raytheon Technologies (RTX)"),
+            "All Equal": ("ConocoPhillips (COP)", "Edison International (EIX)"),
+        },
+    },
+}
+
+ASSET_DATA = {
+    "PepsiCo (PEP)": {"expected_return": 7.33, "std_dev": 5.19},
+    "Consolidated Edison (ED)": {"expected_return": 7.53, "std_dev": 5.22},
+    "Edison International (EIX)": {"expected_return": 4.26, "std_dev": 8.20},
+    "Procter & Gamble (PG)": {"expected_return": 8.61, "std_dev": 6.92},
+    "Microsoft (MSFT)": {"expected_return": 23.16, "std_dev": 6.81},
+    "Air Products and Chemicals (APD)": {"expected_return": 10.06, "std_dev": 6.64},
+    "Regency Centers (REG)": {"expected_return": 4.14, "std_dev": 4.09},
+    "Trane Technologies (TT)": {"expected_return": 23.15, "std_dev": 8.35},
+    "Airbnb (ABNB)": {"expected_return": -5.81, "std_dev": 10.67},
+    "Amazon (AMZN)": {"expected_return": 21.84, "std_dev": 7.90},
+    "General Mills (GIS)": {"expected_return": -1.33, "std_dev": 7.33},
+    "ConocoPhillips (COP)": {"expected_return": 15.21, "std_dev": 8.08},
+    "Exelon (EXC)": {"expected_return": 10.72, "std_dev": 5.84},
+    "Pinnacle West Capital (PNW)": {"expected_return": 7.01, "std_dev": 4.96},
+    "Raytheon Technologies (RTX)": {"expected_return": 16.65, "std_dev": 8.73},
+}
 
 # -------------------------------------------------
 # Session state
@@ -42,7 +125,7 @@ def open_recommendation() -> None:
 
 
 # -------------------------------------------------
-# Global styling
+# CSS
 # -------------------------------------------------
 def inject_css() -> None:
     st.markdown(
@@ -272,7 +355,7 @@ def inject_css() -> None:
                 border: none;
             }
 
-            .builder-shell {
+            .tool-shell {
                 background: rgba(255,255,255,0.98);
                 border: 1px solid rgba(15,23,42,0.06);
                 border-radius: 24px;
@@ -280,7 +363,7 @@ def inject_css() -> None:
                 box-shadow: var(--shadow-soft);
             }
 
-            .builder-title {
+            .tool-title {
                 color: #000000;
                 font-size: 2rem;
                 font-weight: 850;
@@ -288,14 +371,14 @@ def inject_css() -> None:
                 margin: 0 0 0.2rem 0;
             }
 
-            .builder-subtitle {
+            .tool-subtitle {
                 color: #000000;
                 font-size: 1rem;
                 line-height: 1.6;
                 margin: 0 0 1.2rem 0;
             }
 
-            .builder-section-label {
+            .tool-section-label {
                 color: #0f766e;
                 font-size: 0.78rem;
                 font-weight: 800;
@@ -304,21 +387,21 @@ def inject_css() -> None:
                 margin-bottom: 0.3rem;
             }
 
-            .builder-section-title {
+            .tool-section-title {
                 color: #000000;
                 font-size: 1.05rem;
                 font-weight: 800;
                 margin: 0.2rem 0 0.85rem 0;
             }
 
-            .builder-divider {
+            .tool-divider {
                 height: 1px;
                 background: rgba(15, 23, 42, 0.08);
                 margin: 1.1rem 0 1.2rem 0;
                 border-radius: 999px;
             }
 
-            .builder-note {
+            .tool-note {
                 color: #334155;
                 font-size: 0.93rem;
                 line-height: 1.55;
@@ -345,6 +428,28 @@ def inject_css() -> None:
                 font-size: 1.2rem;
                 font-weight: 800;
                 line-height: 1.2;
+            }
+
+            .asset-summary {
+                background: #ffffff;
+                border: 1px solid rgba(15, 23, 42, 0.07);
+                border-radius: 18px;
+                padding: 1rem;
+                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+            }
+
+            .asset-summary-title {
+                color: #000000;
+                font-size: 1rem;
+                font-weight: 800;
+                margin-bottom: 0.25rem;
+            }
+
+            .asset-summary-copy {
+                color: #334155;
+                font-size: 0.94rem;
+                line-height: 1.55;
+                margin: 0;
             }
 
             .chart-title {
@@ -443,14 +548,10 @@ def inject_css() -> None:
     )
 
 
-# -------------------------------------------------
-# Builder-specific black text CSS
-# -------------------------------------------------
-def inject_builder_black_text_css() -> None:
+def inject_tool_black_text_css() -> None:
     st.markdown(
         """
         <style>
-            /* Force all builder screen text to black */
             .stApp,
             .stApp p,
             .stApp span,
@@ -521,30 +622,14 @@ def inject_builder_black_text_css() -> None:
             }
 
             [data-testid="stAlert"] *,
-            [data-testid="stNotification"] * {
-                color: #000000 !important;
-            }
-
             [data-testid="metric-container"] *,
             [data-testid="stMarkdownContainer"] * {
-                color: #000000;
+                color: #000000 !important;
             }
 
             div.stButton > button {
                 color: #000000 !important;
                 border: 1px solid rgba(15, 23, 42, 0.10) !important;
-                border-radius: 14px !important;
-                font-weight: 800 !important;
-                min-height: 3.05rem !important;
-            }
-
-            .builder-title,
-            .builder-subtitle,
-            .builder-section-title,
-            .metric-tile-label,
-            .metric-tile-value,
-            .chart-title {
-                color: #000000 !important;
             }
         </style>
         """,
@@ -553,7 +638,7 @@ def inject_builder_black_text_css() -> None:
 
 
 # -------------------------------------------------
-# Shared UI blocks
+# Helpers
 # -------------------------------------------------
 def render_splash_overlay() -> None:
     st.markdown(
@@ -597,6 +682,23 @@ def render_card(title: str, body: str) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def result_tile(label: str, value: str) -> str:
+    return f"""
+    <div class="metric-tile">
+        <div class="metric-tile-label">{label}</div>
+        <div class="metric-tile-value">{value}</div>
+    </div>
+    """
+
+
+def risk_level_from_score(risk_tolerance: int) -> str:
+    if 1 <= risk_tolerance <= 4:
+        return "Low"
+    if 5 <= risk_tolerance <= 7:
+        return "Medium"
+    return "High"
 
 
 # -------------------------------------------------
@@ -722,23 +824,180 @@ def render_home() -> None:
 # Recommendation screen
 # -------------------------------------------------
 def render_recommendation_screen() -> None:
-    col_back, col_main = st.columns([0.16, 0.84])
+    inject_tool_black_text_css()
+
+    col_back, col_main = st.columns([0.14, 0.86])
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
-    st.markdown('<div class="builder-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="builder-section-label">Portfolio recommendation</div>', unsafe_allow_html=True)
-    st.markdown('<div class="builder-title">Recommended portfolio workflow</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="tool-section-label">Portfolio recommendation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tool-title">Give me a portfolio recommendation</div>', unsafe_allow_html=True)
     st.markdown(
         """
-        <div class="builder-subtitle">
-            This area is ready for your recommended public companies workflow.
-            You can connect a curated ESG-screened asset universe here.
+        <div class="tool-subtitle">
+            Receive a recommended two-asset portfolio based on your investment priority,
+            risk tolerance, and preferred ESG focus.
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.info("Recommendation engine placeholder.")
+
+    with st.form("recommendation_form", clear_on_submit=False):
+        st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-section-title">Set your preferences</div>', unsafe_allow_html=True)
+
+        left, right = st.columns(2, gap="large")
+
+        with left:
+            investment_priority_label = st.radio(
+                "Investment priority",
+                [
+                    "Balanced return and sustainability",
+                    "Prioritise financial growth",
+                    "Prioritise sustainability",
+                ],
+                horizontal=True,
+            )
+
+            risk_tolerance = st.slider(
+                "Risk tolerance",
+                min_value=1,
+                max_value=10,
+                value=5,
+            )
+
+        with right:
+            esg_aspect = st.radio(
+                "Which ESG aspect matters most?",
+                ["Environmental", "Sustainability / Social", "Governance", "All Equal"],
+                horizontal=True,
+            )
+
+            correlation_assumption = st.slider(
+                "Portfolio correlation assumption",
+                min_value=-1.0,
+                max_value=1.0,
+                value=0.30,
+                step=0.01,
+                help="Used to estimate 50/50 portfolio standard deviation for the recommended pair.",
+            )
+
+        run_recommendation = st.form_submit_button(
+            "Generate portfolio recommendation",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if run_recommendation:
+        investment_priority_map = {
+            "Balanced return and sustainability": "1",
+            "Prioritise financial growth": "2",
+            "Prioritise sustainability": "3",
+        }
+
+        investment_priority_key = investment_priority_map[investment_priority_label]
+        risk_level = risk_level_from_score(risk_tolerance)
+
+        asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
+
+        if asset1 in ASSET_DATA and asset2 in ASSET_DATA:
+            exp_return1 = ASSET_DATA[asset1]["expected_return"]
+            std_dev1 = ASSET_DATA[asset1]["std_dev"]
+            exp_return2 = ASSET_DATA[asset2]["expected_return"]
+            std_dev2 = ASSET_DATA[asset2]["std_dev"]
+
+            w1 = 0.5
+            w2 = 0.5
+            s1 = std_dev1 / 100
+            s2 = std_dev2 / 100
+            rho = correlation_assumption
+
+            portfolio_return = w1 * exp_return1 + w2 * exp_return2
+            portfolio_std_dev = (
+                np.sqrt((w1 ** 2) * (s1 ** 2) + (w2 ** 2) * (s2 ** 2) + 2 * w1 * w2 * s1 * s2 * rho) * 100
+            )
+
+            st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-label">Recommendation</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-title">Your recommended portfolio</div>', unsafe_allow_html=True)
+
+            a1, a2 = st.columns(2, gap="large")
+            with a1:
+                st.markdown(
+                    f"""
+                    <div class="asset-summary">
+                        <div class="asset-summary-title">{asset1}</div>
+                        <p class="asset-summary-copy">
+                            Expected return: {exp_return1:.2f}%<br>
+                            Standard deviation: {std_dev1:.2f}%
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with a2:
+                st.markdown(
+                    f"""
+                    <div class="asset-summary">
+                        <div class="asset-summary-title">{asset2}</div>
+                        <p class="asset-summary-copy">
+                            Expected return: {exp_return2:.2f}%<br>
+                            Standard deviation: {std_dev2:.2f}%
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown("<div style='height:0.8rem;'></div>", unsafe_allow_html=True)
+
+            r1, r2, r3 = st.columns(3)
+            with r1:
+                st.markdown(result_tile("Investment priority", investment_priority_label), unsafe_allow_html=True)
+            with r2:
+                st.markdown(result_tile("Risk level", risk_level), unsafe_allow_html=True)
+            with r3:
+                st.markdown(result_tile("Preferred ESG aspect", esg_aspect), unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
+
+            m1, m2 = st.columns(2)
+            with m1:
+                st.markdown(result_tile("50/50 expected return", f"{portfolio_return:.2f}%"), unsafe_allow_html=True)
+            with m2:
+                st.markdown(result_tile("50/50 portfolio risk", f"{portfolio_std_dev:.2f}%"), unsafe_allow_html=True)
+
+            st.markdown(
+                f"""
+                <div class="tool-note">
+                    Portfolio risk is estimated using equal weights and a correlation assumption of {correlation_assumption:.2f}.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">Recommended asset comparison</div>', unsafe_allow_html=True)
+
+            fig, ax = plt.subplots(figsize=(10, 5))
+            labels = [asset1, asset2]
+            returns = [exp_return1, exp_return2]
+            risks = [std_dev1, std_dev2]
+            x = np.arange(len(labels))
+            width = 0.34
+
+            ax.bar(x - width / 2, returns, width, label="Expected Return (%)")
+            ax.bar(x + width / 2, risks, width, label="Standard Deviation (%)")
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, rotation=0)
+            ax.set_ylabel("Percentage")
+            ax.set_title("Recommended Asset Metrics")
+            ax.legend()
+
+            st.pyplot(fig)
+            plt.close(fig)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -746,29 +1005,21 @@ def render_recommendation_screen() -> None:
 # Builder screen
 # -------------------------------------------------
 def render_builder_screen() -> None:
-    inject_builder_black_text_css()
-
-    def result_tile(label: str, value: str) -> str:
-        return f"""
-        <div class="metric-tile">
-            <div class="metric-tile-label">{label}</div>
-            <div class="metric-tile-value">{value}</div>
-        </div>
-        """
+    inject_tool_black_text_css()
 
     col_back, col_main = st.columns([0.14, 0.86])
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
-    st.markdown('<div class="builder-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="builder-section-label">Portfolio builder</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="tool-section-label">Portfolio builder</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="builder-title">Build your portfolio based on your ESG preferences</div>',
+        '<div class="tool-title">Build your portfolio based on your ESG preferences</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
         """
-        <div class="builder-subtitle">
+        <div class="tool-subtitle">
             Create a simple ESG-aware portfolio recommendation using your asset assumptions,
             risk tolerance, and sustainability preferences.
         </div>
@@ -777,8 +1028,8 @@ def render_builder_screen() -> None:
     )
 
     with st.form("portfolio_builder_form", clear_on_submit=False):
-        st.markdown('<div class="builder-section-label">Step 1</div>', unsafe_allow_html=True)
-        st.markdown('<div class="builder-section-title">Choose your setup</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-section-title">Choose your setup</div>', unsafe_allow_html=True)
 
         top_left, top_right = st.columns(2)
 
@@ -800,11 +1051,11 @@ def render_builder_screen() -> None:
                 horizontal=True,
             )
 
-        st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
 
         if asset_choice == "Input my own assets":
-            st.markdown('<div class="builder-section-label">Step 2</div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-title">Enter asset assumptions</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-label">Step 2</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-title">Enter asset assumptions</div>', unsafe_allow_html=True)
 
             col1, col2 = st.columns(2, gap="large")
 
@@ -856,10 +1107,9 @@ def render_builder_screen() -> None:
                     step=1.0,
                 )
 
-            st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
-
-            st.markdown('<div class="builder-section-label">Step 3</div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-title">Set portfolio preferences</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-label">Step 3</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-title">Set portfolio preferences</div>', unsafe_allow_html=True)
 
             pref_left, pref_right = st.columns(2, gap="large")
 
@@ -899,6 +1149,7 @@ def render_builder_screen() -> None:
                     "Somewhat important": 0.05,
                     "Very important": 0.10,
                 }
+
                 default_lambda = lambda_map[esg_preference_label]
 
                 esg_slider = st.slider(
@@ -911,7 +1162,7 @@ def render_builder_screen() -> None:
 
                 st.markdown(
                     """
-                    <div class="builder-note">
+                    <div class="tool-note">
                         Higher ESG weight increases the influence of sustainability scores
                         in the portfolio recommendation.
                     </div>
@@ -928,7 +1179,7 @@ def render_builder_screen() -> None:
         else:
             st.markdown(
                 """
-                <div class="builder-note">
+                <div class="tool-note">
                     Recommended public companies mode can be connected next to a curated ESG-screened universe.
                 </div>
                 """,
@@ -1020,9 +1271,9 @@ def render_builder_screen() -> None:
             opt_w1 = weights[optimal_idx]
             opt_w2 = 1 - opt_w1
 
-            st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-label">Recommendation</div>', unsafe_allow_html=True)
-            st.markdown('<div class="builder-section-title">Your ESG-aware portfolio outcome</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-label">Recommendation</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-title">Your ESG-aware portfolio outcome</div>', unsafe_allow_html=True)
 
             row1_col1, row1_col2, row1_col3 = st.columns(3)
             with row1_col1:
@@ -1042,7 +1293,7 @@ def render_builder_screen() -> None:
             with row2_col3:
                 st.markdown(result_tile("Portfolio ESG score", f"{portfolio_esg[optimal_idx] * 100:.2f}/100"), unsafe_allow_html=True)
 
-            st.markdown('<div class="builder-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="chart-title">Efficient frontier</div>', unsafe_allow_html=True)
 
             fig, ax = plt.subplots(figsize=(10, 6))
