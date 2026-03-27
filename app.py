@@ -12,7 +12,10 @@ st.set_page_config(
 
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
-TARGET_PAGE = "pages/1_Build_Your_Portfolio.py"  # Update if your page name differs
+
+# Update these to match your actual Streamlit page filenames
+RECOMMENDATION_PAGE = "pages/1_Portfolio_Recommendation.py"
+BUILDER_PAGE = "pages/2_Build_Your_Portfolio.py"
 
 
 # -------------------------------------------------
@@ -30,12 +33,21 @@ def init_session_state() -> None:
 # -------------------------------------------------
 # Navigation
 # -------------------------------------------------
-def go_to_builder() -> None:
+def go_to_recommendation() -> None:
     try:
-        st.switch_page(TARGET_PAGE)
+        st.switch_page(RECOMMENDATION_PAGE)
     except Exception:
         st.warning(
-            f"Create a page at '{TARGET_PAGE}' so this button can open your portfolio builder."
+            f"Create a page at '{RECOMMENDATION_PAGE}' so this button can open your recommendation screen."
+        )
+
+
+def go_to_builder() -> None:
+    try:
+        st.switch_page(BUILDER_PAGE)
+    except Exception:
+        st.warning(
+            f"Create a page at '{BUILDER_PAGE}' so this button can open your portfolio builder."
         )
 
 
@@ -73,7 +85,6 @@ def inject_css() -> None:
                 padding-bottom: 2rem;
             }
 
-            /* Optional: hide default multipage sidebar nav for cleaner UX */
             [data-testid="stSidebarNav"] {
                 display: none;
             }
@@ -272,7 +283,6 @@ def inject_css() -> None:
                 border: none;
             }
 
-            /* Splash overlay */
             .splash-overlay {
                 position: fixed;
                 inset: 0;
@@ -460,12 +470,13 @@ def render_home() -> None:
                 <h1>Build an investment portfolio that reflects both financial goals and ESG values.</h1>
                 <p>
                     This app helps investors move from intention to action through a cleaner,
-                    smarter portfolio experience. It combines personalised risk profiling with
-                    sustainability preferences to support better-informed portfolio construction.
+                    smarter portfolio experience. It places ESG preferences at the centre of the
+                    decision-making process, so portfolio recommendations can better reflect both
+                    financial goals and sustainability priorities.
                 </p>
                 <div class="pill-row">
                     <span class="pill">Risk-aware design</span>
-                    <span class="pill">ESG-integrated approach</span>
+                    <span class="pill">ESG-first thinking</span>
                     <span class="pill">Portfolio optimisation</span>
                     <span class="pill">Professional user journey</span>
                 </div>
@@ -475,27 +486,26 @@ def render_home() -> None:
         )
 
     with right:
-        render_stat("Trust", "Transparent investment approach")
+        render_stat("Environmental", "Climate, energy, and ecological impact")
         st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-        render_stat("Clarity", "Guided and intuitive experience")
+        render_stat("Social", "People, communities, and workplace outcomes")
         st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-        render_stat("Optimisation", "Built for tailored portfolio outcomes")
+        render_stat("Governance", "Leadership, ethics, and accountability")
 
     st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="section-label">Why this app</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="section-title">An investment app designed for trust, clarity, and optimisation</div>',
+        '<div class="section-title">An investment app that prioritises ESG preferences</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
         """
         <div class="section-copy">
-            This app is designed to help users make confident investment decisions through a process
-            that feels both transparent and personalised. Trust comes from clearly connecting risk
-            preferences and sustainability priorities to portfolio outcomes, clarity comes from a
-            focused and intuitive workflow, and optimisation comes from turning user-specific inputs
-            into a portfolio that better aligns with both financial goals and ESG objectives.
+            This app is designed for investors who want their portfolios to reflect more than financial return alone.
+            It prioritises ESG preferences by allowing sustainability considerations to play a central role in portfolio
+            construction, helping users align their investments with environmental values, social impact priorities,
+            and expectations around strong governance.
         </div>
         """,
         unsafe_allow_html=True,
@@ -504,18 +514,18 @@ def render_home() -> None:
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
         render_card(
-            "Trust through transparency",
-            "The app helps users understand how financial risk and ESG preferences shape portfolio construction."
+            "Environmental (E)",
+            "Environmental factors consider how investments interact with climate risk, carbon emissions, resource use, pollution, and wider ecological sustainability."
         )
     with c2:
         render_card(
-            "Clarity through guided design",
-            "A structured journey reduces friction and keeps the investing experience intuitive and readable."
+            "Social (S)",
+            "Social factors focus on how organisations treat people, including labour standards, diversity and inclusion, community impact, health, safety, and human rights."
         )
     with c3:
         render_card(
-            "Optimisation through personalisation",
-            "The portfolio-building process is designed to convert user-specific inputs into more relevant outcomes."
+            "Governance (G)",
+            "Governance factors examine how organisations are led, including board quality, executive accountability, shareholder rights, transparency, and ethical decision-making."
         )
 
     st.markdown("<div style='height:1.4rem;'></div>", unsafe_allow_html=True)
@@ -526,11 +536,11 @@ def render_home() -> None:
         st.markdown(
             """
             <div class="cta-panel">
-                <div class="section-label">Build your portfolio</div>
-                <h2 class="cta-title">Start the guided portfolio creation journey</h2>
+                <div class="section-label">Choose your next step</div>
+                <h2 class="cta-title">Explore portfolio outcomes or build your own</h2>
                 <p class="cta-copy">
-                    Continue to the next screen to enter investment goals, risk appetite,
-                    and ESG preferences in a dedicated workflow built for portfolio optimisation.
+                    You can move straight to a portfolio recommendation or continue to a dedicated
+                    journey that builds a portfolio around your ESG priorities and investment preferences.
                 </p>
             </div>
             """,
@@ -538,9 +548,12 @@ def render_home() -> None:
         )
 
     with cta_right:
-        st.write("")
-        st.write("")
-        if st.button("Build Your Portfolio", type="primary", use_container_width=True):
+        if st.button("Give me a portfolio recommendation", type="primary", use_container_width=True):
+            go_to_recommendation()
+
+        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+
+        if st.button("Build your portfolio based on your ESG preferences", use_container_width=True):
             go_to_builder()
 
 
@@ -551,7 +564,6 @@ init_session_state()
 inject_css()
 render_home()
 
-# Show splash only on the first render of this session.
 if st.session_state["show_splash"]:
     render_splash_overlay()
     st.session_state["show_splash"] = False
