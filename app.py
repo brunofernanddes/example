@@ -18,16 +18,17 @@ TARGET_PAGE = "pages/1_Build_Your_Portfolio.py"  # Change if your file name diff
 # -------------------------------------------------
 # State
 # -------------------------------------------------
-def init_session_state():
-    if "entered_home" not in st.session_state:
-        st.session_state.entered_home = False
+def init_session_state() -> None:
+    defaults = {
+        "splash_complete": False,
+        "splash_cycle_started": False,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
-def enter_home():
-    st.session_state.entered_home = True
-
-
-def go_to_builder():
+def go_to_builder() -> None:
     try:
         st.switch_page(TARGET_PAGE)
     except Exception:
@@ -39,14 +40,14 @@ def go_to_builder():
 # -------------------------------------------------
 # Styling
 # -------------------------------------------------
-def inject_css():
+def inject_css() -> None:
     st.markdown(
         """
         <style>
             :root {
                 --bg1: #f7fbfa;
                 --bg2: #eef6f4;
-                --card: rgba(255,255,255,0.84);
+                --card: rgba(255,255,255,0.86);
                 --card-strong: rgba(255,255,255,0.96);
                 --text: #0f172a;
                 --muted: #475569;
@@ -181,6 +182,7 @@ def inject_css():
             .section-copy {
                 color: var(--muted);
                 margin-bottom: 1rem;
+                line-height: 1.6;
             }
 
             .card {
@@ -263,7 +265,6 @@ def inject_css():
                 border: none;
             }
 
-            /* Splash */
             .splash-shell {
                 min-height: 88vh;
                 display: flex;
@@ -345,7 +346,7 @@ def inject_css():
 # -------------------------------------------------
 # Reusable HTML blocks
 # -------------------------------------------------
-def render_stat(value, label):
+def render_stat(value: str, label: str) -> None:
     st.markdown(
         f"""
         <div class="stat">
@@ -357,7 +358,7 @@ def render_stat(value, label):
     )
 
 
-def render_card(title, body):
+def render_card(title: str, body: str) -> None:
     st.markdown(
         f"""
         <div class="card">
@@ -372,7 +373,7 @@ def render_card(title, body):
 # -------------------------------------------------
 # Splash screen
 # -------------------------------------------------
-def render_splash():
+def splash_markup() -> None:
     st.markdown(
         f"""
         <div class="splash-shell">
@@ -382,7 +383,7 @@ def render_splash():
                 <div class="splash-copy">
                     {APP_TAGLINE}<br>
                     A streamlined sustainable finance experience for building portfolios
-                    around both risk appetite and ESG priorities.
+                    around both financial risk and ESG priorities.
                 </div>
                 <div class="splash-tag">Professional • Personalised • ESG-aware</div>
             </div>
@@ -391,22 +392,33 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    left, centre, right = st.columns([1.2, 1, 1.2])
-    with centre:
-        st.button(
-            "Enter App",
-            type="primary",
-            use_container_width=True,
-            on_click=enter_home,
-        )
 
+if hasattr(st, "fragment"):
+    @st.fragment(run_every=2)
+    def auto_splash_fragment() -> None:
+        if not st.session_state["splash_cycle_started"]:
+            st.session_state["splash_cycle_started"] = True
+            splash_markup()
+        else:
+            st.session_state["splash_complete"] = True
+            st.rerun()
+else:
+    def auto_splash_fragment() -> None:
+        # Fallback for older Streamlit versions:
+        # skip the timed splash rather than breaking the app
+        st.session_state["splash_complete"] = True
+        st.rerun()
+
+
+def render_splash() -> None:
+    auto_splash_fragment()
     st.stop()
 
 
 # -------------------------------------------------
 # Homepage
 # -------------------------------------------------
-def render_home():
+def render_home() -> None:
     st.markdown(
         f"""
         <div class="brand-row">
@@ -429,15 +441,15 @@ def render_home():
                 <div class="badge">Personalised sustainable investing</div>
                 <h1>Build an investment portfolio that reflects both financial goals and ESG values.</h1>
                 <p>
-                    This app gives users a clean, premium path into portfolio construction.
-                    The homepage stays focused on brand, trust, and clarity, while the next screen
-                    handles risk profiling and sustainability preferences.
+                    This app helps investors move from intention to action through a cleaner,
+                    smarter portfolio experience. It combines personalised risk profiling with
+                    sustainability preferences to support better-informed portfolio construction.
                 </p>
                 <div class="pill-row">
                     <span class="pill">Risk-aware design</span>
                     <span class="pill">ESG-integrated approach</span>
-                    <span class="pill">Clear user flow</span>
-                    <span class="pill">Optimiser-ready structure</span>
+                    <span class="pill">Portfolio optimisation</span>
+                    <span class="pill">Professional user journey</span>
                 </div>
             </div>
             """,
@@ -445,39 +457,46 @@ def render_home():
         )
 
     with right:
-        render_stat("Risk", "Aligned with investor profile")
+        render_stat("Trust", "Transparent investment approach")
         st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-        render_stat("ESG", "Reflects user priorities")
+        render_stat("Clarity", "Guided and intuitive experience")
         st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-        render_stat("Build", "Dedicated next-step workflow")
+        render_stat("Optimisation", "Built for tailored portfolio outcomes")
 
     st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
 
     st.markdown('<div class="section-label">Why this app</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="section-title">A homepage designed for trust, clarity, and momentum</div>',
+        '<div class="section-title">An investment app designed for trust, clarity, and optimisation</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="section-copy">Keep the landing screen clean. Explain the product quickly. Then move the user straight into the portfolio-building journey.</div>',
+        """
+        <div class="section-copy">
+            This app is designed to help users make confident investment decisions through a process
+            that feels both transparent and personalised. Trust comes from a clear sustainability-led
+            framework, clarity comes from a focused and intuitive journey, and optimisation comes from
+            transforming user preferences into a portfolio that better aligns with their financial and ESG objectives.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     c1, c2, c3 = st.columns(3, gap="large")
     with c1:
         render_card(
-            "Professional first impression",
-            "A polished launch experience that feels like a serious fintech product."
+            "Trust through transparency",
+            "The app makes it easier for users to understand how risk and sustainability preferences shape portfolio decisions."
         )
     with c2:
         render_card(
-            "Streamlined architecture",
-            "No forms or inputs on the homepage. All user preferences belong on the builder page."
+            "Clarity through guided design",
+            "A structured flow keeps the experience simple and readable, reducing friction while improving decision quality."
         )
     with c3:
         render_card(
-            "Clear transition to action",
-            "A single, prominent CTA sends users into the portfolio construction flow."
+            "Optimisation through personalisation",
+            "The portfolio-building process is designed to convert user-specific inputs into more relevant and targeted outcomes."
         )
 
     st.markdown("<div style='height:1.4rem;'></div>", unsafe_allow_html=True)
@@ -492,7 +511,7 @@ def render_home():
                 <h2 class="cta-title">Start the guided portfolio creation journey</h2>
                 <p class="cta-copy">
                     Continue to the next screen to enter investment goals, risk appetite,
-                    and ESG preferences in a dedicated, focused workflow.
+                    and ESG preferences in a dedicated workflow built for portfolio optimisation.
                 </p>
             </div>
             """,
@@ -505,7 +524,6 @@ def render_home():
         if st.button("Build Your Portfolio", type="primary", use_container_width=True):
             go_to_builder()
 
-        # Optional secondary link fallback
         try:
             st.page_link(
                 TARGET_PAGE,
@@ -518,11 +536,15 @@ def render_home():
 
 
 # -------------------------------------------------
-# Run
+# Run app
 # -------------------------------------------------
 init_session_state()
 inject_css()
 
+if not st.session_state["splash_complete"]:
+    render_splash()
+
+render_home()
 if not st.session_state.entered_home:
     render_splash()
 
