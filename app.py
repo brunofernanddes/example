@@ -392,10 +392,10 @@ def inject_css() -> None:
 
             .tool-note {
                 color: #2f4f43;
-                font-size: 0.93rem;
+                font-size: 0.88rem;
                 line-height: 1.55;
-                margin-top: 0.25rem;
-                margin-bottom: 0.25rem;
+                margin-top: 0.2rem;
+                margin-bottom: 0.2rem;
             }
 
             .metric-tile {
@@ -437,6 +437,12 @@ def inject_css() -> None:
                 background: rgba(22,163,74,0.06);
                 cursor: help;
                 line-height: 1;
+            }
+
+            .field-label {
+                font-weight: 800;
+                color: #000000;
+                margin-bottom: 0.2rem;
             }
 
             .asset-summary {
@@ -713,6 +719,24 @@ def risk_level_from_score(risk_tolerance: int) -> str:
     return "High"
 
 
+def render_risk_tolerance_helper() -> None:
+    st.markdown(
+        '<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_custom_label(text: str) -> None:
+    st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
+
+
+def render_label_with_tooltip(text: str, tooltip: str) -> None:
+    st.markdown(
+        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
 # -------------------------------------------------
 # Homepage
 # -------------------------------------------------
@@ -846,28 +870,35 @@ def render_recommendation_screen() -> None:
         left, right = st.columns(2, gap="large")
 
         with left:
+            render_custom_label("Investment Priority")
             investment_priority_label = st.radio(
-                "Investment priority",
+                "Investment Priority",
                 [
                     "Prioritise sustainability",
                     "Prioritise financial growth",
                     "Balanced return and sustainability",
                 ],
                 horizontal=False,
+                label_visibility="collapsed",
             )
 
+            render_custom_label("Risk Tolerance")
             risk_tolerance = st.slider(
-                "Risk tolerance",
+                "Risk Tolerance",
                 min_value=1,
                 max_value=10,
                 value=5,
+                label_visibility="collapsed",
             )
+            render_risk_tolerance_helper()
 
         with right:
+            render_custom_label("Which ESG aspect matters most?")
             esg_aspect = st.radio(
                 "Which ESG aspect matters most?",
-                ["Environmental", "Sustainability / Social", "Governance", "All Equal"],
-                horizontal=True,
+                ["All Equal", "Governance", "Environmental", "Sustainability / Social"],
+                horizontal=False,
+                label_visibility="collapsed",
             )
 
         run_recommendation = st.form_submit_button(
@@ -1093,20 +1124,28 @@ def render_builder_screen() -> None:
                     step=0.01,
                 )
 
+                render_label_with_tooltip(
+                    "Risk-Free Rate",
+                    "Standard rate of 4.84% as per the UK 10 year bond yield since it represents a safe, long-term investment alternative",
+                )
                 risk_free_rate = st.number_input(
-                    "Risk-free rate (%)",
+                    "Risk-Free Rate",
                     min_value=0.0,
                     max_value=20.0,
                     value=4.84,
                     step=0.01,
+                    label_visibility="collapsed",
                 )
 
+                render_custom_label("Risk Tolerance")
                 risk_tolerance = st.slider(
-                    "Risk tolerance",
+                    "Risk Tolerance",
                     min_value=1,
                     max_value=10,
                     value=5,
+                    label_visibility="collapsed",
                 )
+                render_risk_tolerance_helper()
 
             with pref_right:
                 esg_preference_label = st.radio(
