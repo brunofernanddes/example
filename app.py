@@ -108,11 +108,9 @@ def init_session_state() -> None:
         "show_splash": True,
         "show_recommendation_popup": False,
         "show_builder_popup": False,
-        # Recommendation inputs
         "rec_investment_priority": "Prioritise sustainability",
         "rec_risk_tolerance": 5,
         "rec_esg_aspect": "All Equal",
-        # Builder inputs
         "builder_asset_choice": "Input my own assets",
         "builder_asset1": "Asset 1",
         "builder_asset2": "Asset 2",
@@ -150,8 +148,7 @@ def open_recommendation() -> None:
 def open_builder() -> None:
     st.session_state.current_view = "builder"
     st.session_state.show_recommendation_popup = False
-    if "builder_risk_free_rate" not in st.session_state:
-        st.session_state.builder_risk_free_rate = 4.84
+    st.session_state.builder_risk_free_rate = st.session_state.get("builder_risk_free_rate", 4.84)
 
 
 def show_recommendation_popup() -> None:
@@ -626,138 +623,97 @@ def inject_tool_text_css() -> None:
 
 
 # -------------------------------------------------
-# Computation helpers
+# UI helpers
 # -------------------------------------------------
-def risk_level_from_score(risk_tolerance: int) -> str:
-    if 1 <= risk_tolerance <= 4:
-        return "Low"
-    if 5 <= risk_tolerance <= 7:
-        return "Medium"
-    return "High"
-
-
-def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect: str) -> dict:
-    investment_priority_map = {
-        "Balanced return and sustainability": "1",
-        "Prioritise financial growth": "2",
-        "Prioritise sustainability": "3",
-    }
-
-    investment_priority_key = investment_priority_map[priority_label]
-    risk_level = risk_level_from_score(risk_tolerance)
-
-    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
-    exp_return1 = ASSET_DATA[asset1]["expected_return"]
-    std_dev1 = ASSET_DATA[asset1]["std_dev"]
-    exp_return2 = ASSET_DATA[asset2]["expected_return"]
-    std_dev2 = ASSET_DATA[asset2]["std_dev"]
-
-    rho = 0.30
-    w1 = 0.5
-    w2 = 0.5
-    s1 = std_dev1 / 100
-    s2 = std_dev2 / 100
-
-    portfolio_return = w1 * exp_return1 + w2 * exp_return2
-    portfolio_std_dev = (
-        np.sqrt((w1 ** 2) * (s1 ** 2) + (w2 ** 2) * (s2 ** 2) + 2 * w1 * w2 * s1 * s2 * rho) * 100
+def render_splash_overlay() -> None:
+    st.markdown(
+        f"""
+        <div class="splash-overlay">
+            <div class="splash-card">
+                <div class="splash-logo">VW</div>
+                <div class="splash-title">{APP_NAME}</div>
+                <div class="splash-copy">
+                    {APP_TAGLINE}<br>
+                    A streamlined sustainable finance experience built around
+                    financial risk and ESG priorities.
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    return {
-        "investment_priority_label": priority_label,
-        "risk_level": risk_level,
-        "esg_aspect": esg_aspect,
-        "asset1": asset1,
-        "asset2": asset2,
-        "exp_return1": exp_return1,
-        "std_dev1": std_dev1,
-        "exp_return2": exp_return2,
-        "std_dev2": std_dev2,
-        "portfolio_return": portfolio_return,
-        "portfolio_std_dev": portfolio_std_dev,
-    }
+
+def render_stat(value: str, label: str) -> None:
+    st.markdown(
+        f"""
+        <div class="stat">
+            <div class="stat-value">{value}</div>
+            <div class="stat-label">{label}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
-def compute_builder_result(
-    asset1: str,
-    asset2: str,
-    exp_return1: float,
-    exp_return2: float,
-    std_dev1: float,
-    std_dev2: float,
-    esg_score1: float,
-    esg_score2: float,
-    correlation: float,
-    risk_free_rate: float,
-    risk_tolerance: int,
-    esg_slider: float,
-) -> dict:
-    r1 = exp_return1 / 100
-    r2 = exp_return2 / 100
-    s1 = std_dev1 / 100
-    s2 = std_dev2 / 100
-    rho = correlation
-    rf = risk_free_rate / 100
-    esg1 = esg_score1 / 100
-    esg2 = esg_score2 / 100
+def render_card(title: str, body: str) -> None:
+    st.markdown(
+        f"""
+        <div class="card">
+            <h3>{title}</h3>
+            <p>{body}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    gamma = 11 - risk_tolerance
-    weights = np.linspace(0, 1, 600)
 
-    portfolio_returns = []
-    portfolio_risks = []
-    portfolio_esg = []
-    portfolio_sharpes = []
-    portfolio_utility = []
+def render_page_header(title: str, subtitle: str) -> None:
+    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
 
-    for w1 in weights:
-        w2 = 1 - w1
-        port_return = w1 * r1 + w2 * r2
-        port_variance = (
-            (w1 ** 2) * (s1 ** 2)
-            + (w2 ** 2) * (s2 ** 2)
-            + 2 * w1 * w2 * s1 * s2 * rho
-        )
-        port_risk = np.sqrt(max(port_variance, 0))
-        port_esg = w1 * esg1 + w2 * esg2
-        sharpe = (port_return - rf) / port_risk if port_risk > 0 else 0.0
-        utility = port_return - 0.5 * gamma * port_variance + esg_slider * port_esg
 
-        portfolio_returns.append(port_return)
-        portfolio_risks.append(port_risk)
-        portfolio_esg.append(port_esg)
-        portfolio_sharpes.append(sharpe)
-        portfolio_utility.append(utility)
+def render_custom_label(text: str) -> None:
+    st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
 
-    portfolio_returns = np.array(portfolio_returns)
-    portfolio_risks = np.array(portfolio_risks)
-    portfolio_esg = np.array(portfolio_esg)
-    portfolio_sharpes = np.array(portfolio_sharpes)
-    portfolio_utility = np.array(portfolio_utility)
 
-    max_sharpe_idx = int(np.argmax(portfolio_sharpes))
-    optimal_idx = int(np.argmax(portfolio_utility))
+def render_label_with_tooltip(text: str, tooltip: str) -> None:
+    st.markdown(
+        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
+        unsafe_allow_html=True,
+    )
 
-    opt_w1 = float(weights[optimal_idx])
-    opt_w2 = float(1 - opt_w1)
 
-    return {
-        "asset1": asset1,
-        "asset2": asset2,
-        "weights": weights,
-        "portfolio_returns": portfolio_returns,
-        "portfolio_risks": portfolio_risks,
-        "portfolio_esg": portfolio_esg,
-        "portfolio_sharpes": portfolio_sharpes,
-        "max_sharpe_idx": max_sharpe_idx,
-        "optimal_idx": optimal_idx,
-        "opt_w1": opt_w1,
-        "opt_w2": opt_w2,
-        "opt_return": float(portfolio_returns[optimal_idx]),
-        "opt_risk": float(portfolio_risks[optimal_idx]),
-        "opt_esg": float(portfolio_esg[optimal_idx]),
-        "opt_sharpe": float(portfolio_sharpes[optimal_idx]),
-    }
+def render_risk_tolerance_helper() -> None:
+    st.markdown(
+        '<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
+    tooltip_html = ""
+    if tooltip:
+        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
+    return f"""
+    <div class="metric-tile">
+        <div class="metric-tile-label">{label} {tooltip_html}</div>
+        <div class="metric-tile-value">{value}</div>
+    </div>
+    """
+
+
+def style_modern_axes(ax) -> None:
+    ax.set_facecolor("#ffffff")
+    ax.grid(axis="y", linestyle="--", linewidth=0.8, alpha=0.22)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#d7e8dc")
+    ax.spines["bottom"].set_color("#d7e8dc")
+    ax.tick_params(colors="#234236", labelsize=10)
+    ax.title.set_color("#0a1f17")
+    ax.xaxis.label.set_color("#234236")
+    ax.yaxis.label.set_color("#234236")
 
 
 # -------------------------------------------------
@@ -815,7 +771,6 @@ def render_recommendation_popup() -> None:
 
             with right:
                 st.markdown('<div class="mini-header">Recommended Assets</div>', unsafe_allow_html=True)
-
                 st.markdown(
                     f"""
                     <div class="asset-card">
@@ -920,7 +875,7 @@ def render_builder_popup() -> None:
             with header_left:
                 st.markdown('<div class="popup-title">Live Portfolio Builder Output</div>', unsafe_allow_html=True)
                 st.markdown(
-                    '<div class="popup-subtitle">The graph is prioritised first, so the generated portfolio focuses on the efficient frontier rather than the inputs.</div>',
+                    '<div class="popup-subtitle">The efficient frontier is prioritised first so the screen focuses on the graph rather than the inputs.</div>',
                     unsafe_allow_html=True,
                 )
             with header_right:
@@ -1173,9 +1128,6 @@ def render_recommendation_screen() -> None:
 
 def render_builder_screen() -> None:
     inject_tool_text_css()
-
-    if "builder_risk_free_rate" not in st.session_state:
-        st.session_state.builder_risk_free_rate = 4.84
 
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
