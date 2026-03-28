@@ -826,11 +826,11 @@ def render_recommendation_screen() -> None:
             investment_priority_label = st.radio(
                 "Investment priority",
                 [
-                    "Balanced return and sustainability",
-                    "Prioritise financial growth",
                     "Prioritise sustainability",
+                    "Prioritise financial growth",
+                    "Balanced return and sustainability",
                 ],
-                horizontal=True,
+                horizontal=False,
             )
 
             risk_tolerance = st.slider(
@@ -845,15 +845,6 @@ def render_recommendation_screen() -> None:
                 "Which ESG aspect matters most?",
                 ["Environmental", "Sustainability / Social", "Governance", "All Equal"],
                 horizontal=True,
-            )
-
-            correlation_assumption = st.slider(
-                "Portfolio correlation assumption",
-                min_value=-1.0,
-                max_value=1.0,
-                value=0.30,
-                step=0.01,
-                help="Used to estimate 50/50 portfolio standard deviation for the recommended pair.",
             )
 
         run_recommendation = st.form_submit_button(
@@ -880,11 +871,12 @@ def render_recommendation_screen() -> None:
             exp_return2 = ASSET_DATA[asset2]["expected_return"]
             std_dev2 = ASSET_DATA[asset2]["std_dev"]
 
+            # Internal fixed correlation assumption for recommended portfolios
+            rho = 0.30
             w1 = 0.5
             w2 = 0.5
             s1 = std_dev1 / 100
             s2 = std_dev2 / 100
-            rho = correlation_assumption
 
             portfolio_return = w1 * exp_return1 + w2 * exp_return2
             portfolio_std_dev = (
@@ -937,18 +929,9 @@ def render_recommendation_screen() -> None:
 
             m1, m2 = st.columns(2)
             with m1:
-                st.markdown(result_tile("50/50 expected return", f"{portfolio_return:.2f}%"), unsafe_allow_html=True)
+                st.markdown(result_tile("Expected Returns", f"{portfolio_return:.2f}%"), unsafe_allow_html=True)
             with m2:
-                st.markdown(result_tile("50/50 portfolio risk", f"{portfolio_std_dev:.2f}%"), unsafe_allow_html=True)
-
-            st.markdown(
-                f"""
-                <div class="tool-note">
-                    Portfolio risk is estimated using equal weights and a correlation assumption of {correlation_assumption:.2f}.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                st.markdown(result_tile("Portfolio Risk", f"{portfolio_std_dev:.2f}%"), unsafe_allow_html=True)
 
             st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="chart-title">Recommended asset comparison</div>', unsafe_allow_html=True)
