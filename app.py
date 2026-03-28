@@ -410,7 +410,8 @@ def inject_css() -> None:
             }
 
             .metric-tile.compact {
-                padding: 0.72rem 0.85rem;
+                padding: 0.55rem 0.7rem;
+                min-height: 82px;
             }
 
             .metric-tile-label {
@@ -424,8 +425,8 @@ def inject_css() -> None:
             }
 
             .metric-tile.compact .metric-tile-label {
-                font-size: 0.78rem;
-                margin-bottom: 0.18rem;
+                font-size: 0.73rem;
+                margin-bottom: 0.14rem;
             }
 
             .metric-tile-value {
@@ -436,7 +437,8 @@ def inject_css() -> None:
             }
 
             .metric-tile.compact .metric-tile-value {
-                font-size: 1rem;
+                font-size: 0.94rem;
+                line-height: 1.15;
             }
 
             .tooltip-icon {
@@ -468,6 +470,10 @@ def inject_css() -> None:
                 padding: 1rem;
                 box-shadow: 0 8px 20px rgba(22,101,52,0.04);
                 height: 100%;
+            }
+
+            .asset-summary.tight {
+                padding: 1rem 1rem 0.95rem 1rem;
             }
 
             .asset-summary-title {
@@ -1093,51 +1099,56 @@ def render_recommendation_result_screen() -> None:
     with left:
         st.markdown(result_tile("Investment Priority", result["investment_priority_label"], compact=True), unsafe_allow_html=True)
         st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-        st.markdown(result_tile("Risk Level", result["risk_level"], compact=True), unsafe_allow_html=True)
-        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-        st.markdown(result_tile("Preferred ESG Aspect", result["esg_aspect"], compact=True), unsafe_allow_html=True)
-        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-        st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%', compact=True), unsafe_allow_html=True)
-        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-        st.markdown(
-            result_tile(
-                "Portfolio Risk",
-                f'{result["portfolio_std_dev"]:.2f}%',
-                tooltip="Portfolio risk is characterised by standard deviation.",
-                compact=True,
-            ),
-            unsafe_allow_html=True,
-        )
+
+        grid1_col1, grid1_col2 = st.columns(2, gap="small")
+        with grid1_col1:
+            st.markdown(result_tile("Risk Level", result["risk_level"], compact=True), unsafe_allow_html=True)
+        with grid1_col2:
+            st.markdown(result_tile("Preferred ESG Aspect", result["esg_aspect"], compact=True), unsafe_allow_html=True)
+
+        st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
+
+        grid2_col1, grid2_col2 = st.columns(2, gap="small")
+        with grid2_col1:
+            st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%', compact=True), unsafe_allow_html=True)
+        with grid2_col2:
+            st.markdown(
+                result_tile(
+                    "Portfolio Risk",
+                    f'{result["portfolio_std_dev"]:.2f}%',
+                    tooltip="Portfolio risk is characterised by standard deviation.",
+                    compact=True,
+                ),
+                unsafe_allow_html=True,
+            )
 
     with right:
         st.markdown('<div class="side-header">Recommended Assets</div>', unsafe_allow_html=True)
-        a1, a2 = st.columns(2, gap="large")
-        with a1:
-            st.markdown(
-                f"""
-                <div class="asset-summary">
-                    <div class="asset-summary-title">{result["asset1"]}</div>
-                    <p class="asset-summary-copy">
-                        Expected return: {result["exp_return1"]:.2f}%<br>
-                        Standard deviation: {result["std_dev1"]:.2f}%
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with a2:
-            st.markdown(
-                f"""
-                <div class="asset-summary">
-                    <div class="asset-summary-title">{result["asset2"]}</div>
-                    <p class="asset-summary-copy">
-                        Expected return: {result["exp_return2"]:.2f}%<br>
-                        Standard deviation: {result["std_dev2"]:.2f}%
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f"""
+            <div class="asset-summary tight">
+                <div class="asset-summary-title">{result["asset1"]}</div>
+                <p class="asset-summary-copy">
+                    Expected return: {result["exp_return1"]:.2f}%<br>
+                    Standard deviation: {result["std_dev1"]:.2f}%
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="asset-summary tight">
+                <div class="asset-summary-title">{result["asset2"]}</div>
+                <p class="asset-summary-copy">
+                    Expected return: {result["exp_return2"]:.2f}%<br>
+                    Standard deviation: {result["std_dev2"]:.2f}%
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Asset Comparison</div>', unsafe_allow_html=True)
@@ -1387,18 +1398,9 @@ def render_builder_result_screen() -> None:
     optimal_idx = result["optimal_idx"]
 
     st.button("← Back", on_click=open_builder, use_container_width=False)
-
-    st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="tool-section-label">Portfolio builder</div>', unsafe_allow_html=True)
-    st.markdown('<div class="tool-title">Your ESG-aware portfolio outcome</div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="tool-subtitle">
-            The portfolio below reflects your asset assumptions, risk tolerance,
-            and ESG preference weight.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    render_page_header(
+        "Portfolio Builder",
+        "Your ESG-aware portfolio outcome based on the assumptions and sustainability preferences you provided.",
     )
 
     row1_col1, row1_col2, row1_col3 = st.columns(3)
@@ -1481,8 +1483,6 @@ def render_builder_result_screen() -> None:
 
     st.pyplot(fig)
     plt.close(fig)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # -------------------------------------------------
