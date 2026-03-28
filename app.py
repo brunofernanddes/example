@@ -15,6 +15,7 @@ st.set_page_config(
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
 
+
 # -------------------------------------------------
 # Data for recommendation engine
 # -------------------------------------------------
@@ -99,6 +100,7 @@ ASSET_DATA = {
     "Raytheon Technologies (RTX)": {"expected_return": 16.65, "std_dev": 8.73},
 }
 
+
 # -------------------------------------------------
 # Session state
 # -------------------------------------------------
@@ -132,24 +134,26 @@ def inject_css() -> None:
         """
         <style>
             :root {
-                --bg1: #f7fbfa;
-                --bg2: #eef6f4;
+                --bg1: #f3fbf6;
+                --bg2: #e7f7ee;
                 --card: rgba(255,255,255,0.94);
-                --card-strong: rgba(255,255,255,0.98);
-                --text: #0f172a;
-                --muted: #475569;
-                --line: rgba(15,23,42,0.08);
-                --primary: #0f766e;
-                --primary-2: #14b8a6;
-                --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
-                --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.05);
+                --card-strong: rgba(255,255,255,0.99);
+                --text: #0a1f17;
+                --muted: #3d5c52;
+                --line: rgba(10,31,23,0.08);
+                --primary: #166534;
+                --primary-2: #16a34a;
+                --primary-3: #22c55e;
+                --soft-green: rgba(22,163,74,0.08);
+                --shadow: 0 18px 50px rgba(22, 101, 52, 0.08);
+                --shadow-soft: 0 10px 24px rgba(22, 101, 52, 0.05);
             }
 
             .stApp {
                 background:
-                    radial-gradient(circle at top left, rgba(20,184,166,0.08), transparent 28%),
-                    radial-gradient(circle at top right, rgba(15,118,110,0.05), transparent 24%),
-                    linear-gradient(180deg, var(--bg1) 0%, #f4f7fb 100%);
+                    radial-gradient(circle at top left, rgba(34,197,94,0.10), transparent 28%),
+                    radial-gradient(circle at top right, rgba(22,163,74,0.08), transparent 24%),
+                    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
             }
 
             .block-container {
@@ -173,14 +177,14 @@ def inject_css() -> None:
                 width: 50px;
                 height: 50px;
                 border-radius: 16px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-2));
+                background: linear-gradient(135deg, var(--primary), var(--primary-3));
                 color: white;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-size: 1.05rem;
                 font-weight: 900;
-                box-shadow: 0 12px 28px rgba(15,118,110,0.22);
+                box-shadow: 0 12px 28px rgba(22,163,74,0.24);
             }
 
             .brand-title {
@@ -198,8 +202,8 @@ def inject_css() -> None:
             }
 
             .hero {
-                background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88));
-                border: 1px solid rgba(255,255,255,0.7);
+                background: linear-gradient(135deg, rgba(255,255,255,0.97), rgba(245,255,249,0.90));
+                border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 26px;
                 padding: 2.2rem 2rem;
                 box-shadow: var(--shadow);
@@ -210,9 +214,9 @@ def inject_css() -> None:
                 display: inline-block;
                 padding: 0.4rem 0.76rem;
                 border-radius: 999px;
-                background: rgba(15,118,110,0.09);
+                background: var(--soft-green);
                 color: var(--primary);
-                border: 1px solid rgba(15,118,110,0.13);
+                border: 1px solid rgba(22,163,74,0.16);
                 font-size: 0.82rem;
                 font-weight: 800;
                 margin-bottom: 0.95rem;
@@ -230,7 +234,7 @@ def inject_css() -> None:
 
             .hero p {
                 margin: 0;
-                color: #334155;
+                color: var(--muted);
                 font-size: 1.04rem;
                 line-height: 1.7;
                 max-width: 760px;
@@ -246,8 +250,8 @@ def inject_css() -> None:
             .pill {
                 padding: 0.42rem 0.78rem;
                 border-radius: 999px;
-                background: rgba(255,255,255,0.92);
-                border: 1px solid var(--line);
+                background: rgba(255,255,255,0.95);
+                border: 1px solid rgba(22,101,52,0.10);
                 color: var(--text);
                 font-size: 0.87rem;
                 font-weight: 700;
@@ -278,7 +282,7 @@ def inject_css() -> None:
 
             .card {
                 background: var(--card);
-                border: 1px solid rgba(255,255,255,0.72);
+                border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 20px;
                 padding: 1.05rem;
                 box-shadow: var(--shadow-soft);
@@ -299,32 +303,9 @@ def inject_css() -> None:
                 line-height: 1.55;
             }
 
-            .cta-panel {
-                background: linear-gradient(135deg, rgba(15,118,110,0.10), rgba(20,184,166,0.05));
-                border: 1px solid rgba(15,118,110,0.10);
-                border-radius: 24px;
-                padding: 1.35rem;
-                box-shadow: var(--shadow-soft);
-            }
-
-            .cta-title {
-                color: var(--text);
-                font-size: 1.55rem;
-                font-weight: 850;
-                letter-spacing: -0.03em;
-                margin: 0 0 0.35rem 0;
-            }
-
-            .cta-copy {
-                color: var(--muted);
-                font-size: 0.98rem;
-                line-height: 1.6;
-                margin: 0;
-            }
-
             .stat {
                 background: var(--card-strong);
-                border: 1px solid var(--line);
+                border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 18px;
                 padding: 0.95rem 1rem;
                 box-shadow: var(--shadow-soft);
@@ -352,12 +333,20 @@ def inject_css() -> None:
                 border-radius: 14px;
                 font-weight: 800;
                 font-size: 0.96rem;
-                border: none;
+                border: 1px solid rgba(22,101,52,0.10);
+                background: linear-gradient(135deg, #ffffff, #f6fff8);
+                color: #0a1f17;
+                box-shadow: 0 8px 20px rgba(22,163,74,0.05);
+            }
+
+            div.stButton > button:hover {
+                border: 1px solid rgba(22,163,74,0.22);
+                box-shadow: 0 10px 22px rgba(22,163,74,0.08);
             }
 
             .tool-shell {
                 background: rgba(255,255,255,0.98);
-                border: 1px solid rgba(15,23,42,0.06);
+                border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 24px;
                 padding: 1.45rem;
                 box-shadow: var(--shadow-soft);
@@ -379,7 +368,7 @@ def inject_css() -> None:
             }
 
             .tool-section-label {
-                color: #0f766e;
+                color: var(--primary);
                 font-size: 0.78rem;
                 font-weight: 800;
                 text-transform: uppercase;
@@ -396,13 +385,13 @@ def inject_css() -> None:
 
             .tool-divider {
                 height: 1px;
-                background: rgba(15, 23, 42, 0.08);
+                background: rgba(22,101,52,0.10);
                 margin: 1.1rem 0 1.2rem 0;
                 border-radius: 999px;
             }
 
             .tool-note {
-                color: #334155;
+                color: #2f4f43;
                 font-size: 0.93rem;
                 line-height: 1.55;
                 margin-top: 0.25rem;
@@ -411,14 +400,14 @@ def inject_css() -> None:
 
             .metric-tile {
                 background: #ffffff;
-                border: 1px solid rgba(15, 23, 42, 0.07);
+                border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 16px;
                 padding: 0.95rem 1rem;
-                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+                box-shadow: 0 8px 20px rgba(22,101,52,0.04);
             }
 
             .metric-tile-label {
-                color: #64748b;
+                color: #58756a;
                 font-size: 0.84rem;
                 margin-bottom: 0.3rem;
             }
@@ -432,10 +421,10 @@ def inject_css() -> None:
 
             .asset-summary {
                 background: #ffffff;
-                border: 1px solid rgba(15, 23, 42, 0.07);
+                border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 18px;
                 padding: 1rem;
-                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+                box-shadow: 0 8px 20px rgba(22,101,52,0.04);
             }
 
             .asset-summary-title {
@@ -446,7 +435,7 @@ def inject_css() -> None:
             }
 
             .asset-summary-copy {
-                color: #334155;
+                color: #2f4f43;
                 font-size: 0.94rem;
                 line-height: 1.55;
                 margin: 0;
@@ -467,9 +456,9 @@ def inject_css() -> None:
                 align-items: center;
                 justify-content: center;
                 background:
-                    radial-gradient(circle at top left, rgba(20,184,166,0.14), transparent 28%),
-                    radial-gradient(circle at top right, rgba(15,118,110,0.10), transparent 24%),
-                    linear-gradient(180deg, #f7fbfa 0%, #f3f7fb 100%);
+                    radial-gradient(circle at top left, rgba(34,197,94,0.14), transparent 28%),
+                    radial-gradient(circle at top right, rgba(22,163,74,0.10), transparent 24%),
+                    linear-gradient(180deg, #f3fbf6 0%, #eaf8ef 100%);
                 animation: overlayFadeOut 0.9s ease 2s forwards;
                 pointer-events: none;
             }
@@ -484,7 +473,7 @@ def inject_css() -> None:
                 width: 100px;
                 height: 100px;
                 border-radius: 28px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-2));
+                background: linear-gradient(135deg, var(--primary), var(--primary-3));
                 color: white;
                 margin: 0 auto 1.15rem auto;
                 display: flex;
@@ -492,7 +481,7 @@ def inject_css() -> None:
                 justify-content: center;
                 font-size: 2rem;
                 font-weight: 900;
-                box-shadow: 0 18px 42px rgba(15,118,110,0.25);
+                box-shadow: 0 18px 42px rgba(22,163,74,0.24);
                 animation: brandFadeOut 0.8s ease 2s forwards;
             }
 
@@ -519,8 +508,8 @@ def inject_css() -> None:
                 margin-top: 1rem;
                 padding: 0.4rem 0.75rem;
                 border-radius: 999px;
-                background: rgba(15,118,110,0.08);
-                border: 1px solid rgba(15,118,110,0.12);
+                background: rgba(22,163,74,0.08);
+                border: 1px solid rgba(22,163,74,0.14);
                 color: var(--primary);
                 font-size: 0.82rem;
                 font-weight: 800;
@@ -605,10 +594,10 @@ def inject_tool_black_text_css() -> None:
 
             div[data-testid="stForm"] {
                 background: #ffffff;
-                border: 1px solid rgba(15, 23, 42, 0.08);
+                border: 1px solid rgba(22,101,52,0.10);
                 border-radius: 22px;
                 padding: 1.15rem 1.15rem 0.8rem 1.15rem;
-                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+                box-shadow: 0 10px 24px rgba(22,101,52,0.04);
             }
 
             div[data-testid="stForm"] p,
@@ -629,7 +618,7 @@ def inject_tool_black_text_css() -> None:
 
             div.stButton > button {
                 color: #000000 !important;
-                border: 1px solid rgba(15, 23, 42, 0.10) !important;
+                border: 1px solid rgba(22,101,52,0.12) !important;
             }
         </style>
         """,
@@ -786,33 +775,17 @@ def render_home() -> None:
             "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights."
         )
 
-    st.markdown("<div style='height:1.4rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:1.5rem;'></div>", unsafe_allow_html=True)
 
-    cta_left, cta_right = st.columns([1.15, 0.85], gap="large")
-
-    with cta_left:
-        st.markdown(
-            """
-            <div class="cta-panel">
-                <div class="section-label">Choose your next step</div>
-                <h2 class="cta-title">Explore portfolio outcomes or build your own</h2>
-                <p class="cta-copy">
-                    You can move straight to a portfolio recommendation or continue to a dedicated
-                    journey that builds a portfolio around your ESG priorities and investment preferences.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with cta_right:
+    btn1, btn2 = st.columns(2, gap="large")
+    with btn1:
         st.button(
             "Give me a portfolio recommendation",
             type="primary",
             use_container_width=True,
             on_click=open_recommendation,
         )
-        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+    with btn2:
         st.button(
             "Build your portfolio based on your ESG preferences",
             use_container_width=True,
@@ -1031,25 +1004,11 @@ def render_builder_screen() -> None:
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
         st.markdown('<div class="tool-section-title">Choose your setup</div>', unsafe_allow_html=True)
 
-        top_left, top_right = st.columns(2)
-
-        with top_left:
-            asset_choice = st.radio(
-                "Asset selection method",
-                ["Input my own assets", "Use recommended public companies"],
-                horizontal=True,
-            )
-
-        with top_right:
-            investment_priority = st.radio(
-                "Investment priority",
-                [
-                    "Balanced return and sustainability",
-                    "Prioritise financial growth",
-                    "Prioritise sustainability",
-                ],
-                horizontal=True,
-            )
+        asset_choice = st.radio(
+            "Asset selection method",
+            ["Input my own assets", "Use recommended public companies"],
+            horizontal=True,
+        )
 
         st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
 
@@ -1214,23 +1173,7 @@ def render_builder_screen() -> None:
         if s1 < 0 or s2 < 0:
             st.error("Standard deviations must be non-negative.")
         else:
-            base_gamma = 11 - risk_tolerance
-
-            priority_gamma_adjustment = {
-                "Balanced return and sustainability": 0,
-                "Prioritise financial growth": -2,
-                "Prioritise sustainability": 1,
-            }
-
-            priority_esg_adjustment = {
-                "Balanced return and sustainability": 0.00,
-                "Prioritise financial growth": 0.00,
-                "Prioritise sustainability": 0.03,
-            }
-
-            gamma = max(1, base_gamma + priority_gamma_adjustment[investment_priority])
-            effective_esg_weight = min(0.15, esg_slider + priority_esg_adjustment[investment_priority])
-
+            gamma = 11 - risk_tolerance
             weights = np.linspace(0, 1, 500)
 
             portfolio_returns = []
@@ -1251,7 +1194,7 @@ def render_builder_screen() -> None:
                 port_risk = np.sqrt(max(port_variance, 0))
                 port_esg = w1 * esg1 + w2 * esg2
                 sharpe = (port_return - rf) / port_risk if port_risk > 0 else 0.0
-                utility = port_return - 0.5 * gamma * port_variance + effective_esg_weight * port_esg
+                utility = port_return - 0.5 * gamma * port_variance + esg_slider * port_esg
 
                 portfolio_returns.append(port_return)
                 portfolio_risks.append(port_risk)
@@ -1301,7 +1244,7 @@ def render_builder_screen() -> None:
                 portfolio_risks,
                 portfolio_returns,
                 c=portfolio_esg,
-                cmap="viridis",
+                cmap="Greens",
                 s=18,
             )
             ax.scatter(
@@ -1327,34 +1270,6 @@ def render_builder_screen() -> None:
             cbar.set_label("Portfolio ESG Score")
             st.pyplot(fig)
             plt.close(fig)
-
-            st.markdown('<div class="chart-title">Sensitivity to ESG preference</div>', unsafe_allow_html=True)
-
-            lambdas = np.linspace(0.00, 0.10, 50)
-            optimal_w1_list = []
-            optimal_w2_list = []
-
-            for lam in lambdas:
-                utilities = []
-                for i, w1 in enumerate(weights):
-                    port_variance = portfolio_risks[i] ** 2
-                    utility = portfolio_returns[i] - 0.5 * gamma * port_variance + lam * portfolio_esg[i]
-                    utilities.append(utility)
-
-                best_idx = np.argmax(utilities)
-                optimal_w1_list.append(weights[best_idx])
-                optimal_w2_list.append(1 - weights[best_idx])
-
-            fig2, ax2 = plt.subplots(figsize=(10, 6))
-            ax2.plot(lambdas, optimal_w1_list, label=f"{asset1} Weight")
-            ax2.plot(lambdas, optimal_w2_list, label=f"{asset2} Weight")
-            ax2.set_xlabel("ESG Preference Weight")
-            ax2.set_ylabel("Optimal Portfolio Weight")
-            ax2.set_title("Optimal Weights as ESG Preference Changes")
-            ax2.legend()
-
-            st.pyplot(fig2)
-            plt.close(fig2)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
