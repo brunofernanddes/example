@@ -410,6 +410,10 @@ def inject_css() -> None:
                 color: #58756a;
                 font-size: 0.84rem;
                 margin-bottom: 0.3rem;
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+                flex-wrap: wrap;
             }
 
             .metric-tile-value {
@@ -417,6 +421,22 @@ def inject_css() -> None:
                 font-size: 1.2rem;
                 font-weight: 800;
                 line-height: 1.2;
+            }
+
+            .tooltip-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 16px;
+                height: 16px;
+                border-radius: 999px;
+                border: 1px solid rgba(22,101,52,0.18);
+                font-size: 0.72rem;
+                font-weight: 800;
+                color: #166534;
+                background: rgba(22,163,74,0.06);
+                cursor: help;
+                line-height: 1;
             }
 
             .asset-summary {
@@ -673,10 +693,13 @@ def render_card(title: str, body: str) -> None:
     )
 
 
-def result_tile(label: str, value: str) -> str:
+def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
+    tooltip_html = ""
+    if tooltip:
+        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
     return f"""
     <div class="metric-tile">
-        <div class="metric-tile-label">{label}</div>
+        <div class="metric-tile-label">{label} {tooltip_html}</div>
         <div class="metric-tile-value">{value}</div>
     </div>
     """
@@ -871,7 +894,6 @@ def render_recommendation_screen() -> None:
             exp_return2 = ASSET_DATA[asset2]["expected_return"]
             std_dev2 = ASSET_DATA[asset2]["std_dev"]
 
-            # Internal fixed correlation assumption for recommended portfolios
             rho = 0.30
             w1 = 0.5
             w2 = 0.5
@@ -931,10 +953,17 @@ def render_recommendation_screen() -> None:
             with m1:
                 st.markdown(result_tile("Expected Returns", f"{portfolio_return:.2f}%"), unsafe_allow_html=True)
             with m2:
-                st.markdown(result_tile("Portfolio Risk", f"{portfolio_std_dev:.2f}%"), unsafe_allow_html=True)
+                st.markdown(
+                    result_tile(
+                        "Portfolio Risk",
+                        f"{portfolio_std_dev:.2f}%",
+                        tooltip="Portfolio risk is characterised by standard deviation.",
+                    ),
+                    unsafe_allow_html=True,
+                )
 
             st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="chart-title">Recommended asset comparison</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">Asset Comparison</div>', unsafe_allow_html=True)
 
             fig, ax = plt.subplots(figsize=(10, 5))
             labels = [asset1, asset2]
@@ -947,8 +976,8 @@ def render_recommendation_screen() -> None:
             ax.bar(x + width / 2, risks, width, label="Standard Deviation (%)")
             ax.set_xticks(x)
             ax.set_xticklabels(labels, rotation=0)
-            ax.set_ylabel("Percentage")
-            ax.set_title("Recommended Asset Metrics")
+            ax.set_ylabel("Percentage (%)")
+            ax.set_title("Asset Metrics")
             ax.legend()
 
             st.pyplot(fig)
