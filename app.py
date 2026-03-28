@@ -144,7 +144,7 @@ def inject_css() -> None:
             :root {
                 --bg1: #f2fcf5;
                 --bg2: #e6f7ec;
-                --card: rgba(255,255,255,0.95);
+                --card: rgba(255,255,255,0.96);
                 --card-strong: rgba(255,255,255,0.99);
                 --text: #081b14;
                 --muted: #36574a;
@@ -211,7 +211,7 @@ def inject_css() -> None:
             }
 
             .hero {
-                background: linear-gradient(135deg, rgba(255,255,255,0.97), rgba(245,255,249,0.92));
+                background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(245,255,249,0.93));
                 border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 26px;
                 padding: 2.2rem 2rem;
@@ -325,31 +325,41 @@ def inject_css() -> None:
             }
 
             div.stButton > button,
-            div[data-testid="stFormSubmitButton"] > button,
-            div.stButton > button *,
-            div[data-testid="stFormSubmitButton"] > button * {
-                min-height: 3.05rem;
-                border-radius: 14px;
-                font-weight: 800;
-                font-size: 0.96rem;
+            div[data-testid="stFormSubmitButton"] > button {
+                min-height: 3.02rem !important;
+                border-radius: 14px !important;
+                font-weight: 800 !important;
+                font-size: 0.96rem !important;
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, var(--primary), var(--primary-3)) !important;
                 color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-                fill: #ffffff !important;
-                box-shadow: 0 10px 22px rgba(20,83,45,0.20);
+                box-shadow: 0 8px 18px rgba(20,83,45,0.18) !important;
+                transition: all 0.18s ease !important;
             }
 
             div.stButton > button:hover,
-            div[data-testid="stFormSubmitButton"] > button:hover,
-            div.stButton > button:hover *,
-            div[data-testid="stFormSubmitButton"] > button:hover * {
-                border: 1px solid var(--primary) !important;
+            div[data-testid="stFormSubmitButton"] > button:hover {
                 background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
                 color: #ffffff !important;
+                box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
+                transform: translateY(-1px);
+            }
+
+            div.stButton > button:focus,
+            div[data-testid="stFormSubmitButton"] > button:focus {
+                color: #ffffff !important;
+                outline: none !important;
+                box-shadow: 0 0 0 0.2rem rgba(21, 128, 61, 0.18), 0 10px 20px rgba(20,83,45,0.18) !important;
+            }
+
+            div.stButton > button p,
+            div.stButton > button span,
+            div.stButton > button div,
+            div[data-testid="stFormSubmitButton"] > button p,
+            div[data-testid="stFormSubmitButton"] > button span,
+            div[data-testid="stFormSubmitButton"] > button div {
+                color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
-                fill: #ffffff !important;
-                box-shadow: 0 12px 24px rgba(20,83,45,0.24);
             }
 
             .tool-shell {
@@ -358,21 +368,6 @@ def inject_css() -> None:
                 border-radius: 24px;
                 padding: 1.45rem;
                 box-shadow: var(--shadow-soft);
-            }
-
-            .tool-title {
-                color: #000000;
-                font-size: 2rem;
-                font-weight: 850;
-                letter-spacing: -0.03em;
-                margin: 0 0 0.2rem 0;
-            }
-
-            .tool-subtitle {
-                color: #000000;
-                font-size: 1rem;
-                line-height: 1.6;
-                margin: 0 0 1.2rem 0;
             }
 
             .tool-section-label {
@@ -414,6 +409,10 @@ def inject_css() -> None:
                 box-shadow: 0 8px 20px rgba(22,101,52,0.04);
             }
 
+            .metric-tile.compact {
+                padding: 0.72rem 0.85rem;
+            }
+
             .metric-tile-label {
                 color: #58756a;
                 font-size: 0.84rem;
@@ -424,11 +423,20 @@ def inject_css() -> None:
                 flex-wrap: wrap;
             }
 
+            .metric-tile.compact .metric-tile-label {
+                font-size: 0.78rem;
+                margin-bottom: 0.18rem;
+            }
+
             .metric-tile-value {
                 color: #000000;
                 font-size: 1.2rem;
                 font-weight: 800;
                 line-height: 1.2;
+            }
+
+            .metric-tile.compact .metric-tile-value {
+                font-size: 1rem;
             }
 
             .tooltip-icon {
@@ -459,12 +467,13 @@ def inject_css() -> None:
                 border-radius: 18px;
                 padding: 1rem;
                 box-shadow: 0 8px 20px rgba(22,101,52,0.04);
+                height: 100%;
             }
 
             .asset-summary-title {
                 color: #000000;
-                font-size: 1rem;
-                font-weight: 800;
+                font-size: 1.06rem;
+                font-weight: 850;
                 margin-bottom: 0.25rem;
             }
 
@@ -473,6 +482,13 @@ def inject_css() -> None:
                 font-size: 0.94rem;
                 line-height: 1.55;
                 margin: 0;
+            }
+
+            .side-header {
+                color: #0b1c15;
+                font-size: 1rem;
+                font-weight: 850;
+                margin: 0 0 0.75rem 0;
             }
 
             .chart-title {
@@ -703,12 +719,13 @@ def render_card(title: str, body: str) -> None:
     )
 
 
-def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
+def result_tile(label: str, value: str, tooltip: str | None = None, compact: bool = False) -> str:
     tooltip_html = ""
+    compact_class = " compact" if compact else ""
     if tooltip:
         tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
     return f"""
-    <div class="metric-tile">
+    <div class="metric-tile{compact_class}">
         <div class="metric-tile-label">{label} {tooltip_html}</div>
         <div class="metric-tile-value">{value}</div>
     </div>
@@ -759,17 +776,25 @@ def style_modern_axes(ax) -> None:
     ax.yaxis.label.set_color("#234236")
 
 
-def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect: str) -> dict:
+def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect_ui: str) -> dict:
     investment_priority_map = {
         "Balanced return and sustainability": "1",
         "Prioritise financial growth": "2",
         "Prioritise sustainability": "3",
     }
 
+    esg_internal_map = {
+        "All Equal": "All Equal",
+        "Governance": "Governance",
+        "Environmental": "Environmental",
+        "Social": "Sustainability / Social",
+    }
+
     investment_priority_key = investment_priority_map[priority_label]
     risk_level = risk_level_from_score(risk_tolerance)
+    esg_internal_key = esg_internal_map[esg_aspect_ui]
 
-    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
+    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_internal_key]
     exp_return1 = ASSET_DATA[asset1]["expected_return"]
     std_dev1 = ASSET_DATA[asset1]["std_dev"]
     exp_return2 = ASSET_DATA[asset2]["expected_return"]
@@ -790,7 +815,7 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect:
         "investment_priority_label": priority_label,
         "risk_tolerance": risk_tolerance,
         "risk_level": risk_level,
-        "esg_aspect": esg_aspect,
+        "esg_aspect": esg_aspect_ui,
         "asset1": asset1,
         "asset2": asset2,
         "exp_return1": exp_return1,
@@ -1025,7 +1050,7 @@ def render_recommendation_screen() -> None:
             render_custom_label("Which ESG aspect matters most?")
             esg_aspect = st.radio(
                 "Which ESG aspect matters most?",
-                ["All Equal", "Governance", "Environmental", "Sustainability / Social"],
+                ["All Equal", "Governance", "Environmental", "Social"],
                 horizontal=False,
                 label_visibility="collapsed",
             )
@@ -1058,72 +1083,61 @@ def render_recommendation_result_screen() -> None:
         st.rerun()
 
     st.button("← Back", on_click=open_recommendation, use_container_width=False)
-
-    st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="tool-section-label">Portfolio recommendation</div>', unsafe_allow_html=True)
-    st.markdown('<div class="tool-title">Your recommended portfolio</div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="tool-subtitle">
-            A recommended pair selected using your chosen investment priority,
-            risk tolerance, and ESG focus.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    render_page_header(
+        "Your Recommended Portfolio",
+        "A recommended pair selected using your chosen investment priority, risk tolerance, and ESG focus.",
     )
 
-    a1, a2 = st.columns(2, gap="large")
-    with a1:
-        st.markdown(
-            f"""
-            <div class="asset-summary">
-                <div class="asset-summary-title">{result["asset1"]}</div>
-                <p class="asset-summary-copy">
-                    Expected return: {result["exp_return1"]:.2f}%<br>
-                    Standard deviation: {result["std_dev1"]:.2f}%
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with a2:
-        st.markdown(
-            f"""
-            <div class="asset-summary">
-                <div class="asset-summary-title">{result["asset2"]}</div>
-                <p class="asset-summary-copy">
-                    Expected return: {result["exp_return2"]:.2f}%<br>
-                    Standard deviation: {result["std_dev2"]:.2f}%
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    left, right = st.columns([0.82, 1.18], gap="large")
 
-    st.markdown("<div style='height:0.8rem;'></div>", unsafe_allow_html=True)
-
-    r1, r2, r3 = st.columns(3)
-    with r1:
-        st.markdown(result_tile("Investment priority", result["investment_priority_label"]), unsafe_allow_html=True)
-    with r2:
-        st.markdown(result_tile("Risk level", result["risk_level"]), unsafe_allow_html=True)
-    with r3:
-        st.markdown(result_tile("Preferred ESG aspect", result["esg_aspect"]), unsafe_allow_html=True)
-
-    st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
-
-    m1, m2 = st.columns(2)
-    with m1:
-        st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%'), unsafe_allow_html=True)
-    with m2:
+    with left:
+        st.markdown(result_tile("Investment Priority", result["investment_priority_label"], compact=True), unsafe_allow_html=True)
+        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
+        st.markdown(result_tile("Risk Level", result["risk_level"], compact=True), unsafe_allow_html=True)
+        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
+        st.markdown(result_tile("Preferred ESG Aspect", result["esg_aspect"], compact=True), unsafe_allow_html=True)
+        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
+        st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%', compact=True), unsafe_allow_html=True)
+        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
         st.markdown(
             result_tile(
                 "Portfolio Risk",
                 f'{result["portfolio_std_dev"]:.2f}%',
                 tooltip="Portfolio risk is characterised by standard deviation.",
+                compact=True,
             ),
             unsafe_allow_html=True,
         )
+
+    with right:
+        st.markdown('<div class="side-header">Recommended Assets</div>', unsafe_allow_html=True)
+        a1, a2 = st.columns(2, gap="large")
+        with a1:
+            st.markdown(
+                f"""
+                <div class="asset-summary">
+                    <div class="asset-summary-title">{result["asset1"]}</div>
+                    <p class="asset-summary-copy">
+                        Expected return: {result["exp_return1"]:.2f}%<br>
+                        Standard deviation: {result["std_dev1"]:.2f}%
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with a2:
+            st.markdown(
+                f"""
+                <div class="asset-summary">
+                    <div class="asset-summary-title">{result["asset2"]}</div>
+                    <p class="asset-summary-copy">
+                        Expected return: {result["exp_return2"]:.2f}%<br>
+                        Standard deviation: {result["std_dev2"]:.2f}%
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Asset Comparison</div>', unsafe_allow_html=True)
@@ -1148,8 +1162,6 @@ def render_recommendation_result_screen() -> None:
 
     st.pyplot(fig)
     plt.close(fig)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # -------------------------------------------------
