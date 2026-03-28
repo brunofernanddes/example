@@ -108,11 +108,11 @@ def init_session_state() -> None:
         "show_splash": True,
         "show_recommendation_popup": False,
         "show_builder_popup": False,
-        # Recommendation widgets
+        # Recommendation inputs
         "rec_investment_priority": "Prioritise sustainability",
         "rec_risk_tolerance": 5,
         "rec_esg_aspect": "All Equal",
-        # Builder widgets
+        # Builder inputs
         "builder_asset_choice": "Input my own assets",
         "builder_asset1": "Asset 1",
         "builder_asset2": "Asset 2",
@@ -150,6 +150,8 @@ def open_recommendation() -> None:
 def open_builder() -> None:
     st.session_state.current_view = "builder"
     st.session_state.show_recommendation_popup = False
+    if "builder_risk_free_rate" not in st.session_state:
+        st.session_state.builder_risk_free_rate = 4.84
 
 
 def show_recommendation_popup() -> None:
@@ -180,12 +182,10 @@ def inject_css() -> None:
                 --bg2: #e6f7ec;
                 --text: #081b14;
                 --muted: #36574a;
-                --line: rgba(8,27,20,0.08);
                 --primary: #14532d;
                 --primary2: #166534;
                 --primary3: #15803d;
                 --primary4: #22c55e;
-                --soft: rgba(22,163,74,0.08);
                 --shadow: 0 18px 50px rgba(20, 83, 45, 0.08);
                 --shadow-soft: 0 10px 24px rgba(20, 83, 45, 0.05);
             }
@@ -465,8 +465,7 @@ def inject_css() -> None:
                 padding: 0.2rem !important;
             }
 
-            div.stButton > button,
-            div[data-testid="stFormSubmitButton"] > button {
+            div.stButton > button {
                 min-height: 3.02rem !important;
                 border-radius: 14px !important;
                 font-weight: 800 !important;
@@ -478,8 +477,7 @@ def inject_css() -> None:
                 transition: all 0.18s ease !important;
             }
 
-            div.stButton > button:hover,
-            div[data-testid="stFormSubmitButton"] > button:hover {
+            div.stButton > button:hover {
                 background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
                 color: #ffffff !important;
                 box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
@@ -488,10 +486,7 @@ def inject_css() -> None:
 
             div.stButton > button p,
             div.stButton > button span,
-            div.stButton > button div,
-            div[data-testid="stFormSubmitButton"] > button p,
-            div[data-testid="stFormSubmitButton"] > button span,
-            div[data-testid="stFormSubmitButton"] > button div {
+            div.stButton > button div {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
             }
@@ -628,100 +623,6 @@ def inject_tool_text_css() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-# -------------------------------------------------
-# UI helpers
-# -------------------------------------------------
-def render_splash_overlay() -> None:
-    st.markdown(
-        f"""
-        <div class="splash-overlay">
-            <div class="splash-card">
-                <div class="splash-logo">VW</div>
-                <div class="splash-title">{APP_NAME}</div>
-                <div class="splash-copy">
-                    {APP_TAGLINE}<br>
-                    A streamlined sustainable finance experience built around
-                    financial risk and ESG priorities.
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_stat(value: str, label: str) -> None:
-    st.markdown(
-        f"""
-        <div class="stat">
-            <div class="stat-value">{value}</div>
-            <div class="stat-label">{label}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_card(title: str, body: str) -> None:
-    st.markdown(
-        f"""
-        <div class="card">
-            <h3>{title}</h3>
-            <p>{body}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_page_header(title: str, subtitle: str) -> None:
-    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
-
-
-def render_custom_label(text: str) -> None:
-    st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
-
-
-def render_label_with_tooltip(text: str, tooltip: str) -> None:
-    st.markdown(
-        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
-        unsafe_allow_html=True,
-    )
-
-
-def render_risk_tolerance_helper() -> None:
-    st.markdown(
-        '<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
-    tooltip_html = ""
-    if tooltip:
-        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
-    return f"""
-    <div class="metric-tile">
-        <div class="metric-tile-label">{label} {tooltip_html}</div>
-        <div class="metric-tile-value">{value}</div>
-    </div>
-    """
-
-
-def style_modern_axes(ax) -> None:
-    ax.set_facecolor("#ffffff")
-    ax.grid(axis="y", linestyle="--", linewidth=0.8, alpha=0.22)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color("#d7e8dc")
-    ax.spines["bottom"].set_color("#d7e8dc")
-    ax.tick_params(colors="#234236", labelsize=10)
-    ax.title.set_color("#0a1f17")
-    ax.xaxis.label.set_color("#234236")
-    ax.yaxis.label.set_color("#234236")
 
 
 # -------------------------------------------------
@@ -979,8 +880,7 @@ def render_builder_popup() -> None:
                         unsafe_allow_html=True,
                     )
                 with header_right:
-                    st.button("Close", key="close_builder_popup_btn_info", use_container_width=True, on_click=hide_builder_popup)
-
+                    st.button("Close", key="close_builder_popup_info", use_container_width=True, on_click=hide_builder_popup)
                 st.info("Recommended public companies mode is ready for your curated ESG universe integration.")
         return
 
@@ -1008,7 +908,7 @@ def render_builder_popup() -> None:
                 with header_left:
                     st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
                 with header_right:
-                    st.button("Close", key="close_builder_popup_btn_error", use_container_width=True, on_click=hide_builder_popup)
+                    st.button("Close", key="close_builder_popup_error", use_container_width=True, on_click=hide_builder_popup)
                 st.error("Please check your inputs and try again.")
         return
 
@@ -1018,52 +918,25 @@ def render_builder_popup() -> None:
         with popup:
             header_left, header_right = st.columns([0.82, 0.18], gap="small")
             with header_left:
-                st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
+                st.markdown('<div class="popup-title">Live Portfolio Builder Output</div>', unsafe_allow_html=True)
                 st.markdown(
-                    '<div class="popup-subtitle">Your portfolio updates live as you adjust assumptions, ESG scores, risk tolerance, and ESG weight.</div>',
+                    '<div class="popup-subtitle">The graph is prioritised first, so the generated portfolio focuses on the efficient frontier rather than the inputs.</div>',
                     unsafe_allow_html=True,
                 )
             with header_right:
-                st.button("Close", key="close_builder_popup_btn", use_container_width=True, on_click=hide_builder_popup)
-
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            row1c1, row1c2, row1c3 = st.columns(3, gap="small")
-            with row1c1:
-                st.markdown(result_tile(f'{result["asset1"]} weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
-            with row1c2:
-                st.markdown(result_tile(f'{result["asset2"]} weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
-            with row1c3:
-                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
-
-            st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
-            row2c1, row2c2, row2c3 = st.columns(3, gap="small")
-            with row2c1:
-                st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
-            with row2c2:
-                st.markdown(
-                    result_tile(
-                        "Portfolio Risk",
-                        f'{result["opt_risk"]:.2%}',
-                        tooltip="Portfolio risk is characterised by standard deviation.",
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with row2c3:
-                st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
+                st.button("Close", key="close_builder_popup", use_container_width=True, on_click=hide_builder_popup)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontier</div>', unsafe_allow_html=True)
 
-            fig, ax = plt.subplots(figsize=(9.2, 5.1), dpi=180, constrained_layout=True)
+            fig, ax = plt.subplots(figsize=(9.2, 5.4), dpi=180, constrained_layout=True)
             fig.patch.set_facecolor("white")
             scatter = ax.scatter(
                 result["portfolio_risks"],
                 result["portfolio_returns"],
                 c=result["portfolio_esg"],
                 cmap="Greens",
-                s=26,
+                s=28,
                 alpha=0.92,
                 edgecolors="none",
             )
@@ -1111,6 +984,33 @@ def render_builder_popup() -> None:
 
             st.pyplot(fig)
             plt.close(fig)
+
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            row1c1, row1c2, row1c3 = st.columns(3, gap="small")
+            with row1c1:
+                st.markdown(result_tile(f'{result["asset1"]} weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
+            with row1c2:
+                st.markdown(result_tile(f'{result["asset2"]} weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
+            with row1c3:
+                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
+
+            row2c1, row2c2, row2c3 = st.columns(3, gap="small")
+            with row2c1:
+                st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
+            with row2c2:
+                st.markdown(
+                    result_tile(
+                        "Portfolio Risk",
+                        f'{result["opt_risk"]:.2%}',
+                        tooltip="Portfolio risk is characterised by standard deviation.",
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with row2c3:
+                st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
 
 
 # -------------------------------------------------
@@ -1274,6 +1174,9 @@ def render_recommendation_screen() -> None:
 def render_builder_screen() -> None:
     inject_tool_text_css()
 
+    if "builder_risk_free_rate" not in st.session_state:
+        st.session_state.builder_risk_free_rate = 4.84
+
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
         "Portfolio Builder",
@@ -1376,6 +1279,10 @@ def render_builder_screen() -> None:
             step=0.01,
             key="builder_risk_free_rate",
             label_visibility="collapsed",
+        )
+        st.markdown(
+            '<div class="tool-note">Default: 4.84%. You can change it whenever you want.</div>',
+            unsafe_allow_html=True,
         )
 
         render_custom_label("Risk Tolerance")
