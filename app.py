@@ -152,7 +152,9 @@ def inject_css() -> None:
                 --primary: #166534;
                 --primary-2: #16a34a;
                 --primary-3: #22c55e;
-                --primary-4: #86efac;
+                --orange1: #f97316;
+                --orange2: #fb923c;
+                --orange3: #ea580c;
                 --soft-green: rgba(22,163,74,0.08);
                 --shadow: 0 20px 50px rgba(22, 101, 52, 0.08);
                 --shadow-soft: 0 10px 24px rgba(22, 101, 52, 0.05);
@@ -333,15 +335,6 @@ def inject_css() -> None:
                 margin-top: 0.15rem;
             }
 
-            .visual-card {
-                background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(242,252,245,0.95));
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 22px;
-                padding: 0.6rem;
-                box-shadow: var(--shadow-soft);
-                overflow: hidden;
-            }
-
             .spacer {
                 height: 0.65rem;
             }
@@ -351,15 +344,17 @@ def inject_css() -> None:
                 border-radius: 14px;
                 font-weight: 800;
                 font-size: 0.96rem;
-                border: 1px solid rgba(22,101,52,0.10);
-                background: linear-gradient(135deg, #ffffff, #f6fff8);
-                color: #0a1f17;
-                box-shadow: 0 8px 20px rgba(22,163,74,0.05);
+                border: 1px solid var(--orange3) !important;
+                background: linear-gradient(135deg, var(--orange1), var(--orange2)) !important;
+                color: white !important;
+                box-shadow: 0 10px 22px rgba(249,115,22,0.18);
             }
 
             div.stButton > button:hover {
-                border: 1px solid rgba(22,163,74,0.22);
-                box-shadow: 0 10px 22px rgba(22,163,74,0.08);
+                border: 1px solid var(--orange3) !important;
+                background: linear-gradient(135deg, var(--orange3), var(--orange1)) !important;
+                color: white !important;
+                box-shadow: 0 12px 24px rgba(249,115,22,0.24);
             }
 
             .tool-shell {
@@ -662,8 +657,8 @@ def inject_tool_black_text_css() -> None:
             }
 
             div.stButton > button {
-                color: #000000 !important;
-                border: 1px solid rgba(22,101,52,0.12) !important;
+                color: white !important;
+                border: 1px solid #ea580c !important;
             }
         </style>
         """,
@@ -718,56 +713,6 @@ def render_card(title: str, body: str) -> None:
     )
 
 
-def render_home_visual() -> None:
-    st.markdown(
-        """
-        <div class="visual-card">
-            <svg viewBox="0 0 420 270" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <linearGradient id="bggrad" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="#f7fff9"/>
-                        <stop offset="100%" stop-color="#e8f7ee"/>
-                    </linearGradient>
-                    <linearGradient id="leafgrad" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="#16a34a"/>
-                        <stop offset="100%" stop-color="#22c55e"/>
-                    </linearGradient>
-                    <linearGradient id="chartgrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#16a34a" stop-opacity="0.35"/>
-                        <stop offset="100%" stop-color="#16a34a" stop-opacity="0.03"/>
-                    </linearGradient>
-                </defs>
-
-                <rect x="0" y="0" width="420" height="270" rx="22" fill="url(#bggrad)"/>
-                <circle cx="60" cy="50" r="34" fill="#dcfce7"/>
-                <circle cx="360" cy="55" r="42" fill="#dcfce7"/>
-                <circle cx="330" cy="215" r="52" fill="#ecfdf3"/>
-
-                <rect x="34" y="144" width="152" height="86" rx="18" fill="#ffffff" stroke="#d1fae5"/>
-                <rect x="53" y="182" width="18" height="28" rx="6" fill="#86efac"/>
-                <rect x="82" y="166" width="18" height="44" rx="6" fill="#4ade80"/>
-                <rect x="111" y="153" width="18" height="57" rx="6" fill="#22c55e"/>
-                <rect x="140" y="174" width="18" height="36" rx="6" fill="#16a34a"/>
-                <path d="M52 115 C92 84, 124 104, 162 72 C188 49, 232 58, 274 95" fill="none" stroke="#166534" stroke-width="5" stroke-linecap="round"/>
-                <circle cx="162" cy="72" r="6" fill="#166534"/>
-                <circle cx="274" cy="95" r="6" fill="#166534"/>
-
-                <rect x="214" y="126" width="170" height="104" rx="20" fill="#ffffff" stroke="#d1fae5"/>
-                <path d="M255 196 C233 174, 236 145, 269 132 C287 154, 284 181, 255 196Z" fill="url(#leafgrad)"/>
-                <path d="M297 204 C278 182, 282 148, 320 136 C336 163, 330 191, 297 204Z" fill="url(#leafgrad)"/>
-                <path d="M342 191 C325 172, 330 144, 359 136 C373 158, 369 180, 342 191Z" fill="url(#leafgrad)"/>
-                <path d="M270 134 C277 154, 274 177, 262 195" fill="none" stroke="#14532d" stroke-width="2"/>
-                <path d="M320 138 C323 158, 315 181, 301 203" fill="none" stroke="#14532d" stroke-width="2"/>
-                <path d="M360 138 C361 156, 354 176, 344 190" fill="none" stroke="#14532d" stroke-width="2"/>
-
-                <path d="M42 128 L84 112 L121 118 L162 89 L206 98 L248 82 L290 112 L290 230 L42 230 Z" fill="url(#chartgrad)"/>
-            </svg>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     tooltip_html = ""
     if tooltip:
@@ -808,12 +753,12 @@ def render_label_with_tooltip(text: str, tooltip: str) -> None:
 
 def style_modern_axes(ax) -> None:
     ax.set_facecolor("#ffffff")
-    ax.grid(axis="y", linestyle="--", linewidth=0.7, alpha=0.22)
+    ax.grid(axis="y", linestyle="--", linewidth=0.8, alpha=0.22)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_color("#d7e8dc")
     ax.spines["bottom"].set_color("#d7e8dc")
-    ax.tick_params(colors="#234236")
+    ax.tick_params(colors="#234236", labelsize=10)
     ax.title.set_color("#0a1f17")
     ax.xaxis.label.set_color("#234236")
     ax.yaxis.label.set_color("#234236")
@@ -992,8 +937,6 @@ def render_home() -> None:
         render_stat("Social", "People, communities, and workplace outcomes")
         st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
         render_stat("Governance", "Leadership, ethics, and accountability")
-        st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-        render_home_visual()
 
     st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
 
@@ -1036,14 +979,14 @@ def render_home() -> None:
     btn1, btn2 = st.columns(2, gap="large")
     with btn1:
         st.button(
-            "Give me a portfolio recommendation",
+            "Give Me a Portfolio Recommendation",
             type="primary",
             use_container_width=True,
             on_click=open_recommendation,
         )
     with btn2:
         st.button(
-            "Build your portfolio based on your ESG preferences",
+            "Build Your Portfolio Based on ESG Preferences",
             use_container_width=True,
             on_click=open_builder,
         )
@@ -1058,19 +1001,6 @@ def render_recommendation_screen() -> None:
     col_back, col_main = st.columns([0.14, 0.86])
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
-
-    st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="tool-section-label">Portfolio recommendation</div>', unsafe_allow_html=True)
-    st.markdown('<div class="tool-title">Give me a portfolio recommendation</div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="tool-subtitle">
-            Receive a recommended two-asset portfolio based on your investment priority,
-            risk tolerance, and preferred ESG focus.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     with st.form("recommendation_form", clear_on_submit=False):
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
@@ -1124,8 +1054,6 @@ def render_recommendation_screen() -> None:
         )
         open_recommendation_result()
         st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # -------------------------------------------------
@@ -1246,22 +1174,6 @@ def render_builder_screen() -> None:
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
-    st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="tool-section-label">Portfolio builder</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="tool-title">Build your portfolio based on your ESG preferences</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <div class="tool-subtitle">
-            Create a simple ESG-aware portfolio recommendation using your asset assumptions,
-            risk tolerance, and sustainability preferences.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     with st.form("portfolio_builder_form", clear_on_submit=False):
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
         st.markdown('<div class="tool-section-title">Choose your setup</div>', unsafe_allow_html=True)
@@ -1369,10 +1281,12 @@ def render_builder_screen() -> None:
                 render_risk_tolerance_helper()
 
             with pref_right:
+                render_custom_label("How important is ESG when choosing investments?")
                 esg_preference_label = st.radio(
                     "How important is ESG when choosing investments?",
-                    ["Not important", "Somewhat important", "Very important"],
-                    horizontal=True,
+                    ["Not important", "Very important", "Somewhat important"],
+                    horizontal=False,
+                    label_visibility="collapsed",
                 )
 
                 lambda_map = {
@@ -1450,8 +1364,6 @@ def render_builder_screen() -> None:
         open_builder_result()
         st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
 
 # -------------------------------------------------
 # Builder result screen
@@ -1524,7 +1436,7 @@ def render_builder_result_screen() -> None:
         portfolio_returns,
         c=portfolio_esg,
         cmap="Greens",
-        s=24,
+        s=28,
         alpha=0.92,
         edgecolors="none",
     )
@@ -1532,7 +1444,7 @@ def render_builder_result_screen() -> None:
         portfolio_risks[max_sharpe_idx],
         portfolio_returns[max_sharpe_idx],
         marker="*",
-        s=280,
+        s=300,
         color="#166534",
         label="Max Sharpe",
         zorder=5,
@@ -1541,7 +1453,7 @@ def render_builder_result_screen() -> None:
         portfolio_risks[optimal_idx],
         portfolio_returns[optimal_idx],
         marker="X",
-        s=230,
+        s=240,
         color="#0f172a",
         label="Optimal ESG-aware",
         zorder=6,
