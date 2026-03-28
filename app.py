@@ -108,9 +108,11 @@ def init_session_state() -> None:
         "show_splash": True,
         "show_recommendation_popup": False,
         "show_builder_popup": False,
+        # Recommendation widgets
         "rec_investment_priority": "Prioritise sustainability",
         "rec_risk_tolerance": 5,
         "rec_esg_aspect": "All Equal",
+        # Builder widgets
         "builder_asset_choice": "Input my own assets",
         "builder_asset1": "Asset 1",
         "builder_asset2": "Asset 2",
@@ -148,7 +150,6 @@ def open_recommendation() -> None:
 def open_builder() -> None:
     st.session_state.current_view = "builder"
     st.session_state.show_recommendation_popup = False
-    st.session_state.builder_risk_free_rate = st.session_state.get("builder_risk_free_rate", 4.84)
 
 
 def show_recommendation_popup() -> None:
@@ -179,10 +180,12 @@ def inject_css() -> None:
                 --bg2: #e6f7ec;
                 --text: #081b14;
                 --muted: #36574a;
+                --line: rgba(8,27,20,0.08);
                 --primary: #14532d;
                 --primary2: #166534;
                 --primary3: #15803d;
                 --primary4: #22c55e;
+                --soft: rgba(22,163,74,0.08);
                 --shadow: 0 18px 50px rgba(20, 83, 45, 0.08);
                 --shadow-soft: 0 10px 24px rgba(20, 83, 45, 0.05);
             }
@@ -462,7 +465,8 @@ def inject_css() -> None:
                 padding: 0.2rem !important;
             }
 
-            div.stButton > button {
+            div.stButton > button,
+            div[data-testid="stFormSubmitButton"] > button {
                 min-height: 3.02rem !important;
                 border-radius: 14px !important;
                 font-weight: 800 !important;
@@ -474,7 +478,8 @@ def inject_css() -> None:
                 transition: all 0.18s ease !important;
             }
 
-            div.stButton > button:hover {
+            div.stButton > button:hover,
+            div[data-testid="stFormSubmitButton"] > button:hover {
                 background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
                 color: #ffffff !important;
                 box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
@@ -483,7 +488,10 @@ def inject_css() -> None:
 
             div.stButton > button p,
             div.stButton > button span,
-            div.stButton > button div {
+            div.stButton > button div,
+            div[data-testid="stFormSubmitButton"] > button p,
+            div[data-testid="stFormSubmitButton"] > button span,
+            div[data-testid="stFormSubmitButton"] > button div {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
             }
@@ -717,6 +725,141 @@ def style_modern_axes(ax) -> None:
 
 
 # -------------------------------------------------
+# Computation helpers
+# -------------------------------------------------
+def risk_level_from_score(risk_tolerance: int) -> str:
+    if 1 <= risk_tolerance <= 4:
+        return "Low"
+    if 5 <= risk_tolerance <= 7:
+        return "Medium"
+    return "High"
+
+
+def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect: str) -> dict:
+    investment_priority_map = {
+        "Balanced return and sustainability": "1",
+        "Prioritise financial growth": "2",
+        "Prioritise sustainability": "3",
+    }
+
+    investment_priority_key = investment_priority_map[priority_label]
+    risk_level = risk_level_from_score(risk_tolerance)
+
+    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
+    exp_return1 = ASSET_DATA[asset1]["expected_return"]
+    std_dev1 = ASSET_DATA[asset1]["std_dev"]
+    exp_return2 = ASSET_DATA[asset2]["expected_return"]
+    std_dev2 = ASSET_DATA[asset2]["std_dev"]
+
+    rho = 0.30
+    w1 = 0.5
+    w2 = 0.5
+    s1 = std_dev1 / 100
+    s2 = std_dev2 / 100
+
+    portfolio_return = w1 * exp_return1 + w2 * exp_return2
+    portfolio_std_dev = (
+        np.sqrt((w1 ** 2) * (s1 ** 2) + (w2 ** 2) * (s2 ** 2) + 2 * w1 * w2 * s1 * s2 * rho) * 100
+    )
+
+    return {
+        "investment_priority_label": priority_label,
+        "risk_level": risk_level,
+        "esg_aspect": esg_aspect,
+        "asset1": asset1,
+        "asset2": asset2,
+        "exp_return1": exp_return1,
+        "std_dev1": std_dev1,
+        "exp_return2": exp_return2,
+        "std_dev2": std_dev2,
+        "portfolio_return": portfolio_return,
+        "portfolio_std_dev": portfolio_std_dev,
+    }
+
+
+def compute_builder_result(
+    asset1: str,
+    asset2: str,
+    exp_return1: float,
+    exp_return2: float,
+    std_dev1: float,
+    std_dev2: float,
+    esg_score1: float,
+    esg_score2: float,
+    correlation: float,
+    risk_free_rate: float,
+    risk_tolerance: int,
+    esg_slider: float,
+) -> dict:
+    r1 = exp_return1 / 100
+    r2 = exp_return2 / 100
+    s1 = std_dev1 / 100
+    s2 = std_dev2 / 100
+    rho = correlation
+    rf = risk_free_rate / 100
+    esg1 = esg_score1 / 100
+    esg2 = esg_score2 / 100
+
+    gamma = 11 - risk_tolerance
+    weights = np.linspace(0, 1, 600)
+
+    portfolio_returns = []
+    portfolio_risks = []
+    portfolio_esg = []
+    portfolio_sharpes = []
+    portfolio_utility = []
+
+    for w1 in weights:
+        w2 = 1 - w1
+        port_return = w1 * r1 + w2 * r2
+        port_variance = (
+            (w1 ** 2) * (s1 ** 2)
+            + (w2 ** 2) * (s2 ** 2)
+            + 2 * w1 * w2 * s1 * s2 * rho
+        )
+        port_risk = np.sqrt(max(port_variance, 0))
+        port_esg = w1 * esg1 + w2 * esg2
+        sharpe = (port_return - rf) / port_risk if port_risk > 0 else 0.0
+        utility = port_return - 0.5 * gamma * port_variance + esg_slider * port_esg
+
+        portfolio_returns.append(port_return)
+        portfolio_risks.append(port_risk)
+        portfolio_esg.append(port_esg)
+        portfolio_sharpes.append(sharpe)
+        portfolio_utility.append(utility)
+
+    portfolio_returns = np.array(portfolio_returns)
+    portfolio_risks = np.array(portfolio_risks)
+    portfolio_esg = np.array(portfolio_esg)
+    portfolio_sharpes = np.array(portfolio_sharpes)
+    portfolio_utility = np.array(portfolio_utility)
+
+    max_sharpe_idx = int(np.argmax(portfolio_sharpes))
+    optimal_idx = int(np.argmax(portfolio_utility))
+
+    opt_w1 = float(weights[optimal_idx])
+    opt_w2 = float(1 - opt_w1)
+
+    return {
+        "asset1": asset1,
+        "asset2": asset2,
+        "weights": weights,
+        "portfolio_returns": portfolio_returns,
+        "portfolio_risks": portfolio_risks,
+        "portfolio_esg": portfolio_esg,
+        "portfolio_sharpes": portfolio_sharpes,
+        "max_sharpe_idx": max_sharpe_idx,
+        "optimal_idx": optimal_idx,
+        "opt_w1": opt_w1,
+        "opt_w2": opt_w2,
+        "opt_return": float(portfolio_returns[optimal_idx]),
+        "opt_risk": float(portfolio_risks[optimal_idx]),
+        "opt_esg": float(portfolio_esg[optimal_idx]),
+        "opt_sharpe": float(portfolio_sharpes[optimal_idx]),
+    }
+
+
+# -------------------------------------------------
 # Popup renderers
 # -------------------------------------------------
 def render_recommendation_popup() -> None:
@@ -771,6 +914,7 @@ def render_recommendation_popup() -> None:
 
             with right:
                 st.markdown('<div class="mini-header">Recommended Assets</div>', unsafe_allow_html=True)
+
                 st.markdown(
                     f"""
                     <div class="asset-card">
@@ -835,7 +979,8 @@ def render_builder_popup() -> None:
                         unsafe_allow_html=True,
                     )
                 with header_right:
-                    st.button("Close", key="close_builder_popup_info", use_container_width=True, on_click=hide_builder_popup)
+                    st.button("Close", key="close_builder_popup_btn_info", use_container_width=True, on_click=hide_builder_popup)
+
                 st.info("Recommended public companies mode is ready for your curated ESG universe integration.")
         return
 
@@ -863,7 +1008,7 @@ def render_builder_popup() -> None:
                 with header_left:
                     st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
                 with header_right:
-                    st.button("Close", key="close_builder_popup_error", use_container_width=True, on_click=hide_builder_popup)
+                    st.button("Close", key="close_builder_popup_btn_error", use_container_width=True, on_click=hide_builder_popup)
                 st.error("Please check your inputs and try again.")
         return
 
@@ -873,25 +1018,52 @@ def render_builder_popup() -> None:
         with popup:
             header_left, header_right = st.columns([0.82, 0.18], gap="small")
             with header_left:
-                st.markdown('<div class="popup-title">Live Portfolio Builder Output</div>', unsafe_allow_html=True)
+                st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
                 st.markdown(
-                    '<div class="popup-subtitle">The efficient frontier is prioritised first so the screen focuses on the graph rather than the inputs.</div>',
+                    '<div class="popup-subtitle">Your portfolio updates live as you adjust assumptions, ESG scores, risk tolerance, and ESG weight.</div>',
                     unsafe_allow_html=True,
                 )
             with header_right:
-                st.button("Close", key="close_builder_popup", use_container_width=True, on_click=hide_builder_popup)
+                st.button("Close", key="close_builder_popup_btn", use_container_width=True, on_click=hide_builder_popup)
+
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            row1c1, row1c2, row1c3 = st.columns(3, gap="small")
+            with row1c1:
+                st.markdown(result_tile(f'{result["asset1"]} weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
+            with row1c2:
+                st.markdown(result_tile(f'{result["asset2"]} weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
+            with row1c3:
+                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
+
+            row2c1, row2c2, row2c3 = st.columns(3, gap="small")
+            with row2c1:
+                st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
+            with row2c2:
+                st.markdown(
+                    result_tile(
+                        "Portfolio Risk",
+                        f'{result["opt_risk"]:.2%}',
+                        tooltip="Portfolio risk is characterised by standard deviation.",
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with row2c3:
+                st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontier</div>', unsafe_allow_html=True)
 
-            fig, ax = plt.subplots(figsize=(9.2, 5.4), dpi=180, constrained_layout=True)
+            fig, ax = plt.subplots(figsize=(9.2, 5.1), dpi=180, constrained_layout=True)
             fig.patch.set_facecolor("white")
             scatter = ax.scatter(
                 result["portfolio_risks"],
                 result["portfolio_returns"],
                 c=result["portfolio_esg"],
                 cmap="Greens",
-                s=28,
+                s=26,
                 alpha=0.92,
                 edgecolors="none",
             )
@@ -939,33 +1111,6 @@ def render_builder_popup() -> None:
 
             st.pyplot(fig)
             plt.close(fig)
-
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            row1c1, row1c2, row1c3 = st.columns(3, gap="small")
-            with row1c1:
-                st.markdown(result_tile(f'{result["asset1"]} weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
-            with row1c2:
-                st.markdown(result_tile(f'{result["asset2"]} weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
-            with row1c3:
-                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
-
-            st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
-            row2c1, row2c2, row2c3 = st.columns(3, gap="small")
-            with row2c1:
-                st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
-            with row2c2:
-                st.markdown(
-                    result_tile(
-                        "Portfolio Risk",
-                        f'{result["opt_risk"]:.2%}',
-                        tooltip="Portfolio risk is characterised by standard deviation.",
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with row2c3:
-                st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
 
 
 # -------------------------------------------------
@@ -1231,10 +1376,6 @@ def render_builder_screen() -> None:
             step=0.01,
             key="builder_risk_free_rate",
             label_visibility="collapsed",
-        )
-        st.markdown(
-            '<div class="tool-note">Default: 4.84%. You can change it whenever you want.</div>',
-            unsafe_allow_html=True,
         )
 
         render_custom_label("Risk Tolerance")
