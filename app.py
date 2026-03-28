@@ -219,18 +219,6 @@ def inject_css() -> None:
                 backdrop-filter: blur(8px);
             }
 
-            .badge {
-                display: inline-block;
-                padding: 0.4rem 0.76rem;
-                border-radius: 999px;
-                background: var(--soft-green);
-                color: var(--primary);
-                border: 1px solid rgba(22,163,74,0.16);
-                font-size: 0.82rem;
-                font-weight: 800;
-                margin-bottom: 0.95rem;
-            }
-
             .hero h1 {
                 margin: 0 0 0.9rem 0;
                 color: var(--text);
@@ -247,23 +235,6 @@ def inject_css() -> None:
                 font-size: 1.04rem;
                 line-height: 1.7;
                 max-width: 760px;
-            }
-
-            .pill-row {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.55rem;
-                margin-top: 1.05rem;
-            }
-
-            .pill {
-                padding: 0.42rem 0.78rem;
-                border-radius: 999px;
-                background: rgba(255,255,255,0.95);
-                border: 1px solid rgba(22,101,52,0.10);
-                color: var(--text);
-                font-size: 0.87rem;
-                font-weight: 700;
             }
 
             .section-label {
@@ -342,7 +313,7 @@ def inject_css() -> None:
                 font-size: 2.2rem;
                 font-weight: 900;
                 letter-spacing: -0.04em;
-                margin: 0 0 0.25rem 0;
+                margin: 0.7rem 0 0.25rem 0;
             }
 
             .page-subtitle {
@@ -354,22 +325,30 @@ def inject_css() -> None:
             }
 
             div.stButton > button,
-            div[data-testid="stFormSubmitButton"] > button {
+            div[data-testid="stFormSubmitButton"] > button,
+            div.stButton > button *,
+            div[data-testid="stFormSubmitButton"] > button * {
                 min-height: 3.05rem;
                 border-radius: 14px;
                 font-weight: 800;
                 font-size: 0.96rem;
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, var(--primary), var(--primary-3)) !important;
-                color: white !important;
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                fill: #ffffff !important;
                 box-shadow: 0 10px 22px rgba(20,83,45,0.20);
             }
 
             div.stButton > button:hover,
-            div[data-testid="stFormSubmitButton"] > button:hover {
+            div[data-testid="stFormSubmitButton"] > button:hover,
+            div.stButton > button:hover *,
+            div[data-testid="stFormSubmitButton"] > button:hover * {
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
-                color: white !important;
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                fill: #ffffff !important;
                 box-shadow: 0 12px 24px rgba(20,83,45,0.24);
             }
 
@@ -928,7 +907,6 @@ def render_home() -> None:
         st.markdown(
             """
             <div class="hero">
-                <div class="badge">Personalised sustainable investing</div>
                 <h1>Build an investment portfolio that reflects both financial goals and ESG values.</h1>
                 <p>
                     This app helps investors move from intention to action through a cleaner,
@@ -936,12 +914,6 @@ def render_home() -> None:
                     decision-making process, so portfolio recommendations can better reflect both
                     financial goals and sustainability priorities.
                 </p>
-                <div class="pill-row">
-                    <span class="pill">Risk-aware design</span>
-                    <span class="pill">ESG-first thinking</span>
-                    <span class="pill">Portfolio optimisation</span>
-                    <span class="pill">Professional user journey</span>
-                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1014,19 +986,15 @@ def render_home() -> None:
 def render_recommendation_screen() -> None:
     inject_tool_black_text_css()
 
-    col_back, col_main = st.columns([0.14, 0.86])
-    with col_back:
-        st.button("← Back", on_click=open_home, use_container_width=True)
-
-    with col_main:
-        render_page_header(
-            "Portfolio Recommendation",
-            "Set your preferences to receive a recommended two-asset portfolio aligned with your investment priority, risk tolerance, and ESG focus.",
-        )
+    st.button("← Back", on_click=open_home, use_container_width=False)
+    render_page_header(
+        "Portfolio Recommendation",
+        "Set your preferences to receive a recommended two-asset portfolio aligned with your investment priority, risk tolerance, and ESG focus.",
+    )
 
     with st.form("recommendation_form", clear_on_submit=False):
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
-        st.markdown('<div class="tool-section-title">Set your preferences</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-section-title">Set Your Preferences</div>', unsafe_allow_html=True)
 
         left, right = st.columns(2, gap="large")
 
@@ -1089,9 +1057,7 @@ def render_recommendation_result_screen() -> None:
         open_recommendation()
         st.rerun()
 
-    col_back, col_main = st.columns([0.14, 0.86])
-    with col_back:
-        st.button("← Back", on_click=open_recommendation, use_container_width=True)
+    st.button("← Back", on_click=open_recommendation, use_container_width=False)
 
     st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
     st.markdown('<div class="tool-section-label">Portfolio recommendation</div>', unsafe_allow_html=True)
@@ -1192,15 +1158,11 @@ def render_recommendation_result_screen() -> None:
 def render_builder_screen() -> None:
     inject_tool_black_text_css()
 
-    col_back, col_main = st.columns([0.14, 0.86])
-    with col_back:
-        st.button("← Back", on_click=open_home, use_container_width=True)
-
-    with col_main:
-        render_page_header(
-            "Portfolio Builder",
-            "Enter your asset assumptions and sustainability preferences to build a personalised ESG-aware portfolio.",
-        )
+    st.button("← Back", on_click=open_home, use_container_width=False)
+    render_page_header(
+        "Portfolio Builder",
+        "Enter your asset assumptions and sustainability preferences to build a personalised ESG-aware portfolio.",
+    )
 
     with st.form("portfolio_builder_form", clear_on_submit=False):
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
@@ -1412,9 +1374,7 @@ def render_builder_result_screen() -> None:
     max_sharpe_idx = result["max_sharpe_idx"]
     optimal_idx = result["optimal_idx"]
 
-    col_back, col_main = st.columns([0.14, 0.86])
-    with col_back:
-        st.button("← Back", on_click=open_builder, use_container_width=True)
+    st.button("← Back", on_click=open_builder, use_container_width=False)
 
     st.markdown('<div class="tool-shell">', unsafe_allow_html=True)
     st.markdown('<div class="tool-section-label">Portfolio builder</div>', unsafe_allow_html=True)
