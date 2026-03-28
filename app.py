@@ -149,12 +149,10 @@ def inject_css() -> None:
                 --text: #081b14;
                 --muted: #36574a;
                 --line: rgba(8,27,20,0.08);
-                --primary: #166534;
-                --primary-2: #16a34a;
-                --primary-3: #22c55e;
-                --orange1: #f97316;
-                --orange2: #fb923c;
-                --orange3: #ea580c;
+                --primary: #14532d;
+                --primary-2: #166534;
+                --primary-3: #15803d;
+                --primary-4: #22c55e;
                 --soft-green: rgba(22,163,74,0.08);
                 --shadow: 0 20px 50px rgba(22, 101, 52, 0.08);
                 --shadow-soft: 0 10px 24px rgba(22, 101, 52, 0.05);
@@ -188,7 +186,7 @@ def inject_css() -> None:
                 width: 50px;
                 height: 50px;
                 border-radius: 16px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-3));
+                background: linear-gradient(135deg, var(--primary), var(--primary-4));
                 color: white;
                 display: flex;
                 align-items: center;
@@ -339,22 +337,40 @@ def inject_css() -> None:
                 height: 0.65rem;
             }
 
-            div.stButton > button {
+            .page-title {
+                color: #081b14;
+                font-size: 2.2rem;
+                font-weight: 900;
+                letter-spacing: -0.04em;
+                margin: 0 0 0.25rem 0;
+            }
+
+            .page-subtitle {
+                color: #36574a;
+                font-size: 0.98rem;
+                line-height: 1.6;
+                margin: 0 0 1.25rem 0;
+                max-width: 760px;
+            }
+
+            div.stButton > button,
+            div[data-testid="stFormSubmitButton"] > button {
                 min-height: 3.05rem;
                 border-radius: 14px;
                 font-weight: 800;
                 font-size: 0.96rem;
-                border: 1px solid var(--orange3) !important;
-                background: linear-gradient(135deg, var(--orange1), var(--orange2)) !important;
+                border: 1px solid var(--primary) !important;
+                background: linear-gradient(135deg, var(--primary), var(--primary-3)) !important;
                 color: white !important;
-                box-shadow: 0 10px 22px rgba(249,115,22,0.18);
+                box-shadow: 0 10px 22px rgba(20,83,45,0.20);
             }
 
-            div.stButton > button:hover {
-                border: 1px solid var(--orange3) !important;
-                background: linear-gradient(135deg, var(--orange3), var(--orange1)) !important;
+            div.stButton > button:hover,
+            div[data-testid="stFormSubmitButton"] > button:hover {
+                border: 1px solid var(--primary) !important;
+                background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
                 color: white !important;
-                box-shadow: 0 12px 24px rgba(249,115,22,0.24);
+                box-shadow: 0 12px 24px rgba(20,83,45,0.24);
             }
 
             .tool-shell {
@@ -512,7 +528,7 @@ def inject_css() -> None:
                 width: 100px;
                 height: 100px;
                 border-radius: 28px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-3));
+                background: linear-gradient(135deg, var(--primary), var(--primary-4));
                 color: white;
                 margin: 0 auto 1.15rem auto;
                 display: flex;
@@ -655,11 +671,6 @@ def inject_tool_black_text_css() -> None:
             [data-testid="stMarkdownContainer"] * {
                 color: #000000 !important;
             }
-
-            div.stButton > button {
-                color: white !important;
-                border: 1px solid #ea580c !important;
-            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -749,6 +760,11 @@ def render_label_with_tooltip(text: str, tooltip: str) -> None:
         f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
         unsafe_allow_html=True,
     )
+
+
+def render_page_header(title: str, subtitle: str) -> None:
+    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
 
 
 def style_modern_axes(ax) -> None:
@@ -1002,6 +1018,12 @@ def render_recommendation_screen() -> None:
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
+    with col_main:
+        render_page_header(
+            "Portfolio Recommendation",
+            "Set your preferences to receive a recommended two-asset portfolio aligned with your investment priority, risk tolerance, and ESG focus.",
+        )
+
     with st.form("recommendation_form", clear_on_submit=False):
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
         st.markdown('<div class="tool-section-title">Set your preferences</div>', unsafe_allow_html=True)
@@ -1041,7 +1063,7 @@ def render_recommendation_screen() -> None:
             )
 
         submitted = st.form_submit_button(
-            "Generate portfolio recommendation",
+            "Generate Portfolio Recommendation",
             type="primary",
             use_container_width=True,
         )
@@ -1174,6 +1196,12 @@ def render_builder_screen() -> None:
     with col_back:
         st.button("← Back", on_click=open_home, use_container_width=True)
 
+    with col_main:
+        render_page_header(
+            "Portfolio Builder",
+            "Enter your asset assumptions and sustainability preferences to build a personalised ESG-aware portfolio.",
+        )
+
     with st.form("portfolio_builder_form", clear_on_submit=False):
         st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
         st.markdown('<div class="tool-section-title">Choose your setup</div>', unsafe_allow_html=True)
@@ -1190,7 +1218,7 @@ def render_builder_screen() -> None:
 
         if asset_choice == "Input my own assets":
             st.markdown('<div class="tool-section-label">Step 2</div>', unsafe_allow_html=True)
-            st.markdown('<div class="tool-section-title">Enter asset assumptions</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-title">Enter Asset Assumptions</div>', unsafe_allow_html=True)
 
             col1, col2 = st.columns(2, gap="large")
 
@@ -1244,7 +1272,7 @@ def render_builder_screen() -> None:
 
             st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="tool-section-label">Step 3</div>', unsafe_allow_html=True)
-            st.markdown('<div class="tool-section-title">Set portfolio preferences</div>', unsafe_allow_html=True)
+            st.markdown('<div class="tool-section-title">Set Portfolio Preferences</div>', unsafe_allow_html=True)
 
             pref_left, pref_right = st.columns(2, gap="large")
 
@@ -1316,7 +1344,7 @@ def render_builder_screen() -> None:
                 )
 
             submitted = st.form_submit_button(
-                "Generate portfolio recommendation",
+                "Generate Portfolio Recommendation",
                 type="primary",
                 use_container_width=True,
             )
