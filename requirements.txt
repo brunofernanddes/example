@@ -1,3 +1,7 @@
 streamlit
 pandas
 matplotlib
+numpy
+base64
+zlib
+json
