@@ -1,13 +1,6 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from pathlib import Path
-
-try:
-    from numbers_parser import Document
-    NUMBERS_PARSER_AVAILABLE = True
-except ImportError:
-    NUMBERS_PARSER_AVAILABLE = False
 
 # -------------------------------------------------
 # Page config
@@ -23,25 +16,25 @@ APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
 
 # -------------------------------------------------
-# Data for recommendation engine
+# Recommendation engine data
 # -------------------------------------------------
 RECOMMENDATIONS = {
     "1": {
         "Low": {
             "Environmental": ("Microsoft (MSFT)", "Exelon (EXC)"),
-            "Sustainability / Social": ("Microsoft (MSFT)", "Pinnacle West Capital (PNW)"),
+            "Social": ("Microsoft (MSFT)", "Pinnacle West Capital (PNW)"),
             "Governance": ("Regency Centers (REG)", "Amazon (AMZN)"),
             "All Equal": ("Microsoft (MSFT)", "Exelon (EXC)"),
         },
         "Medium": {
             "Environmental": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
-            "Sustainability / Social": ("ConocoPhillips (COP)", "Microsoft (MSFT)"),
+            "Social": ("ConocoPhillips (COP)", "Microsoft (MSFT)"),
             "Governance": ("Amazon (AMZN)", "Microsoft (MSFT)"),
             "All Equal": ("Microsoft (MSFT)", "ConocoPhillips (COP)"),
         },
         "High": {
             "Environmental": ("Trane Technologies (TT)", "Amazon (AMZN)"),
-            "Sustainability / Social": ("ConocoPhillips (COP)", "Trane Technologies (TT)"),
+            "Social": ("ConocoPhillips (COP)", "Trane Technologies (TT)"),
             "Governance": ("Amazon (AMZN)", "Raytheon Technologies (RTX)"),
             "All Equal": ("ConocoPhillips (COP)", "Amazon (AMZN)"),
         },
@@ -49,19 +42,19 @@ RECOMMENDATIONS = {
     "2": {
         "Low": {
             "Environmental": ("Microsoft (MSFT)", "Exelon (EXC)"),
-            "Sustainability / Social": ("Microsoft (MSFT)", "Exelon (EXC)"),
+            "Social": ("Microsoft (MSFT)", "Exelon (EXC)"),
             "Governance": ("Regency Centers (REG)", "Amazon (AMZN)"),
             "All Equal": ("Microsoft (MSFT)", "Exelon (EXC)"),
         },
         "Medium": {
             "Environmental": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
-            "Sustainability / Social": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
+            "Social": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
             "Governance": ("Amazon (AMZN)", "Microsoft (MSFT)"),
             "All Equal": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
         },
         "High": {
             "Environmental": ("Trane Technologies (TT)", "Amazon (AMZN)"),
-            "Sustainability / Social": ("Trane Technologies (TT)", "ConocoPhillips (COP)"),
+            "Social": ("Trane Technologies (TT)", "ConocoPhillips (COP)"),
             "Governance": ("Amazon (AMZN)", "Trane Technologies (TT)"),
             "All Equal": ("Trane Technologies (TT)", "Amazon (AMZN)"),
         },
@@ -69,19 +62,19 @@ RECOMMENDATIONS = {
     "3": {
         "Low": {
             "Environmental": ("Microsoft (MSFT)", "PepsiCo (PEP)"),
-            "Sustainability / Social": ("Microsoft (MSFT)", "Pinnacle West Capital (PNW)"),
+            "Social": ("Microsoft (MSFT)", "Pinnacle West Capital (PNW)"),
             "Governance": ("Regency Centers (REG)", "Amazon (AMZN)"),
             "All Equal": ("Microsoft (MSFT)", "Exelon (EXC)"),
         },
         "Medium": {
             "Environmental": ("Microsoft (MSFT)", "Trane Technologies (TT)"),
-            "Sustainability / Social": ("ConocoPhillips (COP)", "Microsoft (MSFT)"),
+            "Social": ("ConocoPhillips (COP)", "Microsoft (MSFT)"),
             "Governance": ("Amazon (AMZN)", "Microsoft (MSFT)"),
             "All Equal": ("Microsoft (MSFT)", "ConocoPhillips (COP)"),
         },
         "High": {
             "Environmental": ("Trane Technologies (TT)", "Amazon (AMZN)"),
-            "Sustainability / Social": ("ConocoPhillips (COP)", "Airbnb (ABNB)"),
+            "Social": ("ConocoPhillips (COP)", "Airbnb (ABNB)"),
             "Governance": ("Amazon (AMZN)", "Raytheon Technologies (RTX)"),
             "All Equal": ("ConocoPhillips (COP)", "Edison International (EIX)"),
         },
@@ -106,10 +99,140 @@ ASSET_DATA = {
     "Raytheon Technologies (RTX)": {"expected_return": 16.65, "std_dev": 8.73},
 }
 
+# Built-in ESG lookup data so the app works with only streamlit/numpy/matplotlib
+ESG_COMPANY_PROFILES = [
+    {
+        "display_name": "Airbnb (ABNB)",
+        "grade": "B",
+        "environment": "B",
+        "social": "B",
+        "governance": "B",
+        "industry": "Consumer Services",
+        "exchange": "NASDAQ",
+    },
+    {
+        "display_name": "Amazon (AMZN)",
+        "grade": "B",
+        "environment": "B",
+        "social": "B",
+        "governance": "A",
+        "industry": "Consumer Discretionary",
+        "exchange": "NASDAQ",
+    },
+    {
+        "display_name": "ConocoPhillips (COP)",
+        "grade": "B",
+        "environment": "B",
+        "social": "B",
+        "governance": "B",
+        "industry": "Energy",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Consolidated Edison (ED)",
+        "grade": "A",
+        "environment": "A",
+        "social": "B",
+        "governance": "A",
+        "industry": "Utilities",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Edison International (EIX)",
+        "grade": "B",
+        "environment": "B",
+        "social": "B",
+        "governance": "B",
+        "industry": "Utilities",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Exelon (EXC)",
+        "grade": "A",
+        "environment": "A",
+        "social": "B",
+        "governance": "A",
+        "industry": "Utilities",
+        "exchange": "NASDAQ",
+    },
+    {
+        "display_name": "General Mills (GIS)",
+        "grade": "B",
+        "environment": "B",
+        "social": "B",
+        "governance": "B",
+        "industry": "Consumer Staples",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Microsoft (MSFT)",
+        "grade": "A",
+        "environment": "A",
+        "social": "A",
+        "governance": "A",
+        "industry": "Technology",
+        "exchange": "NASDAQ",
+    },
+    {
+        "display_name": "PepsiCo (PEP)",
+        "grade": "A",
+        "environment": "B",
+        "social": "A",
+        "governance": "A",
+        "industry": "Consumer Staples",
+        "exchange": "NASDAQ",
+    },
+    {
+        "display_name": "Pinnacle West Capital (PNW)",
+        "grade": "A",
+        "environment": "A",
+        "social": "B",
+        "governance": "A",
+        "industry": "Utilities",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Procter & Gamble (PG)",
+        "grade": "A",
+        "environment": "B",
+        "social": "A",
+        "governance": "A",
+        "industry": "Consumer Staples",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Raytheon Technologies (RTX)",
+        "grade": "B",
+        "environment": "B",
+        "social": "B",
+        "governance": "A",
+        "industry": "Industrials",
+        "exchange": "NYSE",
+    },
+    {
+        "display_name": "Regency Centers (REG)",
+        "grade": "A",
+        "environment": "B",
+        "social": "A",
+        "governance": "A",
+        "industry": "Real Estate",
+        "exchange": "NASDAQ",
+    },
+    {
+        "display_name": "Trane Technologies (TT)",
+        "grade": "A",
+        "environment": "A",
+        "social": "B",
+        "governance": "A",
+        "industry": "Industrials",
+        "exchange": "NYSE",
+    },
+]
+
 # -------------------------------------------------
 # Session state
 # -------------------------------------------------
-def init_session_state() -> None:
+def init_session_state():
     defaults = {
         "show_splash": True,
         "current_view": "home",
@@ -123,135 +246,44 @@ def init_session_state() -> None:
             st.session_state[key] = value
 
 
-def open_home() -> None:
+def open_home():
     st.session_state["current_view"] = "home"
 
 
-def open_builder() -> None:
+def open_builder():
     st.session_state["current_view"] = "builder"
 
 
-def open_recommendation() -> None:
+def open_recommendation():
     st.session_state["current_view"] = "recommendation"
 
 
-def open_recommendation_result() -> None:
+def open_recommendation_result():
     st.session_state["current_view"] = "recommendation_result"
 
 
-def open_builder_result() -> None:
+def open_builder_result():
     st.session_state["current_view"] = "builder_result"
-
-
-# -------------------------------------------------
-# File loading
-# -------------------------------------------------
-@st.cache_data(show_spinner=False)
-def load_company_profiles() -> list[dict]:
-    if not NUMBERS_PARSER_AVAILABLE:
-        return []
-
-    search_paths = []
-    base_dir = Path(__file__).resolve().parent
-    search_paths.append(base_dir / "esg data - public companies .numbers")
-    search_paths.extend(base_dir.glob("*.numbers"))
-    search_paths.append(Path("/mnt/data/esg data - public companies .numbers"))
-
-    numbers_path = None
-    seen = set()
-    for candidate in search_paths:
-        candidate = candidate.resolve()
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if candidate.exists() and candidate.suffix == ".numbers":
-            numbers_path = candidate
-            break
-
-    if numbers_path is None:
-        return []
-
-    doc = Document(str(numbers_path))
-    table = doc.sheets[0].tables[0]
-    headers = [table.cell(0, c).value for c in range(table.num_cols)]
-
-    profiles: list[dict] = []
-    for row_idx in range(1, table.num_rows):
-        row = {headers[col]: table.cell(row_idx, col).value for col in range(table.num_cols)}
-        if not row.get("name"):
-            continue
-
-        ticker = str(row.get("ticker", "")).upper()
-        name = str(row.get("name", "")).strip()
-        display_name = f"{name} ({ticker})" if ticker else name
-
-        profiles.append(
-            {
-                "display_name": display_name,
-                "ticker": ticker,
-                "name": name,
-                "industry": str(row.get("industry", "") or "N/A"),
-                "exchange": str(row.get("exchange", "") or "N/A"),
-                "environment_grade": str(row.get("environment_grade", "") or "N/A"),
-                "environment_level": str(row.get("environment_level", "") or "N/A"),
-                "social_grade": str(row.get("social_grade", "") or "N/A"),
-                "social_level": str(row.get("social_level", "") or "N/A"),
-                "governance_grade": str(row.get("governance_grade", "") or "N/A"),
-                "governance_level": str(row.get("governance_level", "") or "N/A"),
-                "environment_score": row.get("environment_score", "N/A"),
-                "social_score": row.get("social_score", "N/A"),
-                "governance_score": row.get("governance_score", "N/A"),
-                "total_score": row.get("total_score", "N/A"),
-                "total_grade": str(row.get("total_grade", "") or "N/A"),
-                "total_level": str(row.get("total_level", "") or "N/A"),
-                "last_processing_date": str(row.get("last_processing_date", "") or "N/A"),
-                "weburl": str(row.get("weburl", "") or ""),
-            }
-        )
-
-    profiles.sort(key=lambda x: x["name"].lower())
-    return profiles
 
 
 # -------------------------------------------------
 # CSS
 # -------------------------------------------------
-def inject_css() -> None:
+def inject_css():
     st.markdown(
         """
         <style>
-            :root {
-                --bg1: #f2fcf5;
-                --bg2: #e6f7ec;
-                --card: rgba(255,255,255,0.96);
-                --card-strong: rgba(255,255,255,0.99);
-                --text: #081b14;
-                --muted: #36574a;
-                --line: rgba(8,27,20,0.08);
-                --primary: #14532d;
-                --primary-2: #166534;
-                --primary-3: #15803d;
-                --primary-4: #22c55e;
-                --soft-green: rgba(22,163,74,0.08);
-                --shadow: 0 20px 50px rgba(22, 101, 52, 0.08);
-                --shadow-soft: 0 10px 24px rgba(22, 101, 52, 0.05);
-            }
-
             .stApp {
                 background:
                     radial-gradient(circle at top left, rgba(34,197,94,0.12), transparent 28%),
                     radial-gradient(circle at top right, rgba(22,163,74,0.09), transparent 24%),
-                    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+                    linear-gradient(180deg, #f2fcf5 0%, #e6f7ec 100%);
             }
 
             .block-container {
                 max-width: 1140px;
                 padding-top: 1.15rem;
                 padding-bottom: 2rem;
-            }
-
-            [data-testid="stSidebarNav"] {
-                display: none;
             }
 
             .brand-row {
@@ -265,7 +297,7 @@ def inject_css() -> None:
                 width: 50px;
                 height: 50px;
                 border-radius: 16px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-4));
+                background: linear-gradient(135deg, #14532d, #22c55e);
                 color: white;
                 display: flex;
                 align-items: center;
@@ -277,15 +309,14 @@ def inject_css() -> None:
 
             .brand-title {
                 margin: 0;
-                color: var(--text);
+                color: #081b14;
                 font-weight: 850;
                 font-size: 1.02rem;
-                letter-spacing: -0.02em;
             }
 
             .brand-subtitle {
                 margin: 0.1rem 0 0 0;
-                color: var(--muted);
+                color: #36574a;
                 font-size: 0.91rem;
             }
 
@@ -294,30 +325,26 @@ def inject_css() -> None:
                 border: 1px solid rgba(22,101,52,0.08);
                 border-radius: 26px;
                 padding: 2.2rem 2rem;
-                box-shadow: var(--shadow);
-                backdrop-filter: blur(8px);
+                box-shadow: 0 20px 50px rgba(22, 101, 52, 0.08);
             }
 
             .hero h1 {
                 margin: 0 0 0.9rem 0;
-                color: var(--text);
+                color: #081b14;
                 font-size: 3rem;
                 line-height: 1.03;
-                letter-spacing: -0.05em;
                 font-weight: 900;
-                max-width: 760px;
             }
 
             .hero p {
                 margin: 0;
-                color: var(--muted);
+                color: #36574a;
                 font-size: 1.04rem;
                 line-height: 1.7;
-                max-width: 760px;
             }
 
             .section-label {
-                color: var(--primary);
+                color: #14532d;
                 font-size: 0.81rem;
                 font-weight: 800;
                 letter-spacing: 0.08em;
@@ -326,72 +353,57 @@ def inject_css() -> None:
             }
 
             .section-title {
-                color: var(--text);
+                color: #081b14;
                 font-size: 1.8rem;
                 font-weight: 850;
-                letter-spacing: -0.03em;
                 margin-bottom: 0.35rem;
             }
 
             .section-copy {
-                color: var(--muted);
+                color: #36574a;
                 margin-bottom: 1rem;
                 line-height: 1.65;
             }
 
-            .card {
-                background: var(--card);
+            .card, .stat, .tool-shell, .lookup-shell, .profile-card, .asset-summary, .metric-tile {
+                background: rgba(255,255,255,0.98);
                 border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 20px;
+                border-radius: 18px;
+                box-shadow: 0 10px 24px rgba(22, 101, 52, 0.05);
+            }
+
+            .card {
                 padding: 1.05rem;
-                box-shadow: var(--shadow-soft);
                 height: 100%;
             }
 
-            .card h3 {
-                margin: 0 0 0.35rem 0;
-                color: var(--text);
-                font-size: 1.02rem;
-                font-weight: 800;
+            .card h3, .stat-value, .asset-summary-title, .profile-title {
+                color: #081b14;
+                font-weight: 850;
             }
 
-            .card p {
-                margin: 0;
-                color: var(--muted);
-                font-size: 0.95rem;
-                line-height: 1.55;
+            .card p, .stat-label, .profile-copy, .asset-summary-copy {
+                color: #36574a;
             }
 
             .stat {
-                background: var(--card-strong);
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 18px;
                 padding: 0.95rem 1rem;
-                box-shadow: var(--shadow-soft);
             }
 
             .stat-value {
-                color: var(--text);
                 font-size: 1.35rem;
-                font-weight: 850;
                 margin: 0;
             }
 
             .stat-label {
-                color: var(--muted);
                 font-size: 0.9rem;
                 margin-top: 0.15rem;
-            }
-
-            .spacer {
-                height: 0.65rem;
             }
 
             .page-title {
                 color: #081b14;
                 font-size: 2.2rem;
                 font-weight: 900;
-                letter-spacing: -0.04em;
                 margin: 0.7rem 0 0.25rem 0;
             }
 
@@ -400,57 +412,14 @@ def inject_css() -> None:
                 font-size: 0.98rem;
                 line-height: 1.6;
                 margin: 0 0 1.25rem 0;
-                max-width: 820px;
             }
 
-            div.stButton > button,
-            div[data-testid="stFormSubmitButton"] > button {
-                min-height: 3.02rem !important;
-                border-radius: 14px !important;
-                font-weight: 800 !important;
-                font-size: 0.96rem !important;
-                border: 1px solid var(--primary) !important;
-                background: linear-gradient(135deg, var(--primary), var(--primary-3)) !important;
-                color: #ffffff !important;
-                box-shadow: 0 8px 18px rgba(20,83,45,0.18) !important;
-                transition: all 0.18s ease !important;
-            }
-
-            div.stButton > button:hover,
-            div[data-testid="stFormSubmitButton"] > button:hover {
-                background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
-                color: #ffffff !important;
-                box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
-                transform: translateY(-1px);
-            }
-
-            div.stButton > button:focus,
-            div[data-testid="stFormSubmitButton"] > button:focus {
-                color: #ffffff !important;
-                outline: none !important;
-                box-shadow: 0 0 0 0.2rem rgba(21, 128, 61, 0.18), 0 10px 20px rgba(20,83,45,0.18) !important;
-            }
-
-            div.stButton > button p,
-            div.stButton > button span,
-            div.stButton > button div,
-            div[data-testid="stFormSubmitButton"] > button p,
-            div[data-testid="stFormSubmitButton"] > button span,
-            div[data-testid="stFormSubmitButton"] > button div {
-                color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-            }
-
-            .tool-shell {
-                background: rgba(255,255,255,0.98);
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 24px;
-                padding: 1.45rem;
-                box-shadow: var(--shadow-soft);
+            .tool-shell, .lookup-shell, .profile-card, .asset-summary, .metric-tile {
+                padding: 1rem;
             }
 
             .tool-section-label {
-                color: var(--primary);
+                color: #14532d;
                 font-size: 0.78rem;
                 font-weight: 800;
                 text-transform: uppercase;
@@ -458,10 +427,10 @@ def inject_css() -> None:
                 margin-bottom: 0.3rem;
             }
 
-            .tool-section-title {
-                color: #000000;
+            .tool-section-title, .side-header {
+                color: #081b14;
                 font-size: 1.05rem;
-                font-weight: 800;
+                font-weight: 850;
                 margin: 0.2rem 0 0.85rem 0;
             }
 
@@ -472,25 +441,16 @@ def inject_css() -> None:
                 border-radius: 999px;
             }
 
-            .tool-note {
-                color: #2f4f43;
+            .tool-note, .lookup-subtitle {
+                color: #36574a;
                 font-size: 0.88rem;
                 line-height: 1.55;
-                margin-top: 0.2rem;
+            }
+
+            .field-label {
+                font-weight: 800;
+                color: #000000;
                 margin-bottom: 0.2rem;
-            }
-
-            .metric-tile {
-                background: #ffffff;
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 16px;
-                padding: 0.95rem 1rem;
-                box-shadow: 0 8px 20px rgba(22,101,52,0.04);
-            }
-
-            .metric-tile.compact {
-                padding: 0.55rem 0.7rem;
-                min-height: 82px;
             }
 
             .metric-tile-label {
@@ -503,11 +463,6 @@ def inject_css() -> None:
                 flex-wrap: wrap;
             }
 
-            .metric-tile.compact .metric-tile-label {
-                font-size: 0.73rem;
-                margin-bottom: 0.14rem;
-            }
-
             .metric-tile-value {
                 color: #000000;
                 font-size: 1.2rem;
@@ -515,7 +470,17 @@ def inject_css() -> None:
                 line-height: 1.2;
             }
 
-            .metric-tile.compact .metric-tile-value {
+            .compact {
+                padding: 0.55rem 0.7rem !important;
+                min-height: 82px;
+            }
+
+            .compact .metric-tile-label {
+                font-size: 0.73rem;
+                margin-bottom: 0.14rem;
+            }
+
+            .compact .metric-tile-value {
                 font-size: 0.94rem;
                 line-height: 1.15;
             }
@@ -536,88 +501,33 @@ def inject_css() -> None:
                 line-height: 1;
             }
 
-            .field-label {
-                font-weight: 800;
-                color: #000000;
-                margin-bottom: 0.2rem;
+            div.stButton > button,
+            div[data-testid="stFormSubmitButton"] > button {
+                min-height: 3.02rem !important;
+                border-radius: 14px !important;
+                font-weight: 800 !important;
+                font-size: 0.96rem !important;
+                border: 1px solid #14532d !important;
+                background: linear-gradient(135deg, #14532d, #15803d) !important;
+                color: #ffffff !important;
+                box-shadow: 0 8px 18px rgba(20,83,45,0.18) !important;
             }
 
-            .lookup-shell {
-                background: rgba(255,255,255,0.98);
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 18px;
-                padding: 1rem;
-                box-shadow: var(--shadow-soft);
+            div.stButton > button:hover,
+            div[data-testid="stFormSubmitButton"] > button:hover {
+                background: linear-gradient(135deg, #0f3f22, #14532d) !important;
+                color: #ffffff !important;
+                transform: translateY(-1px);
             }
 
-            .lookup-subtitle {
-                color: #58756a;
-                font-size: 0.86rem;
-                line-height: 1.5;
-                margin: 0 0 0.7rem 0;
-            }
-
-            .profile-card {
-                background: #ffffff;
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 18px;
-                padding: 1rem;
-                box-shadow: 0 8px 20px rgba(22,101,52,0.04);
-            }
-
-            .profile-title {
-                color: #081b14;
-                font-size: 1rem;
-                font-weight: 850;
-                margin: 0 0 0.2rem 0;
-            }
-
-            .profile-copy {
-                color: #36574a;
-                font-size: 0.9rem;
-                line-height: 1.55;
-                margin: 0 0 0.7rem 0;
-            }
-
-            .asset-summary {
-                background: #ffffff;
-                border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 18px;
-                padding: 1rem;
-                box-shadow: 0 8px 20px rgba(22,101,52,0.04);
-                height: 100%;
-            }
-
-            .asset-summary.tight {
-                padding: 1rem 1rem 0.95rem 1rem;
-            }
-
-            .asset-summary-title {
-                color: #000000;
-                font-size: 1.06rem;
-                font-weight: 850;
-                margin-bottom: 0.25rem;
-            }
-
-            .asset-summary-copy {
-                color: #2f4f43;
-                font-size: 0.94rem;
-                line-height: 1.55;
-                margin: 0;
-            }
-
-            .side-header {
-                color: #0b1c15;
-                font-size: 1rem;
-                font-weight: 850;
-                margin: 0 0 0.75rem 0;
-            }
-
-            .chart-title {
-                color: #000000;
-                font-size: 1rem;
-                font-weight: 800;
-                margin: 0.5rem 0 0.85rem 0;
+            div.stButton > button p,
+            div.stButton > button span,
+            div.stButton > button div,
+            div[data-testid="stFormSubmitButton"] > button p,
+            div[data-testid="stFormSubmitButton"] > button span,
+            div[data-testid="stFormSubmitButton"] > button div {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
             }
 
             .splash-overlay {
@@ -645,7 +555,7 @@ def inject_css() -> None:
                 width: 100px;
                 height: 100px;
                 border-radius: 28px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-4));
+                background: linear-gradient(135deg, #14532d, #22c55e);
                 color: white;
                 margin: 0 auto 1.15rem auto;
                 display: flex;
@@ -658,16 +568,15 @@ def inject_css() -> None:
             }
 
             .splash-title {
-                color: var(--text);
+                color: #081b14;
                 font-size: 2.7rem;
                 font-weight: 900;
-                letter-spacing: -0.05em;
                 margin: 0;
                 animation: brandFadeOut 0.8s ease 2s forwards;
             }
 
             .splash-copy {
-                color: var(--muted);
+                color: #36574a;
                 font-size: 1.03rem;
                 line-height: 1.65;
                 margin: 0.7rem auto 0 auto;
@@ -682,20 +591,20 @@ def inject_css() -> None:
                 border-radius: 999px;
                 background: rgba(22,163,74,0.08);
                 border: 1px solid rgba(22,163,74,0.14);
-                color: var(--primary);
+                color: #14532d;
                 font-size: 0.82rem;
                 font-weight: 800;
                 animation: copyFadeOut 0.7s ease 2.1s forwards;
             }
 
             @keyframes brandFadeOut {
-                0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
-                100% { opacity: 0; transform: translateY(-12px) scale(0.97); filter: blur(3px); }
+                0% { opacity: 1; transform: translateY(0) scale(1); }
+                100% { opacity: 0; transform: translateY(-12px) scale(0.97); }
             }
 
             @keyframes copyFadeOut {
-                0% { opacity: 1; transform: translateY(0); filter: blur(0px); }
-                100% { opacity: 0; transform: translateY(-8px); filter: blur(2px); }
+                0% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-8px); }
             }
 
             @keyframes overlayFadeOut {
@@ -709,95 +618,59 @@ def inject_css() -> None:
     )
 
 
-def inject_tool_black_text_css() -> None:
+# -------------------------------------------------
+# Helpers
+# -------------------------------------------------
+def result_tile(label, value, tooltip=None, compact=False):
+    tooltip_html = ""
+    compact_class = " compact" if compact else ""
+    if tooltip:
+        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
+    return f"""
+    <div class="metric-tile{compact_class}">
+        <div class="metric-tile-label">{label} {tooltip_html}</div>
+        <div class="metric-tile-value">{value}</div>
+    </div>
+    """
+
+
+def render_page_header(title, subtitle):
+    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
+
+
+def render_custom_label(text):
+    st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
+
+
+def render_label_with_tooltip(text, tooltip):
     st.markdown(
-        """
-        <style>
-            .stApp,
-            .stApp p,
-            .stApp span,
-            .stApp label,
-            .stApp div,
-            .stApp h1,
-            .stApp h2,
-            .stApp h3,
-            .stApp h4,
-            .stApp h5,
-            .stApp h6,
-            .stApp li {
-                color: #000000;
-            }
-
-            [data-testid="stWidgetLabel"] p,
-            [data-testid="stWidgetLabel"] label,
-            .stRadio label,
-            .stSlider label,
-            .stTextInput label,
-            .stNumberInput label,
-            .stSelectbox label,
-            .stMultiSelect label,
-            .stCheckbox label,
-            .stMarkdown p,
-            .stCaption,
-            small {
-                color: #000000 !important;
-            }
-
-            .stRadio p,
-            .stSlider p,
-            .stRadio span,
-            .stSlider span {
-                color: #000000 !important;
-            }
-
-            input,
-            textarea,
-            [data-baseweb="input"] input,
-            [data-baseweb="textarea"] textarea {
-                color: #000000 !important;
-                -webkit-text-fill-color: #000000 !important;
-                background: #ffffff !important;
-            }
-
-            div[data-baseweb="input"] {
-                background: #ffffff !important;
-                border-radius: 12px !important;
-                border: 1px solid rgba(22,101,52,0.12) !important;
-            }
-
-            div[data-testid="stForm"] {
-                background: #ffffff;
-                border: 1px solid rgba(22,101,52,0.10);
-                border-radius: 22px;
-                padding: 1.15rem 1.15rem 0.8rem 1.15rem;
-                box-shadow: 0 10px 24px rgba(22,101,52,0.04);
-            }
-
-            div[data-testid="stForm"] p,
-            div[data-testid="stForm"] span,
-            div[data-testid="stForm"] label,
-            div[data-testid="stForm"] div,
-            div[data-testid="stForm"] h1,
-            div[data-testid="stForm"] h2,
-            div[data-testid="stForm"] h3 {
-                color: #000000 !important;
-            }
-
-            [data-testid="stAlert"] *,
-            [data-testid="metric-container"] *,
-            [data-testid="stMarkdownContainer"] * {
-                color: #000000 !important;
-            }
-        </style>
-        """,
+        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
         unsafe_allow_html=True,
     )
 
 
-# -------------------------------------------------
-# Helpers
-# -------------------------------------------------
-def render_splash_overlay() -> None:
+def render_risk_tolerance_helper():
+    st.markdown(
+        '<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def style_modern_axes(ax):
+    ax.set_facecolor("#ffffff")
+    ax.grid(axis="y", linestyle="--", linewidth=0.8, alpha=0.22)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#d7e8dc")
+    ax.spines["bottom"].set_color("#d7e8dc")
+    ax.tick_params(colors="#234236", labelsize=10)
+    ax.title.set_color("#0a1f17")
+    ax.xaxis.label.set_color("#234236")
+    ax.yaxis.label.set_color("#234236")
+
+
+def render_splash_overlay():
     st.markdown(
         f"""
         <div class="splash-overlay">
@@ -817,7 +690,7 @@ def render_splash_overlay() -> None:
     )
 
 
-def render_stat(value: str, label: str) -> None:
+def render_stat(value, label):
     st.markdown(
         f"""
         <div class="stat">
@@ -829,7 +702,7 @@ def render_stat(value: str, label: str) -> None:
     )
 
 
-def render_card(title: str, body: str) -> None:
+def render_card(title, body):
     st.markdown(
         f"""
         <div class="card">
@@ -841,85 +714,76 @@ def render_card(title: str, body: str) -> None:
     )
 
 
-def result_tile(label: str, value: str, tooltip: str | None = None, compact: bool = False) -> str:
-    tooltip_html = ""
-    compact_class = " compact" if compact else ""
-    if tooltip:
-        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
-    return f"""
-    <div class="metric-tile{compact_class}">
-        <div class="metric-tile-label">{label} {tooltip_html}</div>
-        <div class="metric-tile-value">{value}</div>
-    </div>
-    """
+def render_company_lookup_panel():
+    profiles = ESG_COMPANY_PROFILES
+    labels = [p["display_name"] for p in profiles]
 
-
-def risk_level_from_score(risk_tolerance: int) -> str:
-    if 1 <= risk_tolerance <= 4:
-        return "Low"
-    if 5 <= risk_tolerance <= 7:
-        return "Medium"
-    return "High"
-
-
-def render_risk_tolerance_helper() -> None:
+    st.markdown('<div class="lookup-shell">', unsafe_allow_html=True)
+    render_custom_label("Search Public Company ESG Profile")
     st.markdown(
-        '<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>',
+        f'<div class="lookup-subtitle">Search across {len(labels)} built-in public companies. Results narrow automatically as you type.</div>',
         unsafe_allow_html=True,
     )
 
-
-def render_custom_label(text: str) -> None:
-    st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
-
-
-def render_label_with_tooltip(text: str, tooltip: str) -> None:
-    st.markdown(
-        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
-        unsafe_allow_html=True,
+    selected_company = st.selectbox(
+        "Search Public Company ESG Profile",
+        options=labels,
+        index=None,
+        placeholder="Type a company name or ticker...",
+        label_visibility="collapsed",
+        key="selected_company_lookup",
     )
 
+    if selected_company:
+        company = None
+        for profile in profiles:
+            if profile["display_name"] == selected_company:
+                company = profile
+                break
 
-def render_page_header(title: str, subtitle: str) -> None:
-    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
+        if company is not None:
+            st.markdown(
+                f"""
+                <div class="profile-card">
+                    <div class="profile-title">{company["display_name"]}</div>
+                    <p class="profile-copy">
+                        Industry: {company["industry"]}<br>
+                        Exchange: {company["exchange"]}<br>
+                        Overall ESG Grade: <strong>{company["grade"]}</strong>
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            c1, c2, c3 = st.columns(3, gap="small")
+            with c1:
+                st.markdown(result_tile("Environmental", company["environment"], compact=True), unsafe_allow_html=True)
+            with c2:
+                st.markdown(result_tile("Social", company["social"], compact=True), unsafe_allow_html=True)
+            with c3:
+                st.markdown(result_tile("Governance", company["governance"], compact=True), unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
-def style_modern_axes(ax) -> None:
-    ax.set_facecolor("#ffffff")
-    ax.grid(axis="y", linestyle="--", linewidth=0.8, alpha=0.22)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color("#d7e8dc")
-    ax.spines["bottom"].set_color("#d7e8dc")
-    ax.tick_params(colors="#234236", labelsize=10)
-    ax.title.set_color("#0a1f17")
-    ax.xaxis.label.set_color("#234236")
-    ax.yaxis.label.set_color("#234236")
-
-
-def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect_ui: str) -> dict:
+# -------------------------------------------------
+# Core calculations
+# -------------------------------------------------
+def compute_recommendation(priority_label, risk_tolerance, esg_aspect):
     investment_priority_map = {
         "Balanced return and sustainability": "1",
         "Prioritise financial growth": "2",
         "Prioritise sustainability": "3",
     }
 
-    esg_internal_map = {
-        "All Equal": "All Equal",
-        "Governance": "Governance",
-        "Environmental": "Environmental",
-        "Social": "Sustainability / Social",
-    }
-
     investment_priority_key = investment_priority_map[priority_label]
     risk_level = risk_level_from_score(risk_tolerance)
-    esg_internal_key = esg_internal_map[esg_aspect_ui]
 
-    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_internal_key]
+    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
     exp_return1 = ASSET_DATA[asset1]["expected_return"]
     std_dev1 = ASSET_DATA[asset1]["std_dev"]
-    exp_return2 = ASSET_DATA[asset2]["std_dev"] if False else ASSET_DATA[asset2]["expected_return"]
+    exp_return2 = ASSET_DATA[asset2]["expected_return"]
     std_dev2 = ASSET_DATA[asset2]["std_dev"]
 
     rho = 0.30
@@ -937,7 +801,7 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect_
         "investment_priority_label": priority_label,
         "risk_tolerance": risk_tolerance,
         "risk_level": risk_level,
-        "esg_aspect": esg_aspect_ui,
+        "esg_aspect": esg_aspect,
         "asset1": asset1,
         "asset2": asset2,
         "exp_return1": exp_return1,
@@ -950,19 +814,19 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect_
 
 
 def compute_builder_result(
-    asset1: str,
-    asset2: str,
-    exp_return1: float,
-    exp_return2: float,
-    std_dev1: float,
-    std_dev2: float,
-    esg_score1: float,
-    esg_score2: float,
-    correlation: float,
-    risk_free_rate: float,
-    risk_tolerance: int,
-    esg_slider: float,
-) -> dict:
+    asset1,
+    asset2,
+    exp_return1,
+    exp_return2,
+    std_dev1,
+    std_dev2,
+    esg_score1,
+    esg_score2,
+    correlation,
+    risk_free_rate,
+    risk_tolerance,
+    esg_slider,
+):
     r1 = exp_return1 / 100
     r2 = exp_return2 / 100
     s1 = std_dev1 / 100
@@ -1031,93 +895,10 @@ def compute_builder_result(
     }
 
 
-def render_company_lookup_panel() -> None:
-    profiles = load_company_profiles()
-
-    st.markdown('<div class="lookup-shell">', unsafe_allow_html=True)
-    render_custom_label("Search Public Company ESG Profile")
-
-    if not NUMBERS_PARSER_AVAILABLE:
-        st.warning("Install numbers-parser in your Streamlit environment to enable company ESG search.")
-        st.markdown('</div>', unsafe_allow_html=True)
-        return
-
-    if not profiles:
-        st.warning("The public companies .numbers file could not be found or loaded.")
-        st.markdown('</div>', unsafe_allow_html=True)
-        return
-
-    st.markdown(
-        f'<div class="lookup-subtitle">Start typing to search all {len(profiles)} companies loaded from the attached public companies file.</div>',
-        unsafe_allow_html=True,
-    )
-
-    option_labels = [profile["display_name"] for profile in profiles]
-    profile_map = {profile["display_name"]: profile for profile in profiles}
-
-    selected_company = st.selectbox(
-        "Search Public Company ESG Profile",
-        options=option_labels,
-        index=None,
-        placeholder="Type a company name or ticker...",
-        label_visibility="collapsed",
-        key="selected_company_lookup",
-    )
-
-    if selected_company:
-        company = profile_map[selected_company]
-        st.markdown(
-            f"""
-            <div class="profile-card">
-                <div class="profile-title">{company["display_name"]}</div>
-                <p class="profile-copy">
-                    Industry: {company["industry"]}<br>
-                    Exchange: {company["exchange"]}<br>
-                    Overall ESG Grade: <strong>{company["total_grade"]}</strong> ({company["total_level"]})<br>
-                    Total ESG Score: <strong>{company["total_score"]}</strong><br>
-                    Last Updated: {company["last_processing_date"]}
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        e1, e2, e3 = st.columns(3, gap="small")
-        with e1:
-            st.markdown(
-                result_tile(
-                    "Environmental",
-                    f'{company["environment_grade"]} • {company["environment_level"]}',
-                    compact=True,
-                ),
-                unsafe_allow_html=True,
-            )
-        with e2:
-            st.markdown(
-                result_tile(
-                    "Social",
-                    f'{company["social_grade"]} • {company["social_level"]}',
-                    compact=True,
-                ),
-                unsafe_allow_html=True,
-            )
-        with e3:
-            st.markdown(
-                result_tile(
-                    "Governance",
-                    f'{company["governance_grade"]} • {company["governance_level"]}',
-                    compact=True,
-                ),
-                unsafe_allow_html=True,
-            )
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
 # -------------------------------------------------
-# Homepage
+# Screens
 # -------------------------------------------------
-def render_home() -> None:
+def render_home():
     st.markdown(
         f"""
         <div class="brand-row">
@@ -1194,15 +975,14 @@ def render_home() -> None:
 
     st.markdown("<div style='height:1.5rem;'></div>", unsafe_allow_html=True)
 
-    btn1, btn2 = st.columns(2, gap="large")
-    with btn1:
+    b1, b2 = st.columns(2, gap="large")
+    with b1:
         st.button(
             "Give Me a Portfolio Recommendation",
-            type="primary",
             use_container_width=True,
             on_click=open_recommendation,
         )
-    with btn2:
+    with b2:
         st.button(
             "Build Your Portfolio Based on ESG Preferences",
             use_container_width=True,
@@ -1210,12 +990,7 @@ def render_home() -> None:
         )
 
 
-# -------------------------------------------------
-# Recommendation input screen
-# -------------------------------------------------
-def render_recommendation_screen() -> None:
-    inject_tool_black_text_css()
-
+def render_recommendation_screen():
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
         "Portfolio Recommendation",
@@ -1262,7 +1037,6 @@ def render_recommendation_screen() -> None:
 
         submitted = st.form_submit_button(
             "Generate Portfolio Recommendation",
-            type="primary",
             use_container_width=True,
         )
 
@@ -1276,11 +1050,7 @@ def render_recommendation_screen() -> None:
         st.rerun()
 
 
-# -------------------------------------------------
-# Recommendation result screen
-# -------------------------------------------------
-def render_recommendation_result_screen() -> None:
-    inject_tool_black_text_css()
+def render_recommendation_result_screen():
     result = st.session_state.get("recommendation_result")
 
     if not result:
@@ -1299,18 +1069,18 @@ def render_recommendation_result_screen() -> None:
         st.markdown(result_tile("Investment Priority", result["investment_priority_label"], compact=True), unsafe_allow_html=True)
         st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
 
-        grid1_col1, grid1_col2 = st.columns(2, gap="small")
-        with grid1_col1:
+        a, b = st.columns(2, gap="small")
+        with a:
             st.markdown(result_tile("Risk Level", result["risk_level"], compact=True), unsafe_allow_html=True)
-        with grid1_col2:
+        with b:
             st.markdown(result_tile("Preferred ESG Aspect", result["esg_aspect"], compact=True), unsafe_allow_html=True)
 
         st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
 
-        grid2_col1, grid2_col2 = st.columns(2, gap="small")
-        with grid2_col1:
+        c, d = st.columns(2, gap="small")
+        with c:
             st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%', compact=True), unsafe_allow_html=True)
-        with grid2_col2:
+        with d:
             st.markdown(
                 result_tile(
                     "Portfolio Risk",
@@ -1325,7 +1095,7 @@ def render_recommendation_result_screen() -> None:
         st.markdown('<div class="side-header">Recommended Assets</div>', unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div class="asset-summary tight">
+            <div class="asset-summary">
                 <div class="asset-summary-title">{result["asset1"]}</div>
                 <p class="asset-summary-copy">
                     Expected return: {result["exp_return1"]:.2f}%<br>
@@ -1338,7 +1108,7 @@ def render_recommendation_result_screen() -> None:
         st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div class="asset-summary tight">
+            <div class="asset-summary">
                 <div class="asset-summary-title">{result["asset2"]}</div>
                 <p class="asset-summary-copy">
                     Expected return: {result["exp_return2"]:.2f}%<br>
@@ -1374,16 +1144,11 @@ def render_recommendation_result_screen() -> None:
     plt.close(fig)
 
 
-# -------------------------------------------------
-# Builder input screen
-# -------------------------------------------------
-def render_builder_screen() -> None:
-    inject_tool_black_text_css()
-
+def render_builder_screen():
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
         "Portfolio Builder",
-        "Enter your asset assumptions, keep the standard risk-free rate by default or change it if needed, and search the uploaded public companies file for ESG profiles.",
+        "Enter your asset assumptions, use the standard 4.84% risk-free rate by default unless you change it, and search for a company ESG profile.",
     )
 
     st.markdown('<div class="tool-section-label">Step 1</div>', unsafe_allow_html=True)
@@ -1393,13 +1158,13 @@ def render_builder_screen() -> None:
 
     with setup_left:
         render_custom_label("Asset Selection Method")
-        st.session_state["builder_asset_choice"] = st.radio(
+        asset_choice = st.radio(
             "Asset Selection Method",
             ["Input my own assets", "Use recommended public companies"],
             horizontal=True,
             label_visibility="collapsed",
-            key="builder_asset_choice_radio",
         )
+        st.session_state["builder_asset_choice"] = asset_choice
 
     with setup_right:
         render_company_lookup_panel()
@@ -1417,51 +1182,15 @@ def render_builder_screen() -> None:
 
             with col1:
                 asset1 = st.text_input("Asset 1 name", value="Asset 1")
-                exp_return1 = st.number_input(
-                    f"{asset1} expected return (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=8.0,
-                    step=0.1,
-                )
-                std_dev1 = st.number_input(
-                    f"{asset1} standard deviation (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=15.0,
-                    step=0.1,
-                )
-                esg_score1 = st.number_input(
-                    f"{asset1} ESG score (0–100)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=70.0,
-                    step=1.0,
-                )
+                exp_return1 = st.number_input(f"{asset1} expected return (%)", 0.0, 100.0, 8.0, 0.1)
+                std_dev1 = st.number_input(f"{asset1} standard deviation (%)", 0.0, 100.0, 15.0, 0.1)
+                esg_score1 = st.number_input(f"{asset1} ESG score (0–100)", 0.0, 100.0, 70.0, 1.0)
 
             with col2:
                 asset2 = st.text_input("Asset 2 name", value="Asset 2")
-                exp_return2 = st.number_input(
-                    f"{asset2} expected return (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=12.0,
-                    step=0.1,
-                )
-                std_dev2 = st.number_input(
-                    f"{asset2} standard deviation (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=20.0,
-                    step=0.1,
-                )
-                esg_score2 = st.number_input(
-                    f"{asset2} ESG score (0–100)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=55.0,
-                    step=1.0,
-                )
+                exp_return2 = st.number_input(f"{asset2} expected return (%)", 0.0, 100.0, 12.0, 0.1)
+                std_dev2 = st.number_input(f"{asset2} standard deviation (%)", 0.0, 100.0, 20.0, 0.1)
+                esg_score2 = st.number_input(f"{asset2} ESG score (0–100)", 0.0, 100.0, 55.0, 1.0)
 
             st.markdown('<div class="tool-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="tool-section-label">Step 3</div>', unsafe_allow_html=True)
@@ -1478,15 +1207,13 @@ def render_builder_screen() -> None:
                     step=0.01,
                 )
 
-                use_default_rf = st.checkbox(
-                    "Use standard Risk-Free Rate of 4.84%",
-                    value=True,
-                )
+                use_default_rf = st.checkbox("Use standard Risk-Free Rate of 4.84%", value=True)
 
                 render_label_with_tooltip(
                     "Risk-Free Rate",
                     "Standard rate of 4.84% as per the UK 10 year bond yield since it represents a safe, long-term investment alternative",
                 )
+
                 risk_free_rate = st.number_input(
                     "Risk-Free Rate",
                     min_value=0.0,
@@ -1496,6 +1223,7 @@ def render_builder_screen() -> None:
                     disabled=use_default_rf,
                     label_visibility="collapsed",
                 )
+
                 if use_default_rf:
                     risk_free_rate = 4.84
 
@@ -1546,7 +1274,6 @@ def render_builder_screen() -> None:
 
             submitted = st.form_submit_button(
                 "Generate Portfolio Recommendation",
-                type="primary",
                 use_container_width=True,
             )
 
@@ -1560,11 +1287,7 @@ def render_builder_screen() -> None:
                 unsafe_allow_html=True,
             )
 
-            submitted = st.form_submit_button(
-                "Continue",
-                type="primary",
-                use_container_width=True,
-            )
+            submitted = st.form_submit_button("Continue", use_container_width=True)
 
             asset1 = asset2 = ""
             exp_return1 = exp_return2 = 0.0
@@ -1577,28 +1300,24 @@ def render_builder_screen() -> None:
 
     if asset_choice == "Input my own assets" and submitted:
         st.session_state["builder_result"] = compute_builder_result(
-            asset1=asset1,
-            asset2=asset2,
-            exp_return1=exp_return1,
-            exp_return2=exp_return2,
-            std_dev1=std_dev1,
-            std_dev2=std_dev2,
-            esg_score1=esg_score1,
-            esg_score2=esg_score2,
-            correlation=correlation,
-            risk_free_rate=risk_free_rate,
-            risk_tolerance=risk_tolerance,
-            esg_slider=esg_slider,
+            asset1,
+            asset2,
+            exp_return1,
+            exp_return2,
+            std_dev1,
+            std_dev2,
+            esg_score1,
+            esg_score2,
+            correlation,
+            risk_free_rate,
+            risk_tolerance,
+            esg_slider,
         )
         open_builder_result()
         st.rerun()
 
 
-# -------------------------------------------------
-# Builder result screen
-# -------------------------------------------------
-def render_builder_result_screen() -> None:
-    inject_tool_black_text_css()
+def render_builder_result_screen():
     result = st.session_state.get("builder_result")
 
     if not result:
@@ -1649,6 +1368,7 @@ def render_builder_result_screen() -> None:
 
     fig, ax = plt.subplots(figsize=(10, 6), dpi=180, constrained_layout=True)
     fig.patch.set_facecolor("white")
+
     scatter = ax.scatter(
         portfolio_risks,
         portfolio_returns,
@@ -1656,7 +1376,6 @@ def render_builder_result_screen() -> None:
         cmap="Greens",
         s=28,
         alpha=0.92,
-        edgecolors="none",
     )
     ax.scatter(
         portfolio_risks[max_sharpe_idx],
@@ -1695,7 +1414,6 @@ def render_builder_result_screen() -> None:
 
     cbar = plt.colorbar(scatter, ax=ax, pad=0.02)
     cbar.set_label("Portfolio ESG Score")
-    cbar.outline.set_edgecolor("#d7e8dc")
 
     st.pyplot(fig)
     plt.close(fig)
