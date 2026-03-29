@@ -834,6 +834,7 @@ def init_session_state() -> None:
         "builder_esg_score2": 55.0,
         "builder_correlation": 0.30,
         "builder_risk_free_rate": 4.84,
+        "builder_risk_free_rate_touched": False,
         "builder_risk_tolerance": 5,
         "builder_esg_importance": "Somewhat important",
         "builder_esg_slider": 0.05,
@@ -875,6 +876,10 @@ def show_builder_popup() -> None:
 
 def hide_builder_popup() -> None:
     st.session_state.show_builder_popup = False
+
+
+def mark_builder_risk_free_rate_touched() -> None:
+    st.session_state.builder_risk_free_rate_touched = True
 
 
 # -------------------------------------------------
@@ -1330,6 +1335,26 @@ def inject_tool_text_css() -> None:
                 background: #ffffff !important;
                 border-radius: 12px !important;
                 border: 1px solid rgba(22,101,52,0.12) !important;
+                box-shadow: none !important;
+            }
+
+            div[data-baseweb="input"]:focus-within,
+            div[data-baseweb="select"]:focus-within,
+            [data-testid="stTextInput"] > div:focus-within,
+            [data-testid="stNumberInput"] > div:focus-within,
+            [data-testid="stSelectbox"] > div:focus-within {
+                border: 1px solid rgba(21, 128, 61, 0.55) !important;
+                box-shadow: 0 0 0 0.14rem rgba(21, 128, 61, 0.14) !important;
+                outline: none !important;
+            }
+
+            [data-baseweb="input"] input:focus,
+            [data-baseweb="input"] input:active,
+            [data-baseweb="select"] input:focus,
+            [data-baseweb="select"] input:active {
+                box-shadow: none !important;
+                outline: none !important;
+                border-color: transparent !important;
             }
         </style>
         """,
@@ -1533,17 +1558,6 @@ def render_company_profile(company_tuple) -> None:
         st.markdown(result_tile("Governance", f"{g_grade} · {g_level}"), unsafe_allow_html=True)
     with m4:
         st.markdown(result_tile("Total ESG", f"{total_grade} · {total_level}"), unsafe_allow_html=True)
-
-    fig, ax = plt.subplots(figsize=(7.6, 3.8), dpi=180, constrained_layout=True)
-    fig.patch.set_facecolor("white")
-    labels = ["Environmental", "Social", "Governance", "Total"]
-    values = [float(e_score), float(s_score), float(g_score), float(total_score)]
-    ax.bar(labels, values, color=["#16a34a", "#22c55e", "#86efac", "#14532d"], edgecolor="#166534")
-    ax.set_ylabel("Score")
-    ax.set_title("ESG Score Profile")
-    style_modern_axes(ax)
-    st.pyplot(fig)
-    plt.close(fig)
 
 
 # -------------------------------------------------
@@ -2170,8 +2184,10 @@ def render_builder_screen() -> None:
             "Risk-Free Rate",
             min_value=0.0,
             max_value=20.0,
+            value=float(st.session_state.builder_risk_free_rate),
             step=0.01,
             key="builder_risk_free_rate",
+            on_change=mark_builder_risk_free_rate_touched,
             label_visibility="collapsed",
         )
         render_custom_label("Risk Tolerance")
