@@ -1148,6 +1148,64 @@ def inject_css() -> None:
                 margin-top: 0.58rem;
             }
 
+            .interpretation-divider {
+                height: 1px;
+                background: rgba(22,101,52,0.10);
+                margin: 0.9rem 0 0.9rem 0;
+                border-radius: 999px;
+            }
+
+            .allocation-summary {
+                background: linear-gradient(145deg, rgba(255,255,255,0.99), rgba(238,248,241,0.96));
+                border: 1px solid rgba(22,101,52,0.10);
+                border-radius: 20px;
+                padding: 1rem 1.05rem;
+                box-shadow: 0 12px 28px rgba(20,83,45,0.06);
+            }
+
+            .allocation-summary-label {
+                color: #5b7468;
+                font-size: 0.75rem;
+                font-weight: 800;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                margin: 0;
+            }
+
+            .allocation-summary-title {
+                color: #0b1c15;
+                font-size: 1.1rem;
+                font-weight: 900;
+                letter-spacing: -0.02em;
+                line-height: 1.3;
+                margin: 0.22rem 0 0 0;
+            }
+
+            .allocation-summary-copy {
+                color: #36574a;
+                font-size: 0.9rem;
+                line-height: 1.58;
+                margin: 0.38rem 0 0 0;
+            }
+
+            .allocation-chip-row {
+                display: flex;
+                gap: 0.55rem;
+                flex-wrap: wrap;
+                margin-top: 0.85rem;
+            }
+
+            .allocation-chip {
+                background: rgba(255,255,255,0.96);
+                border: 1px solid rgba(22,101,52,0.10);
+                border-radius: 999px;
+                padding: 0.42rem 0.72rem;
+                color: #163f2b;
+                font-size: 0.84rem;
+                font-weight: 700;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+            }
+
             .section-divider {
                 height: 1px;
                 background: rgba(22,101,52,0.10);
@@ -1636,6 +1694,20 @@ def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     """
 
 
+def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float) -> str:
+    return f"""
+    <div class="allocation-summary">
+        <p class="allocation-summary-label">Recommended Allocation</p>
+        <p class="allocation-summary-title">{asset1}: {weight1:.2%} &nbsp;•&nbsp; {asset2}: {weight2:.2%}</p>
+        <p class="allocation-summary-copy">The live portfolio recommendation keeps the allocation visible in one clean summary block, while the key performance metrics remain easy to scan below.</p>
+        <div class="allocation-chip-row">
+            <span class="allocation-chip">{asset1}: {weight1:.2%}</span>
+            <span class="allocation-chip">{asset2}: {weight2:.2%}</span>
+        </div>
+    </div>
+    """
+
+
 def style_modern_axes(ax) -> None:
     ax.set_facecolor("#ffffff")
     ax.grid(axis="y", linestyle="--", linewidth=0.8, alpha=0.22)
@@ -1802,8 +1874,12 @@ def apply_frontier_visibility_lift(
 
 
 def build_dual_frontier_display(result: dict) -> dict:
-    without_indices = np.array(result.get("efficient_idx_without_esg_full", np.array([], dtype=int)), dtype=int)
-    if without_indices.size == 0:
+    portfolio_returns = np.array(result["portfolio_returns"], dtype=float)
+    portfolio_risks = np.array(result["portfolio_risks"], dtype=float)
+    portfolio_esg = np.array(result["portfolio_esg"], dtype=float)
+    weights = np.array(result["weights"], dtype=float)
+
+    if portfolio_returns.size == 0 or portfolio_risks.size == 0:
         empty = np.array([], dtype=float)
         return {
             "without_weights": empty,
@@ -1814,84 +1890,53 @@ def build_dual_frontier_display(result: dict) -> dict:
             "with_risks": empty,
             "with_returns": empty,
             "with_esg": empty,
+            "with_performance": empty,
             "max_sharpe_plot": (0.0, 0.0),
             "optimal_plot": (0.0, 0.0),
             "visual_gap": 0.0,
         }
 
-    without_weights = np.array(result["weights"][without_indices], dtype=float)
-    without_returns, without_risks, without_esg = compute_portfolio_path_from_weights(
-        without_weights,
-        result["exp_return1_input"],
-        result["exp_return2_input"],
-        result["std_dev1_input"],
-        result["std_dev2_input"],
-        result["correlation"],
-        result["esg_score1_input"],
-        result["esg_score2_input"],
-    )
+    without_indices = efficient_frontier_indices(portfolio_risks, portfolio_returns)
 
-    with_weights = build_esg_tilted_weights(
-        without_weights,
-        float(result.get("esg_preference_fraction", 0.0)),
-        result["esg_score1_input"],
-        result["esg_score2_input"],
-    )
-    with_returns, with_risks, with_esg = compute_portfolio_path_from_weights(
-        with_weights,
-        result["exp_return1_input"],
-        result["exp_return2_input"],
-        result["std_dev1_input"],
-        result["std_dev2_input"],
-        result["correlation"],
-        result["esg_score1_input"],
-        result["esg_score2_input"],
-    )
-    with_risks, with_returns = apply_frontier_visibility_lift(
-        without_risks,
-        without_returns,
-        with_risks,
-        with_returns,
-        float(result.get("esg_preference_fraction", 0.0)),
-    )
+    esg_preference_fraction = float(result.get("esg_preference_fraction", 0.0))
+    esg_center = 0.5 * ((result["esg_score1_input"] / 100.0) + (result["esg_score2_input"] / 100.0))
+    return_gap_fraction = abs((result["exp_return1_input"] - result["exp_return2_input"]) / 100.0)
+    performance_shift_scale = 0.09 + 0.65 * return_gap_fraction
+    with_performance_full = portfolio_returns + esg_preference_fraction * performance_shift_scale * (portfolio_esg - esg_center)
+    with_indices = efficient_frontier_indices(portfolio_risks, with_performance_full)
+    if with_indices.size == 0:
+        with_indices = without_indices.copy()
+
+    without_weights = np.array(weights[without_indices], dtype=float)
+    without_risks = np.array(portfolio_risks[without_indices] * 100.0, dtype=float)
+    without_returns = np.array(portfolio_returns[without_indices] * 100.0, dtype=float)
+    without_esg = np.array(portfolio_esg[without_indices] * 100.0, dtype=float)
+
+    with_weights = np.array(weights[with_indices], dtype=float)
+    with_risks = np.array(portfolio_risks[with_indices] * 100.0, dtype=float)
+    with_returns = np.array(with_performance_full[with_indices] * 100.0, dtype=float)
+    with_esg = np.array(portfolio_esg[with_indices] * 100.0, dtype=float)
 
     max_sharpe_plot = (
         float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100.0),
         float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100.0),
     )
-
-    optimal_weight_display = build_esg_tilted_weights(
-        float(result["opt_w1"]),
-        float(result.get("esg_preference_fraction", 0.0)),
-        result["esg_score1_input"],
-        result["esg_score2_input"],
-    )
-    optimal_return_display, optimal_risk_display, _ = compute_portfolio_path_from_weights(
-        optimal_weight_display,
-        result["exp_return1_input"],
-        result["exp_return2_input"],
-        result["std_dev1_input"],
-        result["std_dev2_input"],
-        result["correlation"],
-        result["esg_score1_input"],
-        result["esg_score2_input"],
+    optimal_plot = (
+        float(result["portfolio_risks"][result["optimal_idx"]] * 100.0),
+        float(with_performance_full[result["optimal_idx"]] * 100.0),
     )
 
-    if len(with_weights) > 0:
-        nearest_idx = int(np.argmin(np.abs(with_weights - float(optimal_weight_display))))
-        optimal_plot = (float(with_risks[nearest_idx]), float(with_returns[nearest_idx]))
-    else:
-        optimal_plot = (float(optimal_risk_display[0]), float(optimal_return_display[0]))
-
-    risk_span = max(float(np.max(without_risks) - np.min(without_risks)), 1e-9)
-    return_span = max(float(np.max(without_returns) - np.min(without_returns)), 1e-9)
     comparison_count = min(len(without_risks), len(with_risks))
     if comparison_count > 0:
+        without_sample_idx = np.linspace(0, len(without_risks) - 1, comparison_count).astype(int)
+        with_sample_idx = np.linspace(0, len(with_risks) - 1, comparison_count).astype(int)
+        risk_span = max(float(np.max(without_risks) - np.min(without_risks)), 1e-9)
+        return_span = max(float(np.max(without_returns) - np.min(without_returns)), 1e-9)
         visual_gap = float(
             np.mean(
                 np.sqrt(
-                    ((with_risks[:comparison_count] - without_risks[:comparison_count]) / risk_span) ** 2
-                    + ((with_returns[:comparison_count] - without_returns[:comparison_count]) / return_span) ** 2
+                    ((with_risks[with_sample_idx] - without_risks[without_sample_idx]) / risk_span) ** 2
+                    + ((with_returns[with_sample_idx] - without_returns[without_sample_idx]) / return_span) ** 2
                 )
             )
         )
@@ -1907,6 +1952,7 @@ def build_dual_frontier_display(result: dict) -> dict:
         "with_risks": with_risks,
         "with_returns": with_returns,
         "with_esg": with_esg,
+        "with_performance": np.array(with_performance_full * 100.0, dtype=float),
         "max_sharpe_plot": max_sharpe_plot,
         "optimal_plot": optimal_plot,
         "visual_gap": visual_gap,
@@ -1921,18 +1967,18 @@ def build_frontier_interpretation(result: dict) -> str:
     with_risks = frontier_display["with_risks"]
     with_returns = frontier_display["with_returns"]
 
-    def risk_return_span_text(risks_arr: np.ndarray, returns_arr: np.ndarray) -> str:
+    def frontier_span_text(risks_arr: np.ndarray, returns_arr: np.ndarray) -> str:
         if len(risks_arr) == 0 or len(returns_arr) == 0:
-            return "Not available yet"
+            return "not available yet"
         return (
-            f"{float(np.min(risks_arr)):.2f}% to {float(np.max(risks_arr)):.2f}% risk "
-            f"and {float(np.min(returns_arr)):.2f}% to {float(np.max(returns_arr)):.2f}% expected return"
+            f"{float(np.min(risks_arr)):.2f}% to {float(np.max(risks_arr)):.2f}% risk and "
+            f"{float(np.min(returns_arr)):.2f}% to {float(np.max(returns_arr)):.2f}% portfolio performance"
         )
 
     max_sharpe_risk = float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100.0)
     max_sharpe_return = float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100.0)
-    optimal_risk = float(frontier_display["optimal_plot"][0])
-    optimal_return = float(frontier_display["optimal_plot"][1])
+    optimal_risk = float(result["opt_risk"] * 100.0)
+    optimal_return = float(result["opt_return"] * 100.0)
     optimal_esg = float(result["opt_esg"] * 100.0)
     required_esg = float(result["required_esg"] * 100.0)
 
@@ -1941,41 +1987,29 @@ def build_frontier_interpretation(result: dict) -> str:
     visual_gap = float(frontier_display.get("visual_gap", 0.0))
 
     if return_change >= 0.15 and risk_change <= 0.15:
-        tradeoff_sentence = "The ESG-aware path is currently preserving a strong traditional investment profile while still improving sustainability alignment."
+        tradeoff_sentence = "The ESG-aware path is preserving a strong traditional investment profile while still improving sustainability alignment."
     elif return_change >= 0.0 and risk_change > 0.15:
         tradeoff_sentence = "The ESG-aware path is reaching for more upside, but investors are accepting a visibly higher level of portfolio risk to keep that stronger sustainability tilt."
     elif return_change < 0.0 and risk_change <= 0.0:
         tradeoff_sentence = "The ESG-aware path is behaving more defensively, with a lower expected return profile but a steadier risk posture and a stronger sustainability emphasis."
     else:
-        tradeoff_sentence = "The ESG-aware path is making the sustainability trade-off explicit: investors are changing the usual risk-return balance to keep the portfolio more aligned with ESG priorities."
+        tradeoff_sentence = "The ESG-aware path is changing the usual risk-return balance to keep the portfolio more aligned with ESG priorities."
 
     if visual_gap >= 0.22:
-        gap_sentence = "The separation between the two frontiers is pronounced, so your current ESG preference is materially changing the opportunity set that is being highlighted on the chart."
+        gap_sentence = "The two frontiers are now clearly separated, so the current ESG preference is materially changing the portfolio opportunity set shown on the chart."
     elif visual_gap >= 0.10:
-        gap_sentence = "The two frontiers are clearly separated, showing that the ESG setting is influencing both the shape of the opportunity set and the portfolio combinations that look most attractive."
+        gap_sentence = "The ESG setting is creating a visible gap between the two frontiers, which means the sustainability preference is influencing the shape of the chart in a noticeable way."
     else:
-        gap_sentence = "The two frontiers remain relatively close together, which means the current ESG preference is refining the portfolio choice more than it is dramatically reshaping the overall opportunity set."
+        gap_sentence = "The two frontiers remain relatively close together, which means the ESG preference is refining the decision rather than radically changing the opportunity set."
 
     return f"""
     <div class="interpretation-card">
         <p class="interpretation-title">Portfolio Analysis</p>
         <p class="interpretation-subtitle">This section updates live as the inputs and efficient frontiers change.</p>
-        <div class="analysis-grid">
-            <div class="analysis-pill">
-                <p class="analysis-pill-label">Max Sharpe Ratio</p>
-                <p class="analysis-pill-value">{max_sharpe_return:.2f}% Return at {max_sharpe_risk:.2f}% Risk</p>
-            </div>
-            <div class="analysis-pill">
-                <p class="analysis-pill-label">ESG-Aware Optimum</p>
-                <p class="analysis-pill-value">{optimal_return:.2f}% Return at {optimal_risk:.2f}% Risk</p>
-            </div>
-            <div class="analysis-pill">
-                <p class="analysis-pill-label">Target ESG Level</p>
-                <p class="analysis-pill-value">{required_esg:.2f}/100 with Current Optimum at {optimal_esg:.2f}/100</p>
-            </div>
-        </div>
-        <p class="interpretation-copy"><strong>Without ESG:</strong> the standard efficient frontier currently spans {risk_return_span_text(without_risks, without_returns)}. <strong>With ESG:</strong> the ESG-aware frontier spans {risk_return_span_text(with_risks, with_returns)}.</p>
-        <p class="interpretation-copy">Relative to the max Sharpe Ratio point, the ESG-aware portfolio is changing expected return by {return_change:+.2f} percentage points and risk by {risk_change:+.2f} percentage points. {tradeoff_sentence} {gap_sentence}</p>
+        <div class="interpretation-divider"></div>
+        <p class="interpretation-copy"><strong>Frontier without ESG consideration:</strong> the purely financial frontier currently spans {frontier_span_text(without_risks, without_returns)}.</p>
+        <p class="interpretation-copy"><strong>Frontier with ESG consideration:</strong> the ESG-aware frontier currently spans {frontier_span_text(with_risks, with_returns)}. This green frontier updates as the ESG preference changes, so it adapts live with the user’s input.</p>
+        <p class="interpretation-copy"><strong>Current portfolio positioning:</strong> the Max Sharpe Ratio portfolio is at {max_sharpe_return:.2f}% expected return and {max_sharpe_risk:.2f}% risk, while the ESG-aware recommendation is at {optimal_return:.2f}% expected return, {optimal_risk:.2f}% risk, and {optimal_esg:.2f}/100 ESG against a current target of {required_esg:.2f}/100. {tradeoff_sentence} {gap_sentence}</p>
     </div>
     """
 
@@ -2456,21 +2490,14 @@ def render_builder_popup() -> None:
                 st.button("Close", key="close_builder_popup_btn", use_container_width=True, on_click=hide_builder_popup)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(allocation_summary_html(result["asset1"], result["opt_w1"], result["asset2"], result["opt_w2"]), unsafe_allow_html=True)
 
-            row1c1, row1c2, row1c3 = st.columns(3, gap="small")
-            with row1c1:
-                st.markdown(result_tile(f'{result["asset1"]} weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
-            with row1c2:
-                st.markdown(result_tile(f'{result["asset2"]} weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
-            with row1c3:
-                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
+            st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
 
-            st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
-            row2c1, row2c2, row2c3 = st.columns(3, gap="small")
-            with row2c1:
+            metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
+            with metric_c1:
                 st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
-            with row2c2:
+            with metric_c2:
                 st.markdown(
                     result_tile(
                         "Portfolio Risk",
@@ -2479,8 +2506,10 @@ def render_builder_popup() -> None:
                     ),
                     unsafe_allow_html=True,
                 )
-            with row2c3:
+            with metric_c3:
                 st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
+            with metric_c4:
+                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
@@ -2502,6 +2531,7 @@ def render_builder_popup() -> None:
                     linewidth=2.8,
                     color="#64748b",
                     zorder=2,
+                    label="Frontier Without ESG Consideration",
                 )
 
             if len(with_frontier_risks) > 0:
@@ -2509,9 +2539,10 @@ def render_builder_popup() -> None:
                     with_frontier_risks,
                     with_frontier_returns,
                     linestyle="-",
-                    linewidth=2.9,
+                    linewidth=3.0,
                     color="#16a34a",
                     zorder=3,
+                    label="Frontier With ESG Consideration",
                 )
 
             max_sharpe_x, max_sharpe_y = frontier_display["max_sharpe_plot"]
@@ -2541,13 +2572,13 @@ def render_builder_popup() -> None:
             )
 
             if len(without_frontier_risks) > 0:
-                without_label_pos = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.38)))
+                without_label_pos = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.34)))
                 ax.annotate(
-                    "Efficient Frontier\nWithout ESG",
+                    "Frontier Without\nESG Consideration",
                     (without_frontier_risks[without_label_pos], without_frontier_returns[without_label_pos]),
-                    xytext=(-118, 18),
+                    xytext=(-124, 20),
                     textcoords="offset points",
-                    fontsize=8.5,
+                    fontsize=8.4,
                     color="#475569",
                     weight="bold",
                     bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#cbd5e1", alpha=0.98),
@@ -2555,13 +2586,13 @@ def render_builder_popup() -> None:
                 )
 
             if len(with_frontier_risks) > 0:
-                with_label_pos = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.62)))
+                with_label_pos = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.64)))
                 ax.annotate(
-                    "Efficient Frontier\nWith ESG",
+                    "Frontier With\nESG Consideration",
                     (with_frontier_risks[with_label_pos], with_frontier_returns[with_label_pos]),
-                    xytext=(20, 18),
+                    xytext=(18, 18),
                     textcoords="offset points",
-                    fontsize=8.5,
+                    fontsize=8.4,
                     color="#15803d",
                     weight="bold",
                     bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#bbf7d0", alpha=0.98),
@@ -2571,9 +2602,9 @@ def render_builder_popup() -> None:
             ax.annotate(
                 "Max Sharpe Ratio",
                 (max_sharpe_x, max_sharpe_y),
-                xytext=(-88, 14),
+                xytext=(-92, 12),
                 textcoords="offset points",
-                fontsize=8.5,
+                fontsize=8.4,
                 color="#166534",
                 weight="bold",
                 bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
@@ -2584,7 +2615,7 @@ def render_builder_popup() -> None:
                 (optimal_x, optimal_y),
                 xytext=(14, -28),
                 textcoords="offset points",
-                fontsize=8.5,
+                fontsize=8.4,
                 color="#0f172a",
                 weight="bold",
                 bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#cbd5e1", alpha=0.98),
@@ -2592,11 +2623,11 @@ def render_builder_popup() -> None:
             )
 
             ax.set_xlabel("Portfolio Risk (%)")
-            ax.set_ylabel("Expected Return (%)")
+            ax.set_ylabel("Portfolio Performance (%)")
             ax.set_title("Efficient Frontiers")
             ax.margins(x=0.10, y=0.12)
             style_modern_axes(ax)
-            legend = ax.legend(loc="upper right", frameon=True, fontsize=8.5)
+            legend = ax.legend(loc="upper right", frameon=True, fontsize=8.4)
             legend.get_frame().set_facecolor("white")
             legend.get_frame().set_edgecolor("#d7e8dc")
             legend.get_frame().set_alpha(0.96)
