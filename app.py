@@ -1830,10 +1830,20 @@ def compute_builder_result(
     required_esg = float(np.min(portfolio_esg) + esg_preference_fraction * (np.max(portfolio_esg) - np.min(portfolio_esg)))
     esg_constrained_mask = portfolio_esg >= (required_esg - 1e-12)
 
-    efficient_idx_without_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns)
+    efficient_idx_without_esg_full = efficient_frontier_indices(portfolio_risks, portfolio_returns)
     efficient_idx_with_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns, esg_constrained_mask)
     if efficient_idx_with_esg.size == 0:
-        efficient_idx_with_esg = efficient_idx_without_esg.copy()
+        efficient_idx_with_esg = efficient_idx_without_esg_full.copy()
+
+    efficient_idx_with_esg_set = set(int(idx) for idx in efficient_idx_with_esg.tolist())
+    efficient_idx_without_esg_display = np.array(
+        [int(idx) for idx in efficient_idx_without_esg_full if int(idx) not in efficient_idx_with_esg_set],
+        dtype=int,
+    )
+    frontiers_share_points = bool(
+        efficient_idx_with_esg.size > 0
+        and efficient_idx_without_esg_display.size != efficient_idx_without_esg_full.size
+    )
 
     opt_w1 = float(weights[optimal_idx])
     opt_w2 = float(1 - opt_w1)
@@ -1848,8 +1858,10 @@ def compute_builder_result(
         "portfolio_sharpes": portfolio_sharpes,
         "max_sharpe_idx": max_sharpe_idx,
         "optimal_idx": optimal_idx,
-        "efficient_idx_without_esg": efficient_idx_without_esg,
+        "efficient_idx_without_esg_full": efficient_idx_without_esg_full,
+        "efficient_idx_without_esg_display": efficient_idx_without_esg_display,
         "efficient_idx_with_esg": efficient_idx_with_esg,
+        "frontiers_share_points": frontiers_share_points,
         "required_esg": required_esg,
         "opt_w1": opt_w1,
         "opt_w2": opt_w2,
@@ -2088,25 +2100,50 @@ def render_builder_popup() -> None:
 
             risks_pct = result["portfolio_risks"] * 100
             returns_pct = result["portfolio_returns"] * 100
-            efficient_idx_without_esg = result["efficient_idx_without_esg"]
+            efficient_idx_without_esg_full = result["efficient_idx_without_esg_full"]
+            efficient_idx_without_esg_display = result["efficient_idx_without_esg_display"]
             efficient_idx_with_esg = result["efficient_idx_with_esg"]
 
-            ax.plot(
-                risks_pct[efficient_idx_without_esg],
-                returns_pct[efficient_idx_without_esg],
-                linestyle="--",
-                linewidth=2.3,
-                color="#94a3b8",
-                label="Efficient Frontier (Without ESG)",
-                zorder=2,
-            )
+            if len(efficient_idx_without_esg_full) > 0:
+                ax.plot(
+                    risks_pct[efficient_idx_without_esg_full],
+                    returns_pct[efficient_idx_without_esg_full],
+                    linestyle=":",
+                    linewidth=1.5,
+                    color="#cbd5e1",
+                    alpha=0.95,
+                    zorder=1,
+                )
+
+            if len(efficient_idx_without_esg_display) > 0:
+                ax.plot(
+                    risks_pct[efficient_idx_without_esg_display],
+                    returns_pct[efficient_idx_without_esg_display],
+                    linestyle="--",
+                    linewidth=2.6,
+                    color="#64748b",
+                    label="Efficient Frontier (Without ESG Constraint)",
+                    zorder=2,
+                )
+            else:
+                ax.plot(
+                    risks_pct[efficient_idx_without_esg_full],
+                    returns_pct[efficient_idx_without_esg_full],
+                    linestyle="--",
+                    linewidth=2.1,
+                    color="#94a3b8",
+                    alpha=0.9,
+                    label="Efficient Frontier (Without ESG Constraint)",
+                    zorder=2,
+                )
+
             ax.plot(
                 risks_pct[efficient_idx_with_esg],
                 returns_pct[efficient_idx_with_esg],
                 linestyle="-",
-                linewidth=2.6,
+                linewidth=2.8,
                 color="#16a34a",
-                label="Efficient Frontier (With ESG)",
+                label="Efficient Frontier (With ESG Constraint)",
                 zorder=3,
             )
 
@@ -2133,28 +2170,32 @@ def render_builder_popup() -> None:
                 zorder=6,
             )
 
-            if len(efficient_idx_without_esg) > 0:
-                without_label_idx = efficient_idx_without_esg[min(len(efficient_idx_without_esg) - 1, max(0, int(len(efficient_idx_without_esg) * 0.52)))]
+            label_source_without_esg = efficient_idx_without_esg_display
+            if len(label_source_without_esg) == 0:
+                label_source_without_esg = efficient_idx_without_esg_full
+
+            if len(label_source_without_esg) > 0:
+                without_label_idx = label_source_without_esg[min(len(label_source_without_esg) - 1, max(0, int(len(label_source_without_esg) * 0.58)))]
                 ax.annotate(
-                    "Efficient Frontier\nWithout ESG",
+                    "Efficient Frontier\nWithout ESG Constraint",
                     (risks_pct[without_label_idx], returns_pct[without_label_idx]),
-                    xytext=(-82, 18),
+                    xytext=(-112, 18),
                     textcoords="offset points",
-                    fontsize=8.6,
+                    fontsize=8.5,
                     color="#475569",
                     weight="bold",
                     bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#cbd5e1", alpha=0.97),
-                    arrowprops=dict(arrowstyle="-", color="#94a3b8", lw=1.2, alpha=0.95),
+                    arrowprops=dict(arrowstyle="-", color="#64748b", lw=1.2, alpha=0.95),
                 )
 
             if len(efficient_idx_with_esg) > 0:
-                with_label_idx = efficient_idx_with_esg[min(len(efficient_idx_with_esg) - 1, max(0, int(len(efficient_idx_with_esg) * 0.64)))]
+                with_label_idx = efficient_idx_with_esg[min(len(efficient_idx_with_esg) - 1, max(0, int(len(efficient_idx_with_esg) * 0.46)))]
                 ax.annotate(
-                    "Efficient Frontier\nWith ESG",
+                    "Efficient Frontier\nWith ESG Constraint",
                     (risks_pct[with_label_idx], returns_pct[with_label_idx]),
                     xytext=(18, 18),
                     textcoords="offset points",
-                    fontsize=8.6,
+                    fontsize=8.5,
                     color="#15803d",
                     weight="bold",
                     bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#bbf7d0", alpha=0.97),
@@ -2189,20 +2230,30 @@ def render_builder_popup() -> None:
             ax.set_title("Efficient Frontiers")
             ax.margins(x=0.08, y=0.12)
             style_modern_axes(ax)
-            legend = ax.legend(loc="upper left", frameon=True, fontsize=8.7)
+            legend = ax.legend(loc="upper left", frameon=True, fontsize=8.5)
             legend.get_frame().set_facecolor("white")
             legend.get_frame().set_edgecolor("#d7e8dc")
             legend.get_frame().set_alpha(0.96)
             st.pyplot(fig)
             plt.close(fig)
-            st.markdown(
-                f"""
-                <div class="tool-note">
-                    The ESG frontier shows portfolios that satisfy the current ESG preference level of at least {result["required_esg"] * 100:.1f}/100.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            if result["frontiers_share_points"]:
+                st.markdown(
+                    f"""
+                    <div class="tool-note">
+                        The light dotted curve shows the full unconstrained frontier in the background. The labelled frontiers separate the unconstrained-only segment from the portfolios that satisfy the current ESG requirement of at least {result["required_esg"] * 100:.1f}/100.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"""
+                    <div class="tool-note">
+                        The ESG frontier shows portfolios that satisfy the current ESG requirement of at least {result["required_esg"] * 100:.1f}/100.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
 # -------------------------------------------------
