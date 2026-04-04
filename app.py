@@ -1986,57 +1986,100 @@ def build_dual_frontier_display(result: dict) -> dict:
 def build_frontier_interpretation(result: dict) -> str:
     frontier_display = build_dual_frontier_display(result)
 
-    without_frontier_risks = frontier_display["without_frontier_risks"]
-    without_frontier_returns = frontier_display["without_frontier_returns"]
-    with_frontier_risks = frontier_display["with_frontier_risks"]
-    with_frontier_returns = frontier_display["with_frontier_returns"]
-    without_tangency_risk, without_tangency_return = frontier_display["without_tangency_point"]
-    with_tangency_risk, with_tangency_return = frontier_display["with_tangency_point"]
+    asset1 = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
+    asset2 = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
 
-    def frontier_span_text(risks_arr: np.ndarray, returns_arr: np.ndarray) -> str:
-        if len(risks_arr) == 0 or len(returns_arr) == 0:
-            return "not available yet"
-        return (
-            f"{float(np.min(risks_arr)):.2f}% to {float(np.max(risks_arr)):.2f}% risk and "
-            f"{float(np.min(returns_arr)):.2f}% to {float(np.max(returns_arr)):.2f}% portfolio performance"
-        )
+    opt_w1 = float(result.get("opt_w1", 0.0))
+    opt_w2 = float(result.get("opt_w2", 0.0))
+    opt_return = float(result.get("opt_return", 0.0) * 100.0)
+    opt_risk = float(result.get("opt_risk", 0.0) * 100.0)
+    opt_esg = float(result.get("opt_esg", 0.0) * 100.0)
+    opt_sharpe = float(result.get("opt_sharpe", 0.0))
 
-    optimal_risk = float(result["opt_risk"] * 100.0)
-    optimal_return = float(result["opt_return"] * 100.0)
-    optimal_esg = float(result["opt_esg"] * 100.0)
-    required_esg = float(result["required_esg"] * 100.0)
-    visual_gap = float(frontier_display.get("visual_gap", 0.0))
+    max_sharpe_idx = int(result.get("max_sharpe_idx", 0))
+    portfolio_returns = np.array(result.get("portfolio_returns", []), dtype=float)
+    portfolio_risks = np.array(result.get("portfolio_risks", []), dtype=float)
+    portfolio_esg = np.array(result.get("portfolio_esg", []), dtype=float)
 
-    tangency_gap = with_tangency_return - without_tangency_return
-    risk_gap = with_tangency_risk - without_tangency_risk
-
-    if tangency_gap >= 0.10 and risk_gap <= 0.10:
-        tradeoff_sentence = "The ESG-adjusted tangency view is holding up well against the purely financial tangency point, so the sustainability preference is not materially weakening the headline opportunity."
-    elif tangency_gap < 0.0 and risk_gap <= 0.10:
-        tradeoff_sentence = "The ESG-adjusted tangency view is accepting some performance give-up in exchange for stronger sustainability alignment, while the risk profile remains close to the non-ESG case."
-    elif tangency_gap < 0.0 and risk_gap > 0.10:
-        tradeoff_sentence = "The ESG-adjusted tangency view is clearly shifting the opportunity set, with lower performance and higher risk than the non-ESG tangency point under the current assumptions."
+    if portfolio_returns.size > 0 and 0 <= max_sharpe_idx < portfolio_returns.size:
+        base_return = float(portfolio_returns[max_sharpe_idx] * 100.0)
+        base_risk = float(portfolio_risks[max_sharpe_idx] * 100.0)
+        base_esg = float(portfolio_esg[max_sharpe_idx] * 100.0)
     else:
-        tradeoff_sentence = "The ESG-adjusted tangency view is changing the portfolio trade-off in a visible way, so investors should read the two frontier paths together rather than focusing on one point alone."
+        base_return = opt_return
+        base_risk = opt_risk
+        base_esg = opt_esg
 
-    if visual_gap >= 0.18:
-        gap_sentence = "The two frontiers are now visibly separated, so the ESG input is meaningfully changing the chart."
-    elif visual_gap >= 0.08:
-        gap_sentence = "The two frontiers are moderately separated, which means the ESG input is having a noticeable but not extreme effect."
+    required_esg = float(result.get("required_esg", 0.0) * 100.0)
+    esg_gap = opt_esg - required_esg
+    return_gap = opt_return - base_return
+    risk_gap = opt_risk - base_risk
+    esg_lift = opt_esg - base_esg
+
+    weighted_avg_risk = (
+        float(result.get("opt_w1", 0.0)) * float(result.get("std_dev1_input", 0.0))
+        + float(result.get("opt_w2", 0.0)) * float(result.get("std_dev2_input", 0.0))
+    )
+    diversification_gain = weighted_avg_risk - opt_risk
+    correlation = float(result.get("correlation", 0.0))
+
+    without_tangency_risk, without_tangency_return = frontier_display.get("without_tangency_point", (base_risk, base_return))
+    with_tangency_risk, with_tangency_return = frontier_display.get("with_tangency_point", (opt_risk, opt_return))
+
+    if opt_w1 >= 0.70:
+        allocation_sentence = f"Your current ESG-aware portfolio is concentrated in <strong>{asset1}</strong> at {opt_w1 * 100.0:.1f}%, with the remaining {opt_w2 * 100.0:.1f}% in {asset2}."
+    elif opt_w2 >= 0.70:
+        allocation_sentence = f"Your current ESG-aware portfolio is concentrated in <strong>{asset2}</strong> at {opt_w2 * 100.0:.1f}%, with the remaining {opt_w1 * 100.0:.1f}% in {asset1}."
     else:
-        gap_sentence = "The two frontiers remain fairly close, so the ESG input is refining the result more than transforming it."
+        allocation_sentence = f"Your current ESG-aware portfolio is relatively balanced, allocating {opt_w1 * 100.0:.1f}% to <strong>{asset1}</strong> and {opt_w2 * 100.0:.1f}% to <strong>{asset2}</strong>."
+
+    if diversification_gain >= 1.00:
+        diversification_sentence = f"The combined portfolio risk of {opt_risk:.2f}% sits meaningfully below the weighted standalone-risk average of {weighted_avg_risk:.2f}%, which suggests the two assets are working together to improve diversification."
+    elif diversification_gain >= 0.30:
+        diversification_sentence = f"The portfolio risk of {opt_risk:.2f}% is modestly below the weighted standalone-risk average of {weighted_avg_risk:.2f}%, so diversification is helping but not dramatically."
+    else:
+        diversification_sentence = f"The portfolio risk of {opt_risk:.2f}% is close to the weighted standalone-risk average of {weighted_avg_risk:.2f}%, so the diversification benefit is fairly limited under the current assumptions."
+
+    if esg_gap >= 5.0:
+        esg_sentence = f"The portfolio comfortably clears your implied ESG target of {required_esg:.2f}/100, reaching {opt_esg:.2f}/100. That means your sustainability preference is being met with room to spare."
+    elif esg_gap >= 0.0:
+        esg_sentence = f"The portfolio meets your implied ESG target of {required_esg:.2f}/100, coming in at {opt_esg:.2f}/100. That means the recommendation is aligned with the sustainability level you asked for."
+    else:
+        esg_sentence = f"The portfolio currently sits at {opt_esg:.2f}/100 versus an implied ESG target of {required_esg:.2f}/100, so the sustainability requirement is still a binding trade-off in the optimisation."
+
+    if return_gap >= 0.20 and risk_gap <= 0.15:
+        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation is currently stronger on both return and sustainability. It improves expected return by {abs(return_gap):.2f} percentage points while keeping risk broadly similar."
+    elif return_gap >= 0.0 and risk_gap > 0.15:
+        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation is preserving return while taking on an extra {risk_gap:.2f} percentage points of risk to achieve a better sustainability profile."
+    elif return_gap < 0.0 and risk_gap <= 0.15:
+        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation gives up {abs(return_gap):.2f} percentage points of expected return, but it keeps risk close while lifting ESG by {max(esg_lift, 0.0):.2f} points."
+    else:
+        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation is making a clearer trade-off: expected return is lower by {abs(return_gap):.2f} percentage points and risk is higher by {risk_gap:.2f} percentage points, in exchange for stronger ESG alignment."
+
+    if correlation <= -0.20:
+        correlation_sentence = f"Because the asset correlation is {correlation:.2f}, the mix also benefits from a strong diversification relationship."
+    elif correlation <= 0.35:
+        correlation_sentence = f"With correlation at {correlation:.2f}, the asset mix still offers a useful diversification effect."
+    else:
+        correlation_sentence = f"With correlation at {correlation:.2f}, the two assets are moving fairly closely together, which limits how much diversification can reduce risk."
+
+    if with_tangency_return >= without_tangency_return and with_tangency_risk <= without_tangency_risk:
+        takeaway_sentence = "Overall, the current inputs are producing an ESG-aware portfolio that looks efficient even before sustainability is taken into account."
+    elif with_tangency_return >= without_tangency_return:
+        takeaway_sentence = "Overall, the current inputs suggest you are not sacrificing headline return to pursue ESG, although the risk profile should still be monitored."
+    else:
+        takeaway_sentence = "Overall, the current inputs suggest your sustainability preference is influencing the recommendation in a meaningful way, so the main decision is whether the ESG improvement justifies the financial trade-off for you."
 
     return f"""
     <div class="interpretation-card">
         <p class="interpretation-title">Portfolio Analysis</p>
-        <p class="interpretation-subtitle">This section updates live as the inputs and efficient frontiers change.</p>
+        <p class="interpretation-subtitle">This analysis updates live as your portfolio inputs change.</p>
         <div class="interpretation-divider"></div>
-        <p class="interpretation-copy"><strong>Without ESG:</strong> the traditional mean-variance frontier currently spans {frontier_span_text(without_frontier_risks, without_frontier_returns)}, and its tangency portfolio sits at {without_tangency_return:.2f}% portfolio performance with {without_tangency_risk:.2f}% risk.</p>
-        <p class="interpretation-copy"><strong>With given ESG:</strong> the ESG-adjusted mean-variance frontier currently spans {frontier_span_text(with_frontier_risks, with_frontier_returns)}, and its tangency portfolio sits at {with_tangency_return:.2f}% portfolio performance with {with_tangency_risk:.2f}% risk. {tradeoff_sentence} {gap_sentence}</p>
-        <p class="interpretation-copy"><strong>Live recommendation:</strong> the recommendation panel still reflects the current ESG-aware optimum from your input settings, which is {optimal_return:.2f}% expected return, {optimal_risk:.2f}% risk, and {optimal_esg:.2f}/100 ESG against a current target of {required_esg:.2f}/100.</p>
+        <p class="interpretation-copy">{allocation_sentence} It is currently targeting <strong>{opt_return:.2f}% expected return</strong> at <strong>{opt_risk:.2f}% risk</strong>, with an ESG score of <strong>{opt_esg:.2f}/100</strong> and a Sharpe ratio of <strong>{opt_sharpe:.2f}</strong>.</p>
+        <p class="interpretation-copy">{tradeoff_sentence} {esg_sentence}</p>
+        <p class="interpretation-copy">{diversification_sentence} {correlation_sentence} {takeaway_sentence}</p>
     </div>
     """
-
 
 
 # -------------------------------------------------
