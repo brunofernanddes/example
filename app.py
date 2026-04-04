@@ -1357,15 +1357,48 @@ def inject_css() -> None:
 
             .home-cta-shell {
                 text-align: center;
-                max-width: 760px;
-                margin: 0 auto 0.65rem auto;
+                max-width: 860px;
+                margin: 0 auto 0.75rem auto;
             }
 
             .home-cta-note {
                 color: var(--muted);
-                font-size: 0.97rem;
-                line-height: 1.68;
-                margin: 0.55rem 0 0 0;
+                font-size: 1.02rem;
+                line-height: 1.72;
+                margin: 0.6rem 0 0 0;
+            }
+
+            .home-button-spacer {
+                height: 0.9rem;
+            }
+
+            .st-key-home_recommendation_button button,
+            .st-key-home_builder_button button {
+                min-height: 9.8rem !important;
+                border-radius: 26px !important;
+                font-size: 1.95rem !important;
+                font-weight: 850 !important;
+                line-height: 1.18 !important;
+                padding: 1.6rem 1.35rem !important;
+                box-shadow: 0 20px 38px rgba(20,83,45,0.18) !important;
+                white-space: normal !important;
+            }
+
+            .st-key-home_recommendation_button button:hover,
+            .st-key-home_builder_button button:hover {
+                transform: translateY(-2px) !important;
+                box-shadow: 0 24px 44px rgba(20,83,45,0.22) !important;
+            }
+
+            .st-key-home_recommendation_button button p,
+            .st-key-home_builder_button button p,
+            .st-key-home_recommendation_button button span,
+            .st-key-home_builder_button button span,
+            .st-key-home_recommendation_button button div,
+            .st-key-home_builder_button button div {
+                font-size: 1.95rem !important;
+                line-height: 1.18 !important;
+                white-space: normal !important;
             }
 
             .home-overview-panel {
@@ -1651,11 +1684,6 @@ def render_splash_overlay() -> None:
             <div class="splash-card">
                 <div class="splash-logo">{LEAF_LOGO_SVG}</div>
                 <div class="splash-title">{APP_NAME}</div>
-                <div class="splash-copy">
-                    {APP_TAGLINE}<br>
-                    A streamlined sustainable finance experience built around
-                    financial risk and ESG priorities.
-                </div>
             </div>
         </div>
         """,
@@ -2820,7 +2848,7 @@ def render_home() -> None:
                 """,
                 unsafe_allow_html=True,
             )
-            st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
+            st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
             btn1, btn2 = st.columns(2, gap="large")
             with btn1:
                 st.button(
