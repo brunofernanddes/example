@@ -1374,12 +1374,13 @@ def inject_css() -> None:
 
             .st-key-home_recommendation_button button,
             .st-key-home_builder_button button {
-                min-height: 9.8rem !important;
-                border-radius: 26px !important;
-                font-size: 1.95rem !important;
-                font-weight: 850 !important;
-                line-height: 1.18 !important;
-                padding: 1.6rem 1.35rem !important;
+                min-height: 11.2rem !important;
+                border-radius: 28px !important;
+                font-size: 1.55rem !important;
+                font-weight: 760 !important;
+                line-height: 1.24 !important;
+                padding: 1.9rem 1.25rem !important;
+                text-align: center !important;
                 box-shadow: 0 20px 38px rgba(20,83,45,0.18) !important;
                 white-space: normal !important;
             }
@@ -1396,9 +1397,12 @@ def inject_css() -> None:
             .st-key-home_builder_button button span,
             .st-key-home_recommendation_button button div,
             .st-key-home_builder_button button div {
-                font-size: 1.95rem !important;
-                line-height: 1.18 !important;
+                font-size: 1.55rem !important;
+                font-weight: 760 !important;
+                line-height: 1.24 !important;
+                text-align: center !important;
                 white-space: normal !important;
+                word-break: keep-all !important;
             }
 
             .home-overview-panel {
@@ -2061,8 +2065,6 @@ def build_dual_frontier_display(result: dict) -> dict:
 
 
 def build_frontier_interpretation(result: dict) -> str:
-    frontier_display = build_dual_frontier_display(result)
-
     asset1 = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
     asset2 = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
 
@@ -2072,6 +2074,9 @@ def build_frontier_interpretation(result: dict) -> str:
     opt_risk = float(result.get("opt_risk", 0.0) * 100.0)
     opt_esg = float(result.get("opt_esg", 0.0) * 100.0)
     opt_sharpe = float(result.get("opt_sharpe", 0.0))
+
+    required_esg = float(result.get("required_esg", 0.0) * 100.0)
+    correlation = float(result.get("correlation", 0.0))
 
     max_sharpe_idx = int(result.get("max_sharpe_idx", 0))
     portfolio_returns = np.array(result.get("portfolio_returns", []), dtype=float)
@@ -2087,74 +2092,66 @@ def build_frontier_interpretation(result: dict) -> str:
         base_risk = opt_risk
         base_esg = opt_esg
 
-    required_esg = float(result.get("required_esg", 0.0) * 100.0)
-    esg_gap = opt_esg - required_esg
+    if opt_w1 >= 0.70:
+        allocation_sentence = f"Your portfolio is mainly invested in <strong>{asset1}</strong> ({opt_w1 * 100.0:.1f}%), with {opt_w2 * 100.0:.1f}% in <strong>{asset2}</strong>."
+    elif opt_w2 >= 0.70:
+        allocation_sentence = f"Your portfolio is mainly invested in <strong>{asset2}</strong> ({opt_w2 * 100.0:.1f}%), with {opt_w1 * 100.0:.1f}% in <strong>{asset1}</strong>."
+    else:
+        allocation_sentence = f"Your portfolio is spread across both assets, with {opt_w1 * 100.0:.1f}% in <strong>{asset1}</strong> and {opt_w2 * 100.0:.1f}% in <strong>{asset2}</strong>."
+
+    performance_sentence = (
+        f"Based on your current inputs, the portfolio is targeting <strong>{opt_return:.2f}% expected return</strong> "
+        f"with <strong>{opt_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{opt_sharpe:.2f}</strong>, "
+        f"which means the return is being judged against the amount of risk taken."
+    )
+
+    if opt_esg >= required_esg + 5.0:
+        esg_sentence = (
+            f"The ESG score is <strong>{opt_esg:.2f}/100</strong>, which is comfortably above your current ESG target of "
+            f"<strong>{required_esg:.2f}/100</strong>."
+        )
+    elif opt_esg >= required_esg:
+        esg_sentence = (
+            f"The ESG score is <strong>{opt_esg:.2f}/100</strong>, which meets your current ESG target of "
+            f"<strong>{required_esg:.2f}/100</strong>."
+        )
+    else:
+        esg_sentence = (
+            f"The ESG score is <strong>{opt_esg:.2f}/100</strong>, which is below your current ESG target of "
+            f"<strong>{required_esg:.2f}/100</strong>."
+        )
+
     return_gap = opt_return - base_return
     risk_gap = opt_risk - base_risk
     esg_lift = opt_esg - base_esg
 
-    weighted_avg_risk = (
-        float(result.get("opt_w1", 0.0)) * float(result.get("std_dev1_input", 0.0))
-        + float(result.get("opt_w2", 0.0)) * float(result.get("std_dev2_input", 0.0))
-    )
-    diversification_gain = weighted_avg_risk - opt_risk
-    correlation = float(result.get("correlation", 0.0))
-
-    without_tangency_risk, without_tangency_return = frontier_display.get("without_tangency_point", (base_risk, base_return))
-    with_tangency_risk, with_tangency_return = frontier_display.get("with_tangency_point", (opt_risk, opt_return))
-
-    if opt_w1 >= 0.70:
-        allocation_sentence = f"Your current ESG-aware portfolio is concentrated in <strong>{asset1}</strong> at {opt_w1 * 100.0:.1f}%, with the remaining {opt_w2 * 100.0:.1f}% in {asset2}."
-    elif opt_w2 >= 0.70:
-        allocation_sentence = f"Your current ESG-aware portfolio is concentrated in <strong>{asset2}</strong> at {opt_w2 * 100.0:.1f}%, with the remaining {opt_w1 * 100.0:.1f}% in {asset1}."
+    if abs(return_gap) < 0.15 and abs(risk_gap) < 0.15:
+        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio is very similar financially, so you are not giving up much to reflect your sustainability preference."
+    elif return_gap >= 0.15 and risk_gap <= 0.15:
+        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio is offering slightly stronger return without meaningfully increasing risk."
+    elif return_gap >= -0.15 and risk_gap > 0.15:
+        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio keeps return fairly close, but it does take on more risk."
+    elif return_gap < -0.15 and risk_gap <= 0.15:
+        tradeoff_sentence = f"Compared with the highest Sharpe portfolio, your ESG-focused portfolio gives up a little expected return, but keeps risk close while improving ESG by <strong>{max(esg_lift, 0.0):.2f}</strong> points."
     else:
-        allocation_sentence = f"Your current ESG-aware portfolio is relatively balanced, allocating {opt_w1 * 100.0:.1f}% to <strong>{asset1}</strong> and {opt_w2 * 100.0:.1f}% to <strong>{asset2}</strong>."
-
-    if diversification_gain >= 1.00:
-        diversification_sentence = f"The combined portfolio risk of {opt_risk:.2f}% sits meaningfully below the weighted standalone-risk average of {weighted_avg_risk:.2f}%, which suggests the two assets are working together to improve diversification."
-    elif diversification_gain >= 0.30:
-        diversification_sentence = f"The portfolio risk of {opt_risk:.2f}% is modestly below the weighted standalone-risk average of {weighted_avg_risk:.2f}%, so diversification is helping but not dramatically."
-    else:
-        diversification_sentence = f"The portfolio risk of {opt_risk:.2f}% is close to the weighted standalone-risk average of {weighted_avg_risk:.2f}%, so the diversification benefit is fairly limited under the current assumptions."
-
-    if esg_gap >= 5.0:
-        esg_sentence = f"The portfolio comfortably clears your implied ESG target of {required_esg:.2f}/100, reaching {opt_esg:.2f}/100. That means your sustainability preference is being met with room to spare."
-    elif esg_gap >= 0.0:
-        esg_sentence = f"The portfolio meets your implied ESG target of {required_esg:.2f}/100, coming in at {opt_esg:.2f}/100. That means the recommendation is aligned with the sustainability level you asked for."
-    else:
-        esg_sentence = f"The portfolio currently sits at {opt_esg:.2f}/100 versus an implied ESG target of {required_esg:.2f}/100, so the sustainability requirement is still a binding trade-off in the optimisation."
-
-    if return_gap >= 0.20 and risk_gap <= 0.15:
-        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation is currently stronger on both return and sustainability. It improves expected return by {abs(return_gap):.2f} percentage points while keeping risk broadly similar."
-    elif return_gap >= 0.0 and risk_gap > 0.15:
-        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation is preserving return while taking on an extra {risk_gap:.2f} percentage points of risk to achieve a better sustainability profile."
-    elif return_gap < 0.0 and risk_gap <= 0.15:
-        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation gives up {abs(return_gap):.2f} percentage points of expected return, but it keeps risk close while lifting ESG by {max(esg_lift, 0.0):.2f} points."
-    else:
-        tradeoff_sentence = f"Compared with the purely financial tangency portfolio, the ESG-aware recommendation is making a clearer trade-off: expected return is lower by {abs(return_gap):.2f} percentage points and risk is higher by {risk_gap:.2f} percentage points, in exchange for stronger ESG alignment."
+        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio is making a clearer trade-off: it is prioritising sustainability, but with lower expected return and higher risk."
 
     if correlation <= -0.20:
-        correlation_sentence = f"Because the asset correlation is {correlation:.2f}, the mix also benefits from a strong diversification relationship."
+        diversification_sentence = "The two assets are moving differently enough that diversification is helping reduce risk in a meaningful way."
     elif correlation <= 0.35:
-        correlation_sentence = f"With correlation at {correlation:.2f}, the asset mix still offers a useful diversification effect."
+        diversification_sentence = "The two assets still provide some diversification, which helps smooth overall portfolio risk."
     else:
-        correlation_sentence = f"With correlation at {correlation:.2f}, the two assets are moving fairly closely together, which limits how much diversification can reduce risk."
-
-    if with_tangency_return >= without_tangency_return and with_tangency_risk <= without_tangency_risk:
-        takeaway_sentence = "Overall, the current inputs are producing an ESG-aware portfolio that looks efficient even before sustainability is taken into account."
-    elif with_tangency_return >= without_tangency_return:
-        takeaway_sentence = "Overall, the current inputs suggest you are not sacrificing headline return to pursue ESG, although the risk profile should still be monitored."
-    else:
-        takeaway_sentence = "Overall, the current inputs suggest your sustainability preference is influencing the recommendation in a meaningful way, so the main decision is whether the ESG improvement justifies the financial trade-off for you."
+        diversification_sentence = "The two assets are moving quite similarly, so diversification is limited and the portfolio may be less cushioned against swings."
 
     return f"""
     <div class="interpretation-card">
         <p class="interpretation-title">Portfolio Analysis</p>
-        <p class="interpretation-subtitle">This analysis updates live as your portfolio inputs change.</p>
+        <p class="interpretation-subtitle">This summary updates live as your portfolio inputs change.</p>
         <div class="interpretation-divider"></div>
-        <p class="interpretation-copy">{allocation_sentence} It is currently targeting <strong>{opt_return:.2f}% expected return</strong> at <strong>{opt_risk:.2f}% risk</strong>, with an ESG score of <strong>{opt_esg:.2f}/100</strong> and a Sharpe ratio of <strong>{opt_sharpe:.2f}</strong>.</p>
-        <p class="interpretation-copy">{tradeoff_sentence} {esg_sentence}</p>
-        <p class="interpretation-copy">{diversification_sentence} {correlation_sentence} {takeaway_sentence}</p>
+        <p class="interpretation-copy">{allocation_sentence}</p>
+        <p class="interpretation-copy">{performance_sentence}</p>
+        <p class="interpretation-copy">{esg_sentence} {tradeoff_sentence}</p>
+        <p class="interpretation-copy">{diversification_sentence}</p>
     </div>
     """
 
