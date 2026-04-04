@@ -1165,8 +1165,57 @@ def inject_css() -> None:
                 font-weight: 800;
                 color: #166534;
                 background: rgba(22,163,74,0.06);
-                cursor: help;
                 line-height: 1;
+            }
+
+            .info-details {
+                display: inline-block;
+                position: relative;
+                margin-left: 0.18rem;
+                vertical-align: middle;
+            }
+
+            .info-details summary {
+                list-style: none;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 17px;
+                height: 17px;
+                border-radius: 999px;
+                border: 1px solid rgba(22,101,52,0.18);
+                font-size: 0.72rem;
+                font-weight: 800;
+                color: #166534;
+                background: rgba(22,163,74,0.06);
+                cursor: pointer;
+                line-height: 1;
+            }
+
+            .info-details summary::-webkit-details-marker {
+                display: none;
+            }
+
+            .info-details-content {
+                display: none;
+            }
+
+            .info-details[open] .info-details-content {
+                display: block;
+                position: absolute;
+                top: 1.45rem;
+                right: 0;
+                width: 240px;
+                background: #ffffff;
+                color: #2f4f43;
+                border: 1px solid rgba(22,101,52,0.12);
+                border-radius: 12px;
+                box-shadow: 0 12px 30px rgba(20,83,45,0.14);
+                padding: 0.65rem 0.75rem;
+                font-size: 0.82rem;
+                font-weight: 500;
+                line-height: 1.45;
+                z-index: 999;
             }
 
             div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -1179,7 +1228,7 @@ def inject_css() -> None:
 
             div.stButton > button,
             div[data-testid="stFormSubmitButton"] > button {
-                min-height: 3.02rem !important;
+                min-height: 3.35rem !important;
                 border-radius: 14px !important;
                 font-weight: 800 !important;
                 font-size: 0.96rem !important;
@@ -1325,26 +1374,17 @@ def inject_tool_text_css() -> None:
             input,
             textarea,
             [data-baseweb="input"] input,
-            [data-baseweb="textarea"] textarea,
-            [data-baseweb="select"] input,
-            [data-baseweb="select"] div,
-            [data-baseweb="select"] span {
+            [data-baseweb="textarea"] textarea {
                 color: #000000 !important;
                 -webkit-text-fill-color: #000000 !important;
                 background: #ffffff !important;
             }
 
-            div[data-baseweb="input"],
-            div[data-baseweb="select"] {
+            div[data-baseweb="input"] {
                 background: #ffffff !important;
                 border-radius: 12px !important;
                 border: 1px solid rgba(22,101,52,0.12) !important;
                 box-shadow: none !important;
-            }
-
-            div[data-baseweb="select"] > div {
-                background: #ffffff !important;
-                color: #000000 !important;
             }
 
             div[data-baseweb="input"]:focus-within,
@@ -1355,54 +1395,15 @@ def inject_tool_text_css() -> None:
                 border: 1px solid rgba(21, 128, 61, 0.55) !important;
                 box-shadow: 0 0 0 0.14rem rgba(21, 128, 61, 0.14) !important;
                 outline: none !important;
-                background: #ffffff !important;
             }
 
             [data-baseweb="input"] input:focus,
             [data-baseweb="input"] input:active,
             [data-baseweb="select"] input:focus,
-            [data-baseweb="select"] input:active,
-            [data-baseweb="select"] div:focus,
-            [data-baseweb="select"] div:active {
+            [data-baseweb="select"] input:active {
                 box-shadow: none !important;
                 outline: none !important;
                 border-color: transparent !important;
-                background: #ffffff !important;
-                color: #000000 !important;
-                -webkit-text-fill-color: #000000 !important;
-            }
-
-            div[data-baseweb="popover"],
-            div[data-baseweb="popover"] * {
-                background: #ffffff !important;
-                color: #000000 !important;
-                -webkit-text-fill-color: #000000 !important;
-            }
-
-            div[data-baseweb="popover"] {
-                border: 1px solid rgba(22,101,52,0.12) !important;
-                border-radius: 14px !important;
-                box-shadow: 0 14px 30px rgba(20,83,45,0.12) !important;
-                overflow: hidden !important;
-            }
-
-            div[data-baseweb="popover"] ul,
-            div[data-baseweb="popover"] [role="listbox"] {
-                background: #ffffff !important;
-            }
-
-            div[data-baseweb="popover"] li,
-            div[data-baseweb="popover"] [role="option"] {
-                background: #ffffff !important;
-                color: #000000 !important;
-            }
-
-            div[data-baseweb="popover"] li:hover,
-            div[data-baseweb="popover"] [role="option"]:hover,
-            div[data-baseweb="popover"] li[aria-selected="true"],
-            div[data-baseweb="popover"] [role="option"][aria-selected="true"] {
-                background: #f3fbf6 !important;
-                color: #000000 !important;
             }
         </style>
         """,
@@ -1467,7 +1468,7 @@ def render_custom_label(text: str) -> None:
 
 def render_label_with_tooltip(text: str, tooltip: str) -> None:
     st.markdown(
-        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
+        f'<div class="field-label">{text} <details class="info-details"><summary>i</summary><div class="info-details-content">{tooltip}</div></details></div>',
         unsafe_allow_html=True,
     )
 
@@ -1482,7 +1483,7 @@ def render_risk_tolerance_helper() -> None:
 def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     tooltip_html = ""
     if tooltip:
-        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
+        tooltip_html = f'<details class="info-details"><summary>i</summary><div class="info-details-content">{tooltip}</div></details>'
     return f"""
     <div class="metric-tile">
         <div class="metric-tile-label">{label} {tooltip_html}</div>
@@ -1993,7 +1994,7 @@ def render_builder_popup() -> None:
                 marker="*",
                 s=300,
                 color="#166534",
-                label="Max Sharpe",
+                label="Max Sharpe Ratio",
                 zorder=5,
             )
             ax.scatter(
