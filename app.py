@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 # -------------------------------------------------
 st.set_page_config(
     page_title="Leaf It To Us",
-    page_icon="🌿",
+    page_icon="🍃",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -925,17 +925,21 @@ def inject_css() -> None:
             }
 
             .logo-box {
-                width: 50px;
-                height: 50px;
-                border-radius: 16px;
+                width: 56px;
+                height: 56px;
+                border-radius: 18px;
                 background: linear-gradient(135deg, var(--primary), var(--primary4));
-                color: white;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.05rem;
-                font-weight: 900;
                 box-shadow: 0 12px 28px rgba(22,163,74,0.24);
+                flex-shrink: 0;
+            }
+
+            .brand-leaf-icon {
+                width: 32px;
+                height: 32px;
+                display: block;
             }
 
             .brand-title {
@@ -977,6 +981,54 @@ def inject_css() -> None:
                 font-size: 1.04rem;
                 line-height: 1.7;
                 max-width: 760px;
+            }
+
+            .home-action-hero {
+                background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,252,244,0.95));
+                border: 1px solid rgba(22,101,52,0.10);
+                border-radius: 30px;
+                padding: 2.3rem 2.35rem 2.15rem 2.35rem;
+                box-shadow: 0 20px 48px rgba(20,83,45,0.10);
+                text-align: center;
+                max-width: 980px;
+                margin: 0 auto;
+            }
+
+            .home-action-title {
+                margin: 0;
+                color: var(--text);
+                font-size: 3.05rem;
+                line-height: 1.05;
+                letter-spacing: -0.05em;
+                font-weight: 900;
+                max-width: 860px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .home-action-copy {
+                margin: 1rem auto 0 auto;
+                color: var(--muted);
+                font-size: 1.08rem;
+                line-height: 1.72;
+                max-width: 760px;
+            }
+
+            .home-action-buttons-note {
+                margin: 0.9rem 0 0 0;
+                color: var(--muted);
+                font-size: 0.95rem;
+                line-height: 1.6;
+            }
+
+            .home-insight-strip {
+                max-width: 1020px;
+                margin: 0 auto;
+            }
+
+            .home-section-wrap {
+                max-width: 1040px;
+                margin: 0 auto;
             }
 
             .section-label {
@@ -1350,6 +1402,20 @@ def inject_css() -> None:
                 margin: 0.55rem 0 0 0;
             }
 
+            @media (max-width: 900px) {
+                .home-action-hero {
+                    padding: 1.8rem 1.2rem 1.5rem 1.2rem;
+                }
+
+                .home-action-title {
+                    font-size: 2.15rem;
+                }
+
+                .home-action-copy {
+                    font-size: 1rem;
+                }
+            }
+
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 border-radius: 24px !important;
                 border: 1px solid rgba(22,101,52,0.10) !important;
@@ -1360,11 +1426,11 @@ def inject_css() -> None:
 
             div.stButton > button,
             div[data-testid="stFormSubmitButton"] > button {
-                min-height: 3.45rem !important;
-                border-radius: 16px !important;
+                min-height: 4.05rem !important;
+                border-radius: 18px !important;
                 font-weight: 800 !important;
-                font-size: 1.02rem !important;
-                padding: 0.35rem 0.95rem !important;
+                font-size: 1.12rem !important;
+                padding: 0.55rem 1.2rem !important;
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, var(--primary), var(--primary3)) !important;
                 color: #ffffff !important;
@@ -1416,15 +1482,18 @@ def inject_css() -> None:
                 height: 100px;
                 border-radius: 28px;
                 background: linear-gradient(135deg, var(--primary), var(--primary4));
-                color: white;
                 margin: 0 auto 1.15rem auto;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 2rem;
-                font-weight: 900;
                 box-shadow: 0 18px 42px rgba(22,163,74,0.24);
                 animation: brandFadeOut 0.8s ease 2s forwards;
+            }
+
+            .splash-leaf-icon {
+                width: 56px;
+                height: 56px;
+                display: block;
             }
 
             .splash-title {
@@ -1595,12 +1664,30 @@ def inject_tool_text_css() -> None:
 # -------------------------------------------------
 # UI helpers
 # -------------------------------------------------
+def leaf_logo_html(container_class: str, icon_class: str) -> str:
+    return f"""
+    <div class="{container_class}">
+        <svg class="{icon_class}" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+            <defs>
+                <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#dcfce7" />
+                    <stop offset="100%" stop-color="#ffffff" />
+                </linearGradient>
+            </defs>
+            <path d="M49 12C34 12 20 20 14 33c-4 8-2 16 5 19 9 4 22-1 30-10 9-11 11-22 0-30z" fill="url(#leafGradient)"/>
+            <path d="M20 43c8-4 18-13 24-24" fill="none" stroke="#14532d" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M18 48c6-3 11-6 15-10" fill="none" stroke="#14532d" stroke-width="2.6" stroke-linecap="round" opacity="0.78"/>
+        </svg>
+    </div>
+    """
+
+
 def render_splash_overlay() -> None:
     st.markdown(
         f"""
         <div class="splash-overlay">
             <div class="splash-card">
-                <div class="splash-logo">VW</div>
+                {leaf_logo_html("splash-logo", "splash-leaf-icon")}
                 <div class="splash-title">{APP_NAME}</div>
                 <div class="splash-copy">
                     {APP_TAGLINE}<br>
@@ -2745,7 +2832,7 @@ def render_home() -> None:
     st.markdown(
         f"""
         <div class="brand-row">
-            <div class="logo-box">VW</div>
+            {leaf_logo_html("logo-box", "brand-leaf-icon")}
             <div>
                 <p class="brand-title">{APP_NAME}</p>
                 <p class="brand-subtitle">{APP_TAGLINE}</p>
@@ -2755,50 +2842,62 @@ def render_home() -> None:
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns([1.35, 0.65], gap="large")
-    with left:
-        st.markdown(
-            """
-            <div class="hero">
-                <h1>Build an investment portfolio that reflects both financial goals and ESG values.</h1>
-                <p>
-                    This app helps investors move from intention to action through a cleaner,
-                    smarter portfolio experience. It places ESG preferences at the centre of the
-                    decision-making process, so portfolio recommendations can better reflect both
-                    financial goals and sustainability priorities.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with right:
-        render_stat("Environmental", "Climate, energy, and ecological impact")
-        st.markdown("<div style='height:0.65rem;'></div>", unsafe_allow_html=True)
-        render_stat("Social", "People, communities, and workplace outcomes")
-        st.markdown("<div style='height:0.65rem;'></div>", unsafe_allow_html=True)
-        render_stat("Governance", "Leadership, ethics, and accountability")
+    st.markdown(
+        """
+        <div class="home-action-hero">
+            <div class="section-label">Get Started</div>
+            <h1 class="home-action-title">Choose how you want to build your portfolio</h1>
+            <p class="home-action-copy">
+                Start with a guided recommendation or move straight into a fully customised portfolio build.
+                This streamlined experience helps you move from idea to action with a cleaner, more professional ESG investing workflow.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:1.1rem;'></div>", unsafe_allow_html=True)
+    outer_left, btn1, btn2, outer_right = st.columns([0.42, 1.35, 1.35, 0.42], gap="large")
+    with btn1:
+        st.button(
+            "Give Me a Portfolio Recommendation",
+            key="home_recommendation_button",
+            type="primary",
+            use_container_width=True,
+            on_click=open_recommendation,
+        )
+    with btn2:
+        st.button(
+            "Build Your Customised Portfolio",
+            key="home_builder_button",
+            use_container_width=True,
+            on_click=open_builder,
+        )
+
     st.markdown(
         """
         <div class="home-cta-shell">
-            <div class="section-label">Get Started</div>
-            <div class="section-title">Choose how you want to build your portfolio</div>
-            <div class="home-cta-note">
-                Start with a guided recommendation or move straight into a fully customised portfolio build.
+            <div class="home-action-buttons-note">
+                Choose the experience that best fits your workflow, then continue refining your inputs live inside the app.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    outer_left, btn1, btn2, outer_right = st.columns([0.70, 1.15, 1.15, 0.70], gap="medium")
-    with btn1:
-        st.button("Give Me a Portfolio Recommendation", key="home_recommendation_button", type="primary", use_container_width=True, on_click=open_recommendation)
-    with btn2:
-        st.button("Build Your Customised Portfolio", key="home_builder_button", use_container_width=True, on_click=open_builder)
+    st.markdown("<div style='height:1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="home-insight-strip">', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3, gap="large")
+    with c1:
+        render_stat("Environmental", "Climate, energy, and ecological impact")
+    with c2:
+        render_stat("Social", "People, communities, and workplace outcomes")
+    with c3:
+        render_stat("Governance", "Leadership, ethics, and accountability")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="home-section-wrap">', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">An investment app that prioritises ESG preferences</div>', unsafe_allow_html=True)
     st.markdown(
@@ -2820,6 +2919,7 @@ def render_home() -> None:
         render_card("Social (S)", "Social factors focus on how organisations treat people, including labour standards, diversity, community impact, health, safety, and human rights.")
     with c3:
         render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_recommendation_screen() -> None:
