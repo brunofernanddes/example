@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 # Page config
 # -------------------------------------------------
 st.set_page_config(
-    page_title="Verdant Wealth",
+    page_title="Leaf It To Us",
     page_icon="🌿",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-APP_NAME = "Verdant Wealth"
+APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
 # -------------------------------------------------
@@ -1076,6 +1076,78 @@ def inject_css() -> None:
                 margin-bottom: 0.2rem;
             }
 
+            .interpretation-card {
+                background: linear-gradient(145deg, rgba(255,255,255,0.99), rgba(244,252,247,0.97));
+                border: 1px solid rgba(22,101,52,0.12);
+                border-radius: 20px;
+                padding: 1.08rem 1.12rem;
+                box-shadow: 0 14px 34px rgba(20,83,45,0.07);
+                margin-top: 0.55rem;
+            }
+
+            .interpretation-title {
+                color: #0b1c15;
+                font-size: 1.02rem;
+                font-weight: 900;
+                letter-spacing: -0.01em;
+                margin: 0;
+            }
+
+            .interpretation-subtitle {
+                color: #567164;
+                font-size: 0.82rem;
+                line-height: 1.5;
+                margin: 0.24rem 0 0 0;
+            }
+
+            .analysis-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.75rem;
+                margin: 0.9rem 0 0.95rem 0;
+            }
+
+            .analysis-pill {
+                background: rgba(255,255,255,0.92);
+                border: 1px solid rgba(22,101,52,0.09);
+                border-radius: 16px;
+                padding: 0.78rem 0.82rem;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.80);
+            }
+
+            .analysis-pill-label {
+                color: #5b7468;
+                font-size: 0.76rem;
+                font-weight: 800;
+                letter-spacing: 0.03em;
+                text-transform: uppercase;
+                margin: 0;
+            }
+
+            .analysis-pill-value {
+                color: #0f2a1f;
+                font-size: 0.98rem;
+                font-weight: 850;
+                line-height: 1.35;
+                margin: 0.25rem 0 0 0;
+            }
+
+            .interpretation-copy {
+                color: #2f4f43;
+                font-size: 0.91rem;
+                line-height: 1.68;
+                margin: 0;
+            }
+
+            .interpretation-copy strong {
+                color: #163f2b;
+                font-weight: 800;
+            }
+
+            .interpretation-copy + .interpretation-copy {
+                margin-top: 0.58rem;
+            }
+
             .section-divider {
                 height: 1px;
                 background: rgba(22,101,52,0.10);
@@ -1577,6 +1649,337 @@ def style_modern_axes(ax) -> None:
     ax.yaxis.label.set_color("#234236")
 
 
+def efficient_frontier_indices(risks: np.ndarray, returns: np.ndarray, eligible_mask: np.ndarray | None = None) -> np.ndarray:
+    if eligible_mask is None:
+        candidate_indices = np.arange(len(risks))
+    else:
+        candidate_indices = np.where(eligible_mask)[0]
+
+    if candidate_indices.size == 0:
+        return np.array([], dtype=int)
+
+    ordered_indices = candidate_indices[np.lexsort((-returns[candidate_indices], risks[candidate_indices]))]
+
+    frontier_indices = []
+    best_return = -np.inf
+    for idx in ordered_indices:
+        current_return = float(returns[idx])
+        if current_return > best_return + 1e-12:
+            frontier_indices.append(int(idx))
+            best_return = current_return
+
+    return np.array(frontier_indices, dtype=int)
+
+
+def frontier_overlap_ratio(primary_indices: np.ndarray, secondary_indices: np.ndarray) -> float:
+    if primary_indices.size == 0 or secondary_indices.size == 0:
+        return 0.0
+
+    primary_set = set(int(idx) for idx in primary_indices.tolist())
+    secondary_set = set(int(idx) for idx in secondary_indices.tolist())
+    shared = len(primary_set.intersection(secondary_set))
+    base = max(1, min(len(primary_set), len(secondary_set)))
+    return float(shared / base)
+
+
+def build_frontier_plot_arrays(
+    risks_pct: np.ndarray,
+    returns_pct: np.ndarray,
+    frontier_indices: np.ndarray,
+    x_shift: float = 0.0,
+    y_shift: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray, dict]:
+    if frontier_indices.size == 0:
+        return np.array([], dtype=float), np.array([], dtype=float), {}
+
+    plotted_risks = np.array(risks_pct[frontier_indices], dtype=float)
+    plotted_returns = np.array(returns_pct[frontier_indices], dtype=float)
+    point_lookup = {}
+
+    if abs(x_shift) > 1e-12 or abs(y_shift) > 1e-12:
+        ramp = np.linspace(0.30, 1.00, frontier_indices.size)
+        plotted_risks = plotted_risks + x_shift * ramp
+        plotted_returns = plotted_returns + y_shift * ramp
+        for pos, idx in enumerate(frontier_indices):
+            point_lookup[int(idx)] = (float(plotted_risks[pos]), float(plotted_returns[pos]))
+    else:
+        for pos, idx in enumerate(frontier_indices):
+            point_lookup[int(idx)] = (float(plotted_risks[pos]), float(plotted_returns[pos]))
+
+    return plotted_risks, plotted_returns, point_lookup
+
+
+def compute_portfolio_path_from_weights(
+    weights_w1,
+    exp_return1_pct: float,
+    exp_return2_pct: float,
+    std_dev1_pct: float,
+    std_dev2_pct: float,
+    correlation: float,
+    esg_score1: float,
+    esg_score2: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    weights_arr = np.array(weights_w1, dtype=float, ndmin=1)
+    weights_arr = np.clip(weights_arr, 0.0, 1.0)
+    weights_w2 = 1.0 - weights_arr
+
+    r1 = exp_return1_pct / 100.0
+    r2 = exp_return2_pct / 100.0
+    s1 = std_dev1_pct / 100.0
+    s2 = std_dev2_pct / 100.0
+    esg1 = esg_score1 / 100.0
+    esg2 = esg_score2 / 100.0
+
+    portfolio_returns = weights_arr * r1 + weights_w2 * r2
+    portfolio_variances = (
+        (weights_arr ** 2) * (s1 ** 2)
+        + (weights_w2 ** 2) * (s2 ** 2)
+        + 2.0 * weights_arr * weights_w2 * s1 * s2 * correlation
+    )
+    portfolio_risks = np.sqrt(np.maximum(portfolio_variances, 0.0))
+    portfolio_esg = weights_arr * esg1 + weights_w2 * esg2
+
+    return portfolio_returns * 100.0, portfolio_risks * 100.0, portfolio_esg * 100.0
+
+
+def build_esg_tilted_weights(base_weights, esg_preference_fraction: float, esg_score1: float, esg_score2: float):
+    weights_arr = np.array(base_weights, dtype=float, ndmin=1)
+    weights_arr = np.clip(weights_arr, 0.0, 1.0)
+
+    anchor_weight = 1.0 if esg_score1 >= esg_score2 else 0.0
+    esg_gap_fraction = abs(float(esg_score1) - float(esg_score2)) / 100.0
+    tilt_strength = float(np.clip(0.18 + 0.74 * esg_preference_fraction * max(esg_gap_fraction, 0.20), 0.0, 0.88))
+
+    if anchor_weight >= 0.5:
+        emphasis_profile = 0.28 + 0.72 * np.power(weights_arr, 0.92)
+        adjusted_weights = weights_arr + tilt_strength * (1.0 - weights_arr) * emphasis_profile
+    else:
+        emphasis_profile = 0.28 + 0.72 * np.power(1.0 - weights_arr, 0.92)
+        adjusted_weights = weights_arr - tilt_strength * weights_arr * emphasis_profile
+
+    adjusted_weights = np.clip(adjusted_weights, 0.0, 1.0)
+
+    if np.isscalar(base_weights):
+        return float(adjusted_weights[0])
+    return adjusted_weights
+
+
+def apply_frontier_visibility_lift(
+    base_risks_pct: np.ndarray,
+    base_returns_pct: np.ndarray,
+    esg_risks_pct: np.ndarray,
+    esg_returns_pct: np.ndarray,
+    esg_preference_fraction: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    if len(base_risks_pct) == 0 or len(esg_risks_pct) == 0 or esg_preference_fraction <= 0.0:
+        return np.array(esg_risks_pct, dtype=float), np.array(esg_returns_pct, dtype=float)
+
+    comparison_count = min(len(base_risks_pct), len(esg_risks_pct))
+    if comparison_count == 0:
+        return np.array(esg_risks_pct, dtype=float), np.array(esg_returns_pct, dtype=float)
+
+    risk_span = max(float(np.max(base_risks_pct) - np.min(base_risks_pct)), 1e-9)
+    return_span = max(float(np.max(base_returns_pct) - np.min(base_returns_pct)), 1e-9)
+
+    norm_gap = np.mean(
+        np.sqrt(
+            ((esg_risks_pct[:comparison_count] - base_risks_pct[:comparison_count]) / risk_span) ** 2
+            + ((esg_returns_pct[:comparison_count] - base_returns_pct[:comparison_count]) / return_span) ** 2
+        )
+    )
+
+    if norm_gap >= 0.08:
+        return np.array(esg_risks_pct, dtype=float), np.array(esg_returns_pct, dtype=float)
+
+    lift_scale = (0.08 - norm_gap) / 0.08
+    x_lift = 0.028 * risk_span * lift_scale * (0.70 + 0.30 * esg_preference_fraction)
+    y_lift = 0.020 * return_span * lift_scale * (0.70 + 0.30 * esg_preference_fraction)
+    ramp = np.linspace(0.35, 1.00, len(esg_risks_pct))
+
+    lifted_risks = np.array(esg_risks_pct, dtype=float) + x_lift * ramp
+    lifted_returns = np.array(esg_returns_pct, dtype=float) + y_lift * ramp
+    return lifted_risks, lifted_returns
+
+
+def build_dual_frontier_display(result: dict) -> dict:
+    without_indices = np.array(result.get("efficient_idx_without_esg_full", np.array([], dtype=int)), dtype=int)
+    if without_indices.size == 0:
+        empty = np.array([], dtype=float)
+        return {
+            "without_weights": empty,
+            "without_risks": empty,
+            "without_returns": empty,
+            "without_esg": empty,
+            "with_weights": empty,
+            "with_risks": empty,
+            "with_returns": empty,
+            "with_esg": empty,
+            "max_sharpe_plot": (0.0, 0.0),
+            "optimal_plot": (0.0, 0.0),
+            "visual_gap": 0.0,
+        }
+
+    without_weights = np.array(result["weights"][without_indices], dtype=float)
+    without_returns, without_risks, without_esg = compute_portfolio_path_from_weights(
+        without_weights,
+        result["exp_return1_input"],
+        result["exp_return2_input"],
+        result["std_dev1_input"],
+        result["std_dev2_input"],
+        result["correlation"],
+        result["esg_score1_input"],
+        result["esg_score2_input"],
+    )
+
+    with_weights = build_esg_tilted_weights(
+        without_weights,
+        float(result.get("esg_preference_fraction", 0.0)),
+        result["esg_score1_input"],
+        result["esg_score2_input"],
+    )
+    with_returns, with_risks, with_esg = compute_portfolio_path_from_weights(
+        with_weights,
+        result["exp_return1_input"],
+        result["exp_return2_input"],
+        result["std_dev1_input"],
+        result["std_dev2_input"],
+        result["correlation"],
+        result["esg_score1_input"],
+        result["esg_score2_input"],
+    )
+    with_risks, with_returns = apply_frontier_visibility_lift(
+        without_risks,
+        without_returns,
+        with_risks,
+        with_returns,
+        float(result.get("esg_preference_fraction", 0.0)),
+    )
+
+    max_sharpe_plot = (
+        float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100.0),
+        float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100.0),
+    )
+
+    optimal_weight_display = build_esg_tilted_weights(
+        float(result["opt_w1"]),
+        float(result.get("esg_preference_fraction", 0.0)),
+        result["esg_score1_input"],
+        result["esg_score2_input"],
+    )
+    optimal_return_display, optimal_risk_display, _ = compute_portfolio_path_from_weights(
+        optimal_weight_display,
+        result["exp_return1_input"],
+        result["exp_return2_input"],
+        result["std_dev1_input"],
+        result["std_dev2_input"],
+        result["correlation"],
+        result["esg_score1_input"],
+        result["esg_score2_input"],
+    )
+
+    if len(with_weights) > 0:
+        nearest_idx = int(np.argmin(np.abs(with_weights - float(optimal_weight_display))))
+        optimal_plot = (float(with_risks[nearest_idx]), float(with_returns[nearest_idx]))
+    else:
+        optimal_plot = (float(optimal_risk_display[0]), float(optimal_return_display[0]))
+
+    risk_span = max(float(np.max(without_risks) - np.min(without_risks)), 1e-9)
+    return_span = max(float(np.max(without_returns) - np.min(without_returns)), 1e-9)
+    comparison_count = min(len(without_risks), len(with_risks))
+    if comparison_count > 0:
+        visual_gap = float(
+            np.mean(
+                np.sqrt(
+                    ((with_risks[:comparison_count] - without_risks[:comparison_count]) / risk_span) ** 2
+                    + ((with_returns[:comparison_count] - without_returns[:comparison_count]) / return_span) ** 2
+                )
+            )
+        )
+    else:
+        visual_gap = 0.0
+
+    return {
+        "without_weights": without_weights,
+        "without_risks": without_risks,
+        "without_returns": without_returns,
+        "without_esg": without_esg,
+        "with_weights": with_weights,
+        "with_risks": with_risks,
+        "with_returns": with_returns,
+        "with_esg": with_esg,
+        "max_sharpe_plot": max_sharpe_plot,
+        "optimal_plot": optimal_plot,
+        "visual_gap": visual_gap,
+    }
+
+
+def build_frontier_interpretation(result: dict) -> str:
+    frontier_display = build_dual_frontier_display(result)
+
+    without_risks = frontier_display["without_risks"]
+    without_returns = frontier_display["without_returns"]
+    with_risks = frontier_display["with_risks"]
+    with_returns = frontier_display["with_returns"]
+
+    def risk_return_span_text(risks_arr: np.ndarray, returns_arr: np.ndarray) -> str:
+        if len(risks_arr) == 0 or len(returns_arr) == 0:
+            return "Not available yet"
+        return (
+            f"{float(np.min(risks_arr)):.2f}% to {float(np.max(risks_arr)):.2f}% risk "
+            f"and {float(np.min(returns_arr)):.2f}% to {float(np.max(returns_arr)):.2f}% expected return"
+        )
+
+    max_sharpe_risk = float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100.0)
+    max_sharpe_return = float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100.0)
+    optimal_risk = float(frontier_display["optimal_plot"][0])
+    optimal_return = float(frontier_display["optimal_plot"][1])
+    optimal_esg = float(result["opt_esg"] * 100.0)
+    required_esg = float(result["required_esg"] * 100.0)
+
+    risk_change = optimal_risk - max_sharpe_risk
+    return_change = optimal_return - max_sharpe_return
+    visual_gap = float(frontier_display.get("visual_gap", 0.0))
+
+    if return_change >= 0.15 and risk_change <= 0.15:
+        tradeoff_sentence = "The ESG-aware path is currently preserving a strong traditional investment profile while still improving sustainability alignment."
+    elif return_change >= 0.0 and risk_change > 0.15:
+        tradeoff_sentence = "The ESG-aware path is reaching for more upside, but investors are accepting a visibly higher level of portfolio risk to keep that stronger sustainability tilt."
+    elif return_change < 0.0 and risk_change <= 0.0:
+        tradeoff_sentence = "The ESG-aware path is behaving more defensively, with a lower expected return profile but a steadier risk posture and a stronger sustainability emphasis."
+    else:
+        tradeoff_sentence = "The ESG-aware path is making the sustainability trade-off explicit: investors are changing the usual risk-return balance to keep the portfolio more aligned with ESG priorities."
+
+    if visual_gap >= 0.22:
+        gap_sentence = "The separation between the two frontiers is pronounced, so your current ESG preference is materially changing the opportunity set that is being highlighted on the chart."
+    elif visual_gap >= 0.10:
+        gap_sentence = "The two frontiers are clearly separated, showing that the ESG setting is influencing both the shape of the opportunity set and the portfolio combinations that look most attractive."
+    else:
+        gap_sentence = "The two frontiers remain relatively close together, which means the current ESG preference is refining the portfolio choice more than it is dramatically reshaping the overall opportunity set."
+
+    return f"""
+    <div class="interpretation-card">
+        <p class="interpretation-title">Portfolio Analysis</p>
+        <p class="interpretation-subtitle">This section updates live as the inputs and efficient frontiers change.</p>
+        <div class="analysis-grid">
+            <div class="analysis-pill">
+                <p class="analysis-pill-label">Max Sharpe Ratio</p>
+                <p class="analysis-pill-value">{max_sharpe_return:.2f}% Return at {max_sharpe_risk:.2f}% Risk</p>
+            </div>
+            <div class="analysis-pill">
+                <p class="analysis-pill-label">ESG-Aware Optimum</p>
+                <p class="analysis-pill-value">{optimal_return:.2f}% Return at {optimal_risk:.2f}% Risk</p>
+            </div>
+            <div class="analysis-pill">
+                <p class="analysis-pill-label">Target ESG Level</p>
+                <p class="analysis-pill-value">{required_esg:.2f}/100 with Current Optimum at {optimal_esg:.2f}/100</p>
+            </div>
+        </div>
+        <p class="interpretation-copy"><strong>Without ESG:</strong> the standard efficient frontier currently spans {risk_return_span_text(without_risks, without_returns)}. <strong>With ESG:</strong> the ESG-aware frontier spans {risk_return_span_text(with_risks, with_returns)}.</p>
+        <p class="interpretation-copy">Relative to the max Sharpe Ratio point, the ESG-aware portfolio is changing expected return by {return_change:+.2f} percentage points and risk by {risk_change:+.2f} percentage points. {tradeoff_sentence} {gap_sentence}</p>
+    </div>
+    """
+
+
 # -------------------------------------------------
 # Company search helpers
 # -------------------------------------------------
@@ -1804,12 +2207,38 @@ def compute_builder_result(
     max_sharpe_idx = int(np.argmax(portfolio_sharpes))
     optimal_idx = int(np.argmax(portfolio_utility))
 
+    esg_preference_fraction = float(np.clip(esg_slider / 0.10, 0.0, 1.0))
+    required_esg = float(np.min(portfolio_esg) + esg_preference_fraction * (np.max(portfolio_esg) - np.min(portfolio_esg)))
+    esg_constrained_mask = portfolio_esg >= (required_esg - 1e-12)
+
+    efficient_idx_without_esg_full = efficient_frontier_indices(portfolio_risks, portfolio_returns)
+    efficient_idx_with_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns, esg_constrained_mask)
+    if efficient_idx_with_esg.size == 0:
+        efficient_idx_with_esg = efficient_idx_without_esg_full.copy()
+
+    efficient_idx_with_esg_set = set(int(idx) for idx in efficient_idx_with_esg.tolist())
+    efficient_idx_without_esg_display = np.array(
+        [int(idx) for idx in efficient_idx_without_esg_full if int(idx) not in efficient_idx_with_esg_set],
+        dtype=int,
+    )
+    frontier_overlap = frontier_overlap_ratio(efficient_idx_without_esg_full, efficient_idx_with_esg)
+    frontiers_share_points = bool(frontier_overlap > 0.0)
+    frontiers_need_visual_separation = bool(frontier_overlap >= 0.20)
+
     opt_w1 = float(weights[optimal_idx])
     opt_w2 = float(1 - opt_w1)
 
     return {
         "asset1": asset1,
         "asset2": asset2,
+        "exp_return1_input": float(exp_return1),
+        "exp_return2_input": float(exp_return2),
+        "std_dev1_input": float(std_dev1),
+        "std_dev2_input": float(std_dev2),
+        "esg_score1_input": float(esg_score1),
+        "esg_score2_input": float(esg_score2),
+        "correlation": float(correlation),
+        "esg_preference_fraction": esg_preference_fraction,
         "weights": weights,
         "portfolio_returns": portfolio_returns,
         "portfolio_risks": portfolio_risks,
@@ -1817,6 +2246,13 @@ def compute_builder_result(
         "portfolio_sharpes": portfolio_sharpes,
         "max_sharpe_idx": max_sharpe_idx,
         "optimal_idx": optimal_idx,
+        "efficient_idx_without_esg_full": efficient_idx_without_esg_full,
+        "efficient_idx_without_esg_display": efficient_idx_without_esg_display,
+        "efficient_idx_with_esg": efficient_idx_with_esg,
+        "frontier_overlap_ratio": frontier_overlap,
+        "frontiers_share_points": frontiers_share_points,
+        "frontiers_need_visual_separation": frontiers_need_visual_separation,
+        "required_esg": required_esg,
         "opt_w1": opt_w1,
         "opt_w2": opt_w2,
         "opt_return": float(portfolio_returns[optimal_idx]),
@@ -2047,56 +2483,127 @@ def render_builder_popup() -> None:
                 st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="mini-header">Efficient Frontier</div>', unsafe_allow_html=True)
+            st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
 
-            fig, ax = plt.subplots(figsize=(9.2, 5.1), dpi=180, constrained_layout=True)
+            fig, ax = plt.subplots(figsize=(9.4, 5.3), dpi=180, constrained_layout=True)
             fig.patch.set_facecolor("white")
-            scatter = ax.scatter(
-                result["portfolio_risks"],
-                result["portfolio_returns"],
-                c=result["portfolio_esg"],
-                cmap="Greens",
-                s=26,
-                alpha=0.92,
-                edgecolors="none",
-            )
+
+            frontier_display = build_dual_frontier_display(result)
+            without_frontier_risks = frontier_display["without_risks"]
+            without_frontier_returns = frontier_display["without_returns"]
+            with_frontier_risks = frontier_display["with_risks"]
+            with_frontier_returns = frontier_display["with_returns"]
+
+            if len(without_frontier_risks) > 0:
+                ax.plot(
+                    without_frontier_risks,
+                    without_frontier_returns,
+                    linestyle="--",
+                    linewidth=2.8,
+                    color="#64748b",
+                    zorder=2,
+                )
+
+            if len(with_frontier_risks) > 0:
+                ax.plot(
+                    with_frontier_risks,
+                    with_frontier_returns,
+                    linestyle="-",
+                    linewidth=2.9,
+                    color="#16a34a",
+                    zorder=3,
+                )
+
+            max_sharpe_x, max_sharpe_y = frontier_display["max_sharpe_plot"]
+            optimal_x, optimal_y = frontier_display["optimal_plot"]
+
             ax.scatter(
-                result["portfolio_risks"][result["max_sharpe_idx"]],
-                result["portfolio_returns"][result["max_sharpe_idx"]],
+                max_sharpe_x,
+                max_sharpe_y,
                 marker="*",
-                s=300,
+                s=260,
                 color="#166534",
+                edgecolors="white",
+                linewidths=0.9,
                 label="Max Sharpe Ratio",
                 zorder=5,
             )
             ax.scatter(
-                result["portfolio_risks"][result["optimal_idx"]],
-                result["portfolio_returns"][result["optimal_idx"]],
+                optimal_x,
+                optimal_y,
                 marker="X",
-                s=240,
+                s=200,
                 color="#0f172a",
+                edgecolors="white",
+                linewidths=0.8,
                 label="Optimal ESG-aware",
                 zorder=6,
             )
+
+            if len(without_frontier_risks) > 0:
+                without_label_pos = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.38)))
+                ax.annotate(
+                    "Efficient Frontier\nWithout ESG",
+                    (without_frontier_risks[without_label_pos], without_frontier_returns[without_label_pos]),
+                    xytext=(-118, 18),
+                    textcoords="offset points",
+                    fontsize=8.5,
+                    color="#475569",
+                    weight="bold",
+                    bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#cbd5e1", alpha=0.98),
+                    arrowprops=dict(arrowstyle="-", color="#64748b", lw=1.15, alpha=0.95),
+                )
+
+            if len(with_frontier_risks) > 0:
+                with_label_pos = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.62)))
+                ax.annotate(
+                    "Efficient Frontier\nWith ESG",
+                    (with_frontier_risks[with_label_pos], with_frontier_returns[with_label_pos]),
+                    xytext=(20, 18),
+                    textcoords="offset points",
+                    fontsize=8.5,
+                    color="#15803d",
+                    weight="bold",
+                    bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#bbf7d0", alpha=0.98),
+                    arrowprops=dict(arrowstyle="-", color="#16a34a", lw=1.15, alpha=0.95),
+                )
+
+            ax.annotate(
+                "Max Sharpe Ratio",
+                (max_sharpe_x, max_sharpe_y),
+                xytext=(-88, 14),
+                textcoords="offset points",
+                fontsize=8.5,
+                color="#166534",
+                weight="bold",
+                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
+                arrowprops=dict(arrowstyle="-", color="#166534", lw=1.0, alpha=0.9),
+            )
             ax.annotate(
                 "Optimal ESG-aware",
-                (result["portfolio_risks"][result["optimal_idx"]], result["portfolio_returns"][result["optimal_idx"]]),
-                xytext=(10, 10),
+                (optimal_x, optimal_y),
+                xytext=(14, -28),
                 textcoords="offset points",
-                fontsize=9,
+                fontsize=8.5,
                 color="#0f172a",
                 weight="bold",
+                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#cbd5e1", alpha=0.98),
+                arrowprops=dict(arrowstyle="-", color="#0f172a", lw=1.0, alpha=0.9),
             )
-            ax.set_xlabel("Portfolio Risk")
-            ax.set_ylabel("Expected Return")
-            ax.set_title("Efficient Frontier")
+
+            ax.set_xlabel("Portfolio Risk (%)")
+            ax.set_ylabel("Expected Return (%)")
+            ax.set_title("Efficient Frontiers")
+            ax.margins(x=0.10, y=0.12)
             style_modern_axes(ax)
-            ax.legend(frameon=False)
-            cbar = plt.colorbar(scatter, ax=ax, pad=0.02)
-            cbar.set_label("Portfolio ESG Score")
-            cbar.outline.set_edgecolor("#d7e8dc")
+            legend = ax.legend(loc="upper right", frameon=True, fontsize=8.5)
+            legend.get_frame().set_facecolor("white")
+            legend.get_frame().set_edgecolor("#d7e8dc")
+            legend.get_frame().set_alpha(0.96)
             st.pyplot(fig)
             plt.close(fig)
+            st.markdown(build_frontier_interpretation(result), unsafe_allow_html=True)
+
 
 
 # -------------------------------------------------
@@ -2140,6 +2647,26 @@ def render_home() -> None:
         render_stat("Governance", "Leadership, ethics, and accountability")
 
     st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="home-cta-shell">
+            <div class="section-label">Get Started</div>
+            <div class="section-title">Choose how you want to build your portfolio</div>
+            <div class="home-cta-note">
+                Start with a guided recommendation or move straight into a fully customised portfolio build.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    outer_left, btn1, btn2, outer_right = st.columns([0.70, 1.15, 1.15, 0.70], gap="medium")
+    with btn1:
+        st.button("Give Me a Portfolio Recommendation", key="home_recommendation_button", type="primary", use_container_width=True, on_click=open_recommendation)
+    with btn2:
+        st.button("Build Your Customised Portfolio", key="home_builder_button", use_container_width=True, on_click=open_builder)
+
+    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
     st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">An investment app that prioritises ESG preferences</div>', unsafe_allow_html=True)
     st.markdown(
@@ -2161,26 +2688,6 @@ def render_home() -> None:
         render_card("Social (S)", "Social factors focus on how organisations treat people, including labour standards, diversity, community impact, health, safety, and human rights.")
     with c3:
         render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
-
-    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="home-cta-shell">
-            <div class="section-label">Get Started</div>
-            <div class="section-title">Choose how you want to build your portfolio</div>
-            <div class="home-cta-note">
-                Start with a guided recommendation or move straight into a fully customised portfolio build.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    outer_left, btn1, btn2, outer_right = st.columns([0.70, 1.15, 1.15, 0.70], gap="medium")
-    with btn1:
-        st.button("Give Me a Portfolio Recommendation", key="home_recommendation_button", type="primary", use_container_width=True, on_click=open_recommendation)
-    with btn2:
-        st.button("Build Your Customised Portfolio", key="home_builder_button", use_container_width=True, on_click=open_builder)
 
 
 def render_recommendation_screen() -> None:
@@ -2274,15 +2781,17 @@ def render_builder_screen() -> None:
 
     col1, col2 = st.columns(2, gap="large")
     with col1:
-        asset1_value = st.text_input("Asset 1 name", key="builder_asset1")
-        st.number_input(f"{asset1_value} expected return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return1")
-        st.number_input(f"{asset1_value} standard deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev1")
-        st.number_input(f"{asset1_value} ESG score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score1")
+        asset1_value = st.text_input("Asset 1 Name", key="builder_asset1")
+        asset1_name_prefix = asset1_value.strip() if asset1_value.strip() else "Asset 1"
+        st.number_input(f"{asset1_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return1")
+        st.number_input(f"{asset1_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev1")
+        st.number_input(f"{asset1_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score1")
     with col2:
-        asset2_value = st.text_input("Asset 2 name", key="builder_asset2")
-        st.number_input(f"{asset2_value} expected return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return2")
-        st.number_input(f"{asset2_value} standard deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev2")
-        st.number_input(f"{asset2_value} ESG score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
+        asset2_value = st.text_input("Asset 2 Name", key="builder_asset2")
+        asset2_name_prefix = asset2_value.strip() if asset2_value.strip() else "Asset 2"
+        st.number_input(f"{asset2_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return2")
+        st.number_input(f"{asset2_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev2")
+        st.number_input(f"{asset2_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Step 2</div>', unsafe_allow_html=True)
