@@ -1,10 +1,8 @@
+
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# -------------------------------------------------
-# Page config
-# -------------------------------------------------
 st.set_page_config(
     page_title="Verdant Wealth",
     page_icon="🌿",
@@ -15,10 +13,6 @@ st.set_page_config(
 APP_NAME = "Verdant Wealth"
 APP_TAGLINE = "Sustainable investing, built around you."
 
-# -------------------------------------------------
-# Embedded company ESG data
-# Source: uploaded public companies ESG file
-# -------------------------------------------------
 COMPANY_DATA = [
     ('mmm', '3M Co', 'Industrial Conglomerates', 'NEW YORK STOCK EXCHANGE, INC.', 'A', 'High', 'BB', 'Medium', 'BB', 'Medium', 'BBB', 'High', 526, 310, 305, 1141),
     ('aos', 'A O Smith Corp', 'Building', 'NEW YORK STOCK EXCHANGE, INC.', 'A', 'High', 'BB', 'Medium', 'BB', 'Medium', 'BBB', 'High', 510, 315, 310, 1135),
@@ -745,9 +739,25 @@ COMPANY_DATA = [
 ]
 
 
-# -------------------------------------------------
-# Recommendation data
-# -------------------------------------------------
+
+ASSET_DATA_LOOKUP = {
+    "PepsiCo (PEP)": {"expected_return": 7.33, "std_dev": 5.19},
+    "Consolidated Edison (ED)": {"expected_return": 7.53, "std_dev": 5.22},
+    "Edison International (EIX)": {"expected_return": 4.26, "std_dev": 8.20},
+    "Procter & Gamble (PG)": {"expected_return": 8.61, "std_dev": 6.92},
+    "Microsoft (MSFT)": {"expected_return": 23.16, "std_dev": 6.81},
+    "Air Products and Chemicals (APD)": {"expected_return": 10.06, "std_dev": 6.64},
+    "Regency Centers (REG)": {"expected_return": 4.14, "std_dev": 4.09},
+    "Trane Technologies (TT)": {"expected_return": 23.15, "std_dev": 8.35},
+    "Airbnb (ABNB)": {"expected_return": -5.81, "std_dev": 10.67},
+    "Amazon (AMZN)": {"expected_return": 21.84, "std_dev": 7.90},
+    "General Mills (GIS)": {"expected_return": -1.33, "std_dev": 7.33},
+    "ConocoPhillips (COP)": {"expected_return": 15.21, "std_dev": 8.08},
+    "Exelon (EXC)": {"expected_return": 10.72, "std_dev": 5.84},
+    "Pinnacle West Capital (PNW)": {"expected_return": 7.01, "std_dev": 4.96},
+    "Raytheon Technologies (RTX)": {"expected_return": 16.65, "std_dev": 8.73},
+}
+
 RECOMMENDATIONS = {
     "1": {
         "Low": {
@@ -811,9 +821,7 @@ RECOMMENDATIONS = {
     },
 }
 
-# -------------------------------------------------
-# Session state
-# -------------------------------------------------
+
 def init_session_state() -> None:
     defaults = {
         "current_view": "home",
@@ -834,7 +842,6 @@ def init_session_state() -> None:
         "builder_esg_score2": 55.0,
         "builder_correlation": 0.30,
         "builder_risk_free_rate": 4.84,
-        "builder_risk_free_rate_touched": False,
         "builder_risk_tolerance": 5,
         "builder_esg_importance": "Somewhat important",
         "builder_esg_slider": 0.05,
@@ -878,13 +885,6 @@ def hide_builder_popup() -> None:
     st.session_state.show_builder_popup = False
 
 
-def mark_builder_risk_free_rate_touched() -> None:
-    st.session_state.builder_risk_free_rate_touched = True
-
-
-# -------------------------------------------------
-# Styling
-# -------------------------------------------------
 def inject_css() -> None:
     st.markdown(
         """
@@ -955,8 +955,8 @@ def inject_css() -> None:
             .hero {
                 background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(245,255,249,0.93));
                 border: 1px solid rgba(22,101,52,0.08);
-                border-radius: 26px;
-                padding: 2.25rem 2rem;
+                border-radius: 28px;
+                padding: 2.35rem 2.15rem;
                 box-shadow: var(--shadow);
                 backdrop-filter: blur(8px);
             }
@@ -1048,7 +1048,7 @@ def inject_css() -> None:
 
             .page-title {
                 color: var(--text);
-                font-size: 2.2rem;
+                font-size: 2.25rem;
                 font-weight: 900;
                 letter-spacing: -0.04em;
                 margin: 0.7rem 0 0.25rem 0;
@@ -1111,10 +1111,6 @@ def inject_css() -> None:
                 color: #58756a;
                 font-size: 0.74rem;
                 margin-bottom: 0.18rem;
-                display: flex;
-                align-items: center;
-                gap: 0.35rem;
-                flex-wrap: wrap;
             }
 
             .metric-tile-value {
@@ -1153,71 +1149,6 @@ def inject_css() -> None:
                 margin: 0 0 0.65rem 0;
             }
 
-            .tooltip-icon {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 16px;
-                height: 16px;
-                border-radius: 999px;
-                border: 1px solid rgba(22,101,52,0.18);
-                font-size: 0.72rem;
-                font-weight: 800;
-                color: #166534;
-                background: rgba(22,163,74,0.06);
-                line-height: 1;
-            }
-
-            .info-details {
-                display: inline-block;
-                position: relative;
-                margin-left: 0.18rem;
-                vertical-align: middle;
-            }
-
-            .info-details summary {
-                list-style: none;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 17px;
-                height: 17px;
-                border-radius: 999px;
-                border: 1px solid rgba(22,101,52,0.18);
-                font-size: 0.72rem;
-                font-weight: 800;
-                color: #166534;
-                background: rgba(22,163,74,0.06);
-                cursor: pointer;
-                line-height: 1;
-            }
-
-            .info-details summary::-webkit-details-marker {
-                display: none;
-            }
-
-            .info-details-content {
-                display: none;
-            }
-
-            .info-details[open] .info-details-content {
-                display: block;
-                position: absolute;
-                top: 1.45rem;
-                right: 0;
-                width: 240px;
-                background: #ffffff;
-                color: #2f4f43;
-                border: 1px solid rgba(22,101,52,0.12);
-                border-radius: 12px;
-                box-shadow: 0 12px 30px rgba(20,83,45,0.14);
-                padding: 0.65rem 0.75rem;
-                font-size: 0.82rem;
-                font-weight: 500;
-                line-height: 1.45;
-                z-index: 999;
-            }
-
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 border-radius: 24px !important;
                 border: 1px solid rgba(22,101,52,0.10) !important;
@@ -1228,14 +1159,14 @@ def inject_css() -> None:
 
             div.stButton > button,
             div[data-testid="stFormSubmitButton"] > button {
-                min-height: 3.35rem !important;
-                border-radius: 14px !important;
+                min-height: 3.45rem !important;
+                border-radius: 16px !important;
                 font-weight: 800 !important;
-                font-size: 0.96rem !important;
+                font-size: 1rem !important;
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, var(--primary), var(--primary3)) !important;
                 color: #ffffff !important;
-                box-shadow: 0 8px 18px rgba(20,83,45,0.18) !important;
+                box-shadow: 0 10px 22px rgba(20,83,45,0.18) !important;
                 transition: all 0.18s ease !important;
             }
 
@@ -1364,27 +1295,29 @@ def inject_tool_text_css() -> None:
                 color: #000000 !important;
             }
 
-            .stRadio p,
-            .stSlider p,
-            .stRadio span,
-            .stSlider span {
-                color: #000000 !important;
-            }
-
             input,
             textarea,
             [data-baseweb="input"] input,
-            [data-baseweb="textarea"] textarea {
+            [data-baseweb="textarea"] textarea,
+            [data-baseweb="select"] input,
+            [data-baseweb="select"] div,
+            [data-baseweb="select"] span {
                 color: #000000 !important;
                 -webkit-text-fill-color: #000000 !important;
                 background: #ffffff !important;
             }
 
-            div[data-baseweb="input"] {
+            div[data-baseweb="input"],
+            div[data-baseweb="select"] {
                 background: #ffffff !important;
                 border-radius: 12px !important;
                 border: 1px solid rgba(22,101,52,0.12) !important;
                 box-shadow: none !important;
+            }
+
+            div[data-baseweb="select"] > div {
+                background: #ffffff !important;
+                color: #000000 !important;
             }
 
             div[data-baseweb="input"]:focus-within,
@@ -1395,15 +1328,54 @@ def inject_tool_text_css() -> None:
                 border: 1px solid rgba(21, 128, 61, 0.55) !important;
                 box-shadow: 0 0 0 0.14rem rgba(21, 128, 61, 0.14) !important;
                 outline: none !important;
+                background: #ffffff !important;
             }
 
             [data-baseweb="input"] input:focus,
             [data-baseweb="input"] input:active,
             [data-baseweb="select"] input:focus,
-            [data-baseweb="select"] input:active {
+            [data-baseweb="select"] input:active,
+            [data-baseweb="select"] div:focus,
+            [data-baseweb="select"] div:active {
                 box-shadow: none !important;
                 outline: none !important;
                 border-color: transparent !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+            }
+
+            div[data-baseweb="popover"],
+            div[data-baseweb="popover"] * {
+                background: #ffffff !important;
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+            }
+
+            div[data-baseweb="popover"] {
+                border: 1px solid rgba(22,101,52,0.12) !important;
+                border-radius: 14px !important;
+                box-shadow: 0 14px 30px rgba(20,83,45,0.12) !important;
+                overflow: hidden !important;
+            }
+
+            div[data-baseweb="popover"] ul,
+            div[data-baseweb="popover"] [role="listbox"] {
+                background: #ffffff !important;
+            }
+
+            div[data-baseweb="popover"] li,
+            div[data-baseweb="popover"] [role="option"] {
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+
+            div[data-baseweb="popover"] li:hover,
+            div[data-baseweb="popover"] [role="option"]:hover,
+            div[data-baseweb="popover"] li[aria-selected="true"],
+            div[data-baseweb="popover"] [role="option"][aria-selected="true"] {
+                background: #f3fbf6 !important;
+                color: #000000 !important;
             }
         </style>
         """,
@@ -1411,9 +1383,6 @@ def inject_tool_text_css() -> None:
     )
 
 
-# -------------------------------------------------
-# UI helpers
-# -------------------------------------------------
 def render_splash_overlay() -> None:
     st.markdown(
         f"""
@@ -1431,6 +1400,11 @@ def render_splash_overlay() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_page_header(title: str, subtitle: str) -> None:
+    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
 
 
 def render_stat(value: str, label: str) -> None:
@@ -1457,39 +1431,53 @@ def render_card(title: str, body: str) -> None:
     )
 
 
-def render_page_header(title: str, subtitle: str) -> None:
-    st.markdown(f'<div class="page-title">{title}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
-
-
 def render_custom_label(text: str) -> None:
     st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
 
 
-def render_label_with_tooltip(text: str, tooltip: str) -> None:
-    st.markdown(
-        f'<div class="field-label">{text} <details class="info-details"><summary>i</summary><div class="info-details-content">{tooltip}</div></details></div>',
-        unsafe_allow_html=True,
-    )
+def render_click_info(info_text: str, key: str) -> None:
+    if hasattr(st, "popover"):
+        with st.popover("i", use_container_width=False):
+            st.write(info_text)
+    else:
+        state_key = f"show_info_{key}"
+        if state_key not in st.session_state:
+            st.session_state[state_key] = False
+        if st.button("i", key=f"button_{key}", use_container_width=False):
+            st.session_state[state_key] = not st.session_state[state_key]
+        if st.session_state[state_key]:
+            st.caption(info_text)
 
 
-def render_risk_tolerance_helper() -> None:
-    st.markdown(
-        '<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>',
-        unsafe_allow_html=True,
-    )
+def render_label_with_click_info(text: str, info_text: str, key: str) -> None:
+    c1, c2 = st.columns([0.92, 0.08], gap="small")
+    with c1:
+        render_custom_label(text)
+    with c2:
+        render_click_info(info_text, key)
 
 
-def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
-    tooltip_html = ""
-    if tooltip:
-        tooltip_html = f'<details class="info-details"><summary>i</summary><div class="info-details-content">{tooltip}</div></details>'
+def result_tile_html(label: str, value: str) -> str:
     return f"""
     <div class="metric-tile">
-        <div class="metric-tile-label">{label} {tooltip_html}</div>
+        <div class="metric-tile-label">{label}</div>
         <div class="metric-tile-value">{value}</div>
     </div>
     """
+
+
+def render_metric_tile(label: str, value: str, info_text: str | None = None, key: str | None = None) -> None:
+    box = st.container(border=True)
+    with box:
+        if info_text and key:
+            top_l, top_r = st.columns([0.88, 0.12], gap="small")
+            with top_l:
+                st.markdown(f'<div class="metric-tile-label">{label}</div>', unsafe_allow_html=True)
+            with top_r:
+                render_click_info(info_text, key)
+        else:
+            st.markdown(f'<div class="metric-tile-label">{label}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-tile-value">{value}</div>', unsafe_allow_html=True)
 
 
 def style_modern_axes(ax) -> None:
@@ -1505,16 +1493,21 @@ def style_modern_axes(ax) -> None:
     ax.yaxis.label.set_color("#234236")
 
 
-# -------------------------------------------------
-# Company search helpers
-# -------------------------------------------------
+def risk_level_from_score(risk_tolerance: int) -> str:
+    if 1 <= risk_tolerance <= 4:
+        return "Low"
+    if 5 <= risk_tolerance <= 7:
+        return "Medium"
+    return "High"
+
+
 def company_option_label(company_tuple) -> str:
-    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
-    return f"{name} ({ticker.upper()})"
+    ticker, name, industry, exchange, *_ = company_tuple
+    return f"{name} ({str(ticker).upper()})"
 
 
 def company_search_score(query: str, company_tuple) -> int:
-    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+    ticker, name, industry, exchange, *_ = company_tuple
     q = query.strip().lower()
     if not q:
         return -1
@@ -1545,21 +1538,18 @@ def company_search_score(query: str, company_tuple) -> int:
     parts = [p for p in q.split() if p]
     if parts and all(p in combined for p in parts):
         return 1000 - len(name_l)
-
     return -1
 
 
-def get_company_matches(query: str, limit: int = 30):
+def get_company_matches(query: str, limit: int = 40):
     q = query.strip()
     if not q:
         return []
-
     scored = []
     for company in COMPANY_DATA:
         score = company_search_score(q, company)
         if score >= 0:
             scored.append((score, company_option_label(company), company))
-
     scored.sort(key=lambda item: (-item[0], item[1].lower()))
     return [item[2] for item in scored[:limit]]
 
@@ -1585,7 +1575,7 @@ def render_company_profile(company_tuple) -> None:
     st.markdown(
         f"""
         <div class="asset-card">
-            <div class="asset-card-title">{name} ({ticker.upper()})</div>
+            <div class="asset-card-title">{name} ({str(ticker).upper()})</div>
             <p class="asset-card-copy">
                 Industry: {industry}<br>
                 Exchange: {exchange}<br>
@@ -1597,27 +1587,15 @@ def render_company_profile(company_tuple) -> None:
     )
 
     st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
-
     m1, m2, m3, m4 = st.columns(4, gap="small")
     with m1:
-        st.markdown(result_tile("Environmental", f"{e_grade} · {e_level}"), unsafe_allow_html=True)
+        st.markdown(result_tile_html("Environmental", f"{e_grade} · {e_level}"), unsafe_allow_html=True)
     with m2:
-        st.markdown(result_tile("Social", f"{s_grade} · {s_level}"), unsafe_allow_html=True)
+        st.markdown(result_tile_html("Social", f"{s_grade} · {s_level}"), unsafe_allow_html=True)
     with m3:
-        st.markdown(result_tile("Governance", f"{g_grade} · {g_level}"), unsafe_allow_html=True)
+        st.markdown(result_tile_html("Governance", f"{g_grade} · {g_level}"), unsafe_allow_html=True)
     with m4:
-        st.markdown(result_tile("Total ESG", f"{total_grade} · {total_level}"), unsafe_allow_html=True)
-
-
-# -------------------------------------------------
-# Portfolio computations
-# -------------------------------------------------
-def risk_level_from_score(risk_tolerance: int) -> str:
-    if 1 <= risk_tolerance <= 4:
-        return "Low"
-    if 5 <= risk_tolerance <= 7:
-        return "Medium"
-    return "High"
+        st.markdown(result_tile_html("Total ESG", f"{total_grade} · {total_level}"), unsafe_allow_html=True)
 
 
 def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect: str) -> dict:
@@ -1626,11 +1604,11 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect:
         "Prioritise financial growth": "2",
         "Prioritise sustainability": "3",
     }
-
     investment_priority_key = investment_priority_map[priority_label]
     risk_level = risk_level_from_score(risk_tolerance)
 
     asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
+
     def lookup(asset_label: str):
         ticker = asset_label.split("(")[-1].replace(")", "").strip().lower()
         for row in COMPANY_DATA:
@@ -1638,8 +1616,6 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect:
                 return row
         return None
 
-    row1 = lookup(asset1)
-    row2 = lookup(asset2)
     exp_return1 = ASSET_DATA_LOOKUP.get(asset1, {"expected_return": 0.0, "std_dev": 0.0})["expected_return"]
     std_dev1 = ASSET_DATA_LOOKUP.get(asset1, {"expected_return": 0.0, "std_dev": 0.0})["std_dev"]
     exp_return2 = ASSET_DATA_LOOKUP.get(asset2, {"expected_return": 0.0, "std_dev": 0.0})["expected_return"]
@@ -1667,8 +1643,8 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect:
         "std_dev2": std_dev2,
         "portfolio_return": portfolio_return,
         "portfolio_std_dev": portfolio_std_dev,
-        "company_row1": row1,
-        "company_row2": row2,
+        "company_row1": lookup(asset1),
+        "company_row2": lookup(asset2),
     }
 
 
@@ -1732,21 +1708,17 @@ def compute_builder_result(
     max_sharpe_idx = int(np.argmax(portfolio_sharpes))
     optimal_idx = int(np.argmax(portfolio_utility))
 
-    opt_w1 = float(weights[optimal_idx])
-    opt_w2 = float(1 - opt_w1)
-
     return {
         "asset1": asset1,
         "asset2": asset2,
-        "weights": weights,
         "portfolio_returns": portfolio_returns,
         "portfolio_risks": portfolio_risks,
         "portfolio_esg": portfolio_esg,
         "portfolio_sharpes": portfolio_sharpes,
         "max_sharpe_idx": max_sharpe_idx,
         "optimal_idx": optimal_idx,
-        "opt_w1": opt_w1,
-        "opt_w2": opt_w2,
+        "opt_w1": float(weights[optimal_idx]),
+        "opt_w2": float(1 - weights[optimal_idx]),
         "opt_return": float(portfolio_returns[optimal_idx]),
         "opt_risk": float(portfolio_risks[optimal_idx]),
         "opt_esg": float(portfolio_esg[optimal_idx]),
@@ -1754,31 +1726,6 @@ def compute_builder_result(
     }
 
 
-# -------------------------------------------------
-# Recommendation asset stats lookup
-# -------------------------------------------------
-ASSET_DATA_LOOKUP = {
-    "PepsiCo (PEP)": {"expected_return": 7.33, "std_dev": 5.19},
-    "Consolidated Edison (ED)": {"expected_return": 7.53, "std_dev": 5.22},
-    "Edison International (EIX)": {"expected_return": 4.26, "std_dev": 8.20},
-    "Procter & Gamble (PG)": {"expected_return": 8.61, "std_dev": 6.92},
-    "Microsoft (MSFT)": {"expected_return": 23.16, "std_dev": 6.81},
-    "Air Products and Chemicals (APD)": {"expected_return": 10.06, "std_dev": 6.64},
-    "Regency Centers (REG)": {"expected_return": 4.14, "std_dev": 4.09},
-    "Trane Technologies (TT)": {"expected_return": 23.15, "std_dev": 8.35},
-    "Airbnb (ABNB)": {"expected_return": -5.81, "std_dev": 10.67},
-    "Amazon (AMZN)": {"expected_return": 21.84, "std_dev": 7.90},
-    "General Mills (GIS)": {"expected_return": -1.33, "std_dev": 7.33},
-    "ConocoPhillips (COP)": {"expected_return": 15.21, "std_dev": 8.08},
-    "Exelon (EXC)": {"expected_return": 10.72, "std_dev": 5.84},
-    "Pinnacle West Capital (PNW)": {"expected_return": 7.01, "std_dev": 4.96},
-    "Raytheon Technologies (RTX)": {"expected_return": 16.65, "std_dev": 8.73},
-}
-
-
-# -------------------------------------------------
-# Live popup renderers
-# -------------------------------------------------
 def render_recommendation_popup() -> None:
     result = compute_recommendation(
         st.session_state.rec_investment_priority,
@@ -1793,10 +1740,7 @@ def render_recommendation_popup() -> None:
             header_left, header_right = st.columns([0.82, 0.18], gap="small")
             with header_left:
                 st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="popup-subtitle">This recommendation updates live as you change the inputs below.</div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown('<div class="popup-subtitle">This recommendation updates live as you change the inputs below.</div>', unsafe_allow_html=True)
             with header_right:
                 st.button("Close", key="close_rec_popup_btn", use_container_width=True, on_click=hide_recommendation_popup)
 
@@ -1804,28 +1748,23 @@ def render_recommendation_popup() -> None:
 
             left, right = st.columns([0.9, 1.1], gap="large")
             with left:
-                st.markdown(result_tile("Investment Priority", result["investment_priority_label"]), unsafe_allow_html=True)
+                st.markdown(result_tile_html("Investment Priority", result["investment_priority_label"]), unsafe_allow_html=True)
                 st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
                 g1c1, g1c2 = st.columns(2, gap="small")
                 with g1c1:
-                    st.markdown(result_tile("Risk Level", result["risk_level"]), unsafe_allow_html=True)
+                    st.markdown(result_tile_html("Risk Level", result["risk_level"]), unsafe_allow_html=True)
                 with g1c2:
-                    st.markdown(result_tile("Preferred ESG Aspect", result["esg_aspect"]), unsafe_allow_html=True)
-
+                    st.markdown(result_tile_html("Preferred ESG Aspect", result["esg_aspect"]), unsafe_allow_html=True)
                 st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
                 g2c1, g2c2 = st.columns(2, gap="small")
                 with g2c1:
-                    st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%'), unsafe_allow_html=True)
+                    st.markdown(result_tile_html("Expected Returns", f'{result["portfolio_return"]:.2f}%'), unsafe_allow_html=True)
                 with g2c2:
-                    st.markdown(
-                        result_tile(
-                            "Portfolio Risk",
-                            f'{result["portfolio_std_dev"]:.2f}%',
-                            tooltip="Portfolio risk is characterised by standard deviation.",
-                        ),
-                        unsafe_allow_html=True,
+                    render_metric_tile(
+                        "Portfolio Risk",
+                        f'{result["portfolio_std_dev"]:.2f}%',
+                        info_text="Portfolio risk is characterised by standard deviation.",
+                        key="rec_portfolio_risk",
                     )
 
             with right:
@@ -1848,11 +1787,11 @@ def render_recommendation_popup() -> None:
                             unsafe_allow_html=True,
                         )
                     else:
-                        ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = row
+                        ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, *_ = row
                         st.markdown(
                             f"""
                             <div class="asset-card">
-                                <div class="asset-card-title">{name} ({ticker.upper()})</div>
+                                <div class="asset-card-title">{name} ({str(ticker).upper()})</div>
                                 <p class="asset-card-copy">
                                     Industry: {industry}<br>
                                     ESG Grade: <strong>{total_grade}</strong> · {total_level}<br>
@@ -1893,86 +1832,65 @@ def render_builder_popup() -> None:
         with outer_mid:
             popup = st.container(border=True)
             with popup:
-                header_left, header_right = st.columns([0.82, 0.18], gap="small")
-                with header_left:
+                h1, h2 = st.columns([0.82, 0.18], gap="small")
+                with h1:
                     st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                    st.markdown(
-                        '<div class="popup-subtitle">The popup remains open while you refine the inputs on the page.</div>',
-                        unsafe_allow_html=True,
-                    )
-                with header_right:
-                    st.button("Close", key="close_builder_popup_btn_info", use_container_width=True, on_click=hide_builder_popup)
+                    st.markdown('<div class="popup-subtitle">The popup remains open while you refine the inputs on the page.</div>', unsafe_allow_html=True)
+                with h2:
+                    st.button("Close", key="close_builder_popup_info", use_container_width=True, on_click=hide_builder_popup)
                 st.info("Recommended public companies mode is ready for your curated ESG universe integration.")
         return
 
-    try:
-        result = compute_builder_result(
-            asset1=st.session_state.builder_asset1,
-            asset2=st.session_state.builder_asset2,
-            exp_return1=float(st.session_state.builder_exp_return1),
-            exp_return2=float(st.session_state.builder_exp_return2),
-            std_dev1=float(st.session_state.builder_std_dev1),
-            std_dev2=float(st.session_state.builder_std_dev2),
-            esg_score1=float(st.session_state.builder_esg_score1),
-            esg_score2=float(st.session_state.builder_esg_score2),
-            correlation=float(st.session_state.builder_correlation),
-            risk_free_rate=float(st.session_state.builder_risk_free_rate),
-            risk_tolerance=int(st.session_state.builder_risk_tolerance),
-            esg_slider=float(st.session_state.builder_esg_slider),
-        )
-    except Exception:
-        outer_left, outer_mid, outer_right = st.columns([0.08, 0.84, 0.08])
-        with outer_mid:
-            popup = st.container(border=True)
-            with popup:
-                header_left, header_right = st.columns([0.82, 0.18], gap="small")
-                with header_left:
-                    st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                with header_right:
-                    st.button("Close", key="close_builder_popup_btn_error", use_container_width=True, on_click=hide_builder_popup)
-                st.error("Please check your inputs and try again.")
-        return
+    result = compute_builder_result(
+        asset1=st.session_state.builder_asset1,
+        asset2=st.session_state.builder_asset2,
+        exp_return1=float(st.session_state.builder_exp_return1),
+        exp_return2=float(st.session_state.builder_exp_return2),
+        std_dev1=float(st.session_state.builder_std_dev1),
+        std_dev2=float(st.session_state.builder_std_dev2),
+        esg_score1=float(st.session_state.builder_esg_score1),
+        esg_score2=float(st.session_state.builder_esg_score2),
+        correlation=float(st.session_state.builder_correlation),
+        risk_free_rate=float(st.session_state.builder_risk_free_rate),
+        risk_tolerance=int(st.session_state.builder_risk_tolerance),
+        esg_slider=float(st.session_state.builder_esg_slider),
+    )
 
     outer_left, outer_mid, outer_right = st.columns([0.05, 0.90, 0.05])
     with outer_mid:
         popup = st.container(border=True)
         with popup:
-            header_left, header_right = st.columns([0.82, 0.18], gap="small")
-            with header_left:
+            h1, h2 = st.columns([0.82, 0.18], gap="small")
+            with h1:
                 st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="popup-subtitle">This output updates live while you keep editing the inputs behind it.</div>',
-                    unsafe_allow_html=True,
-                )
-            with header_right:
+                st.markdown('<div class="popup-subtitle">This output updates live while you keep editing the inputs behind it.</div>', unsafe_allow_html=True)
+            with h2:
                 st.button("Close", key="close_builder_popup_btn", use_container_width=True, on_click=hide_builder_popup)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            row1c1, row1c2, row1c3 = st.columns(3, gap="small")
-            with row1c1:
-                st.markdown(result_tile(f'{result["asset1"]} weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
-            with row1c2:
-                st.markdown(result_tile(f'{result["asset2"]} weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
-            with row1c3:
-                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
+            r1c1, r1c2, r1c3 = st.columns(3, gap="small")
+            with r1c1:
+                st.markdown(result_tile_html(f'{result["asset1"]} Weight', f'{result["opt_w1"]:.2%}'), unsafe_allow_html=True)
+            with r1c2:
+                st.markdown(result_tile_html(f'{result["asset2"]} Weight', f'{result["opt_w2"]:.2%}'), unsafe_allow_html=True)
+            with r1c3:
+                st.markdown(result_tile_html("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
 
             st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
 
-            row2c1, row2c2, row2c3 = st.columns(3, gap="small")
-            with row2c1:
-                st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
-            with row2c2:
-                st.markdown(
-                    result_tile(
-                        "Portfolio Risk",
-                        f'{result["opt_risk"]:.2%}',
-                        tooltip="Portfolio risk is characterised by standard deviation.",
-                    ),
-                    unsafe_allow_html=True,
+            r2c1, r2c2, r2c3 = st.columns(3, gap="small")
+            with r2c1:
+                st.markdown(result_tile_html("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
+            with r2c2:
+                render_metric_tile(
+                    "Portfolio Risk",
+                    f'{result["opt_risk"]:.2%}',
+                    info_text="Portfolio risk is characterised by standard deviation.",
+                    key="builder_portfolio_risk",
                 )
-            with row2c3:
-                st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
+            with r2c3:
+                st.markdown(result_tile_html("Portfolio ESG Score", f'{result["opt_esg"] * 100:.2f}/100'), unsafe_allow_html=True)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontier</div>', unsafe_allow_html=True)
@@ -2027,9 +1945,6 @@ def render_builder_popup() -> None:
             plt.close(fig)
 
 
-# -------------------------------------------------
-# Screens
-# -------------------------------------------------
 def render_home() -> None:
     st.markdown(
         f"""
@@ -2090,12 +2005,12 @@ def render_home() -> None:
     with c3:
         render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
 
-    st.markdown("<div style='height:1.5rem;'></div>", unsafe_allow_html=True)
-    btn1, btn2 = st.columns(2, gap="large")
-    with btn1:
+    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
+    spacer_l, b1, b2, spacer_r = st.columns([1.1, 1.35, 1.35, 1.1], gap="large")
+    with b1:
         st.button("Give Me a Portfolio Recommendation", type="primary", use_container_width=True, on_click=open_recommendation)
-    with btn2:
-        st.button("Build Your Portfolio Based on ESG Preferences", use_container_width=True, on_click=open_builder)
+    with b2:
+        st.button("Build Your Customised Portfolio", use_container_width=True, on_click=open_builder)
 
 
 def render_recommendation_screen() -> None:
@@ -2126,7 +2041,8 @@ def render_recommendation_screen() -> None:
         )
         render_custom_label("Risk Tolerance")
         st.slider("Risk Tolerance", min_value=1, max_value=10, key="rec_risk_tolerance", label_visibility="collapsed")
-        render_risk_tolerance_helper()
+        st.markdown('<div class="tool-note">Low: 1-4, Medium: 5-7, High: 8-10</div>', unsafe_allow_html=True)
+
     with right:
         render_custom_label("Which ESG aspect matters most?")
         st.radio(
@@ -2145,7 +2061,7 @@ def render_builder_screen() -> None:
     inject_tool_text_css()
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
-        "Portfolio Builder",
+        "Build Your Customised Portfolio",
         "Build a personalised ESG-aware portfolio. The recommendation opens in a live popup-style panel on this same screen and updates as you change the inputs.",
     )
 
@@ -2153,11 +2069,9 @@ def render_builder_screen() -> None:
         render_builder_popup()
         st.markdown("<div style='height:1.05rem;'></div>", unsafe_allow_html=True)
 
-    header_left, header_right = st.columns([0.56, 0.44], gap="large")
-    with header_left:
+    top_left, top_right = st.columns([0.56, 0.44], gap="large")
+    with top_left:
         st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-label">Step 1</div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Choose Your Setup</div>', unsafe_allow_html=True)
         render_custom_label("Asset Selection Method")
         st.radio(
             "Asset Selection Method",
@@ -2167,7 +2081,7 @@ def render_builder_screen() -> None:
             label_visibility="collapsed",
         )
 
-    with header_right:
+    with top_right:
         st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-label">Company Search</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Search Company ESG Profile</div>', unsafe_allow_html=True)
@@ -2188,8 +2102,7 @@ def render_builder_screen() -> None:
                 key="selected_company_option",
                 label_visibility="collapsed",
             )
-            selected_company = get_company_by_option_label(st.session_state.selected_company_option)
-            render_company_profile(selected_company)
+            render_company_profile(get_company_by_option_label(st.session_state.selected_company_option))
         else:
             if st.session_state.company_search_query.strip():
                 st.info("No company matches found yet. Keep typing to narrow the search.")
@@ -2225,18 +2138,17 @@ def render_builder_screen() -> None:
             step=0.01,
             key="builder_correlation",
         )
-        render_label_with_tooltip(
+        render_label_with_click_info(
             "Risk-Free Rate",
-            "Standard rate of 4.84% as per the UK 10 year bond yield since it represents a safe, long-term investment alternative",
+            "Standard rate of 4.84% as per the UK 10 year bond yield since it represents a safe, long-term investment alternative.",
+            "builder_risk_free_rate",
         )
         st.number_input(
             "Risk-Free Rate",
             min_value=0.0,
             max_value=20.0,
-            value=float(st.session_state.builder_risk_free_rate),
             step=0.01,
             key="builder_risk_free_rate",
-            on_change=mark_builder_risk_free_rate_touched,
             label_visibility="collapsed",
         )
         render_custom_label("Risk Tolerance")
@@ -2252,10 +2164,6 @@ def render_builder_screen() -> None:
             horizontal=False,
             label_visibility="collapsed",
         )
-        lambda_map = {"Not important": 0.00, "Somewhat important": 0.05, "Very important": 0.10}
-        preferred_lambda = lambda_map[st.session_state.builder_esg_importance]
-        if abs(st.session_state.builder_esg_slider - preferred_lambda) > 1e-9 and not st.session_state.show_builder_popup:
-            st.session_state.builder_esg_slider = preferred_lambda
         st.slider("ESG preference weight", min_value=0.00, max_value=0.10, step=0.01, key="builder_esg_slider")
         st.markdown(
             """
@@ -2270,9 +2178,6 @@ def render_builder_screen() -> None:
     st.button("Generate Portfolio Recommendation", type="primary", use_container_width=True, on_click=show_builder_popup)
 
 
-# -------------------------------------------------
-# App router
-# -------------------------------------------------
 init_session_state()
 inject_css()
 
