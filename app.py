@@ -1153,20 +1153,71 @@ def inject_css() -> None:
                 margin: 0 0 0.65rem 0;
             }
 
+            .tooltip-details {
+                position: relative;
+                display: inline-block;
+                margin: 0;
+            }
+
+            .tooltip-details summary {
+                list-style: none;
+            }
+
+            .tooltip-details summary::-webkit-details-marker {
+                display: none;
+            }
+
             .tooltip-icon {
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                width: 16px;
-                height: 16px;
+                width: 18px;
+                height: 18px;
                 border-radius: 999px;
                 border: 1px solid rgba(22,101,52,0.18);
                 font-size: 0.72rem;
                 font-weight: 800;
                 color: #166534;
                 background: rgba(22,163,74,0.06);
-                cursor: help;
+                cursor: pointer;
                 line-height: 1;
+                transition: all 0.18s ease;
+            }
+
+            .tooltip-details[open] .tooltip-icon {
+                background: rgba(22,163,74,0.14);
+                border-color: rgba(22,101,52,0.30);
+                box-shadow: 0 8px 18px rgba(20,83,45,0.12);
+            }
+
+            .tooltip-bubble {
+                position: absolute;
+                top: calc(100% + 0.45rem);
+                left: 0;
+                min-width: 220px;
+                max-width: 280px;
+                padding: 0.72rem 0.78rem;
+                background: #ffffff;
+                border: 1px solid rgba(22,101,52,0.12);
+                border-radius: 14px;
+                color: #2f4f43;
+                font-size: 0.83rem;
+                line-height: 1.5;
+                box-shadow: 0 16px 36px rgba(20,83,45,0.14);
+                z-index: 50;
+            }
+
+            .home-cta-shell {
+                text-align: center;
+                max-width: 760px;
+                margin: 0 auto 0.65rem auto;
+            }
+
+            .home-cta-note {
+                color: var(--muted);
+                font-size: 0.96rem;
+                line-height: 1.65;
+                margin: 0.55rem 0 0 0;
             }
 
             div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -1179,10 +1230,11 @@ def inject_css() -> None:
 
             div.stButton > button,
             div[data-testid="stFormSubmitButton"] > button {
-                min-height: 3.02rem !important;
-                border-radius: 14px !important;
+                min-height: 3.45rem !important;
+                border-radius: 16px !important;
                 font-weight: 800 !important;
-                font-size: 0.96rem !important;
+                font-size: 1.02rem !important;
+                padding: 0.35rem 0.95rem !important;
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, var(--primary), var(--primary3)) !important;
                 color: #ffffff !important;
@@ -1465,9 +1517,30 @@ def render_custom_label(text: str) -> None:
     st.markdown(f'<div class="field-label">{text}</div>', unsafe_allow_html=True)
 
 
+def escape_html_text(value: str) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('\"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
+def click_tooltip_html(tooltip: str) -> str:
+    safe_tooltip = escape_html_text(tooltip)
+    return f"""
+    <details class=\"tooltip-details\">
+        <summary class=\"tooltip-icon\">i</summary>
+        <div class=\"tooltip-bubble\">{safe_tooltip}</div>
+    </details>
+    """
+
+
 def render_label_with_tooltip(text: str, tooltip: str) -> None:
     st.markdown(
-        f'<div class="field-label">{text} <span class="tooltip-icon" title="{tooltip}">i</span></div>',
+        f'<div class="field-label">{text} {click_tooltip_html(tooltip)}</div>',
         unsafe_allow_html=True,
     )
 
@@ -1482,7 +1555,7 @@ def render_risk_tolerance_helper() -> None:
 def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     tooltip_html = ""
     if tooltip:
-        tooltip_html = f'<span class="tooltip-icon" title="{tooltip}">i</span>'
+        tooltip_html = click_tooltip_html(tooltip)
     return f"""
     <div class="metric-tile">
         <div class="metric-tile-label">{label} {tooltip_html}</div>
@@ -1993,7 +2066,7 @@ def render_builder_popup() -> None:
                 marker="*",
                 s=300,
                 color="#166534",
-                label="Max Sharpe",
+                label="Max Sharpe Ratio",
                 zorder=5,
             )
             ax.scatter(
@@ -2089,12 +2162,25 @@ def render_home() -> None:
     with c3:
         render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
 
-    st.markdown("<div style='height:1.5rem;'></div>", unsafe_allow_html=True)
-    btn1, btn2 = st.columns(2, gap="large")
+    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="home-cta-shell">
+            <div class="section-label">Get Started</div>
+            <div class="section-title">Choose how you want to build your portfolio</div>
+            <div class="home-cta-note">
+                Start with a guided recommendation or move straight into a fully customised portfolio build.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    outer_left, btn1, btn2, outer_right = st.columns([0.70, 1.15, 1.15, 0.70], gap="medium")
     with btn1:
-        st.button("Give Me a Portfolio Recommendation", type="primary", use_container_width=True, on_click=open_recommendation)
+        st.button("Give Me a Portfolio Recommendation", key="home_recommendation_button", type="primary", use_container_width=True, on_click=open_recommendation)
     with btn2:
-        st.button("Build Your Portfolio Based on ESG Preferences", use_container_width=True, on_click=open_builder)
+        st.button("Build Your Customised Portfolio", key="home_builder_button", use_container_width=True, on_click=open_builder)
 
 
 def render_recommendation_screen() -> None:
@@ -2144,7 +2230,7 @@ def render_builder_screen() -> None:
     inject_tool_text_css()
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
-        "Portfolio Builder",
+        "Build Your Customised Portfolio",
         "Build a personalised ESG-aware portfolio. The recommendation opens in a live popup-style panel on this same screen and updates as you change the inputs.",
     )
 
@@ -2152,51 +2238,38 @@ def render_builder_screen() -> None:
         render_builder_popup()
         st.markdown("<div style='height:1.05rem;'></div>", unsafe_allow_html=True)
 
-    header_left, header_right = st.columns([0.56, 0.44], gap="large")
-    with header_left:
-        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-label">Step 1</div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Choose Your Setup</div>', unsafe_allow_html=True)
-        render_custom_label("Asset Selection Method")
-        st.radio(
-            "Asset Selection Method",
-            ["Input my own assets", "Use recommended public companies"],
-            key="builder_asset_choice",
-            horizontal=True,
-            label_visibility="collapsed",
-        )
-
-    with header_right:
-        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-label">Company Search</div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Search Company ESG Profile</div>', unsafe_allow_html=True)
-        st.text_input(
-            "Search Company",
-            key="company_search_query",
-            placeholder="Type a company name, ticker, industry, or exchange",
-            label_visibility="collapsed",
-        )
-        matches = get_company_matches(st.session_state.company_search_query, limit=40)
-        option_labels = [company_option_label(c) for c in matches]
-        if option_labels:
-            if st.session_state.selected_company_option not in option_labels:
-                st.session_state.selected_company_option = option_labels[0]
-            st.selectbox(
-                "Matching companies",
-                options=option_labels,
-                key="selected_company_option",
-                label_visibility="collapsed",
-            )
-            selected_company = get_company_by_option_label(st.session_state.selected_company_option)
-            render_company_profile(selected_company)
-        else:
-            if st.session_state.company_search_query.strip():
-                st.info("No company matches found yet. Keep typing to narrow the search.")
-            else:
-                st.info(f"Search across all {len(COMPANY_DATA)} companies to view an ESG profile.")
+    st.session_state.builder_asset_choice = "Input my own assets"
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-label">Step 2</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Company Search</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Search Company ESG Profile</div>', unsafe_allow_html=True)
+    st.text_input(
+        "Search Company",
+        key="company_search_query",
+        placeholder="Type a company name, ticker, industry, or exchange",
+        label_visibility="collapsed",
+    )
+    matches = get_company_matches(st.session_state.company_search_query, limit=40)
+    option_labels = [company_option_label(c) for c in matches]
+    if option_labels:
+        if st.session_state.selected_company_option not in option_labels:
+            st.session_state.selected_company_option = option_labels[0]
+        st.selectbox(
+            "Matching companies",
+            options=option_labels,
+            key="selected_company_option",
+            label_visibility="collapsed",
+        )
+        selected_company = get_company_by_option_label(st.session_state.selected_company_option)
+        render_company_profile(selected_company)
+    else:
+        if st.session_state.company_search_query.strip():
+            st.info("No company matches found yet. Keep typing to narrow the search.")
+        else:
+            st.info(f"Search across all {len(COMPANY_DATA)} companies to view an ESG profile.")
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Step 1</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Enter Asset Assumptions</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2, gap="large")
@@ -2212,7 +2285,7 @@ def render_builder_screen() -> None:
         st.number_input(f"{asset2_value} ESG score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-label">Step 3</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Step 2</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Set Portfolio Preferences</div>', unsafe_allow_html=True)
 
     pref_left, pref_right = st.columns(2, gap="large")
