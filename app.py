@@ -1877,66 +1877,88 @@ def build_dual_frontier_display(result: dict) -> dict:
     portfolio_returns = np.array(result["portfolio_returns"], dtype=float)
     portfolio_risks = np.array(result["portfolio_risks"], dtype=float)
     portfolio_esg = np.array(result["portfolio_esg"], dtype=float)
-    weights = np.array(result["weights"], dtype=float)
 
     if portfolio_returns.size == 0 or portfolio_risks.size == 0:
         empty = np.array([], dtype=float)
         return {
-            "without_weights": empty,
-            "without_risks": empty,
-            "without_returns": empty,
-            "without_esg": empty,
-            "with_weights": empty,
-            "with_risks": empty,
-            "with_returns": empty,
-            "with_esg": empty,
+            "without_curve_risks": empty,
+            "without_curve_returns": empty,
+            "without_frontier_risks": empty,
+            "without_frontier_returns": empty,
+            "with_curve_risks": empty,
+            "with_curve_returns": empty,
+            "with_frontier_risks": empty,
+            "with_frontier_returns": empty,
             "with_performance": empty,
-            "max_sharpe_plot": (0.0, 0.0),
-            "optimal_plot": (0.0, 0.0),
+            "rf_point": (0.0, 0.0),
+            "without_tangency_point": (0.0, 0.0),
+            "with_tangency_point": (0.0, 0.0),
+            "with_tangency_idx": 0,
             "visual_gap": 0.0,
         }
 
-    without_indices = efficient_frontier_indices(portfolio_risks, portfolio_returns)
+    def upper_branch_indices(risks_arr: np.ndarray, performance_arr: np.ndarray) -> np.ndarray:
+        min_risk_idx = int(np.argmin(risks_arr))
+        left_branch = np.arange(0, min_risk_idx + 1, dtype=int)
+        right_branch = np.arange(min_risk_idx, len(risks_arr), dtype=int)
 
-    esg_preference_fraction = float(result.get("esg_preference_fraction", 0.0))
-    esg_center = 0.5 * ((result["esg_score1_input"] / 100.0) + (result["esg_score2_input"] / 100.0))
-    return_gap_fraction = abs((result["exp_return1_input"] - result["exp_return2_input"]) / 100.0)
-    performance_shift_scale = 0.09 + 0.65 * return_gap_fraction
-    with_performance_full = portfolio_returns + esg_preference_fraction * performance_shift_scale * (portfolio_esg - esg_center)
-    with_indices = efficient_frontier_indices(portfolio_risks, with_performance_full)
-    if with_indices.size == 0:
-        with_indices = without_indices.copy()
+        left_best = float(np.max(performance_arr[left_branch])) if left_branch.size > 0 else -np.inf
+        right_best = float(np.max(performance_arr[right_branch])) if right_branch.size > 0 else -np.inf
 
-    without_weights = np.array(weights[without_indices], dtype=float)
-    without_risks = np.array(portfolio_risks[without_indices] * 100.0, dtype=float)
-    without_returns = np.array(portfolio_returns[without_indices] * 100.0, dtype=float)
-    without_esg = np.array(portfolio_esg[without_indices] * 100.0, dtype=float)
+        if right_best >= left_best:
+            return right_branch
+        return left_branch[::-1]
 
-    with_weights = np.array(weights[with_indices], dtype=float)
-    with_risks = np.array(portfolio_risks[with_indices] * 100.0, dtype=float)
-    with_returns = np.array(with_performance_full[with_indices] * 100.0, dtype=float)
-    with_esg = np.array(portfolio_esg[with_indices] * 100.0, dtype=float)
+    without_curve_risks = np.array(portfolio_risks * 100.0, dtype=float)
+    without_curve_returns = np.array(portfolio_returns * 100.0, dtype=float)
+    without_indices = upper_branch_indices(portfolio_risks, portfolio_returns)
+    without_frontier_risks = np.array(without_curve_risks[without_indices], dtype=float)
+    without_frontier_returns = np.array(without_curve_returns[without_indices], dtype=float)
 
-    max_sharpe_plot = (
-        float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100.0),
-        float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100.0),
+    rf = float(result.get("risk_free_rate_input", 0.0)) / 100.0
+    esg_preference_fraction = float(np.clip(result.get("esg_preference_fraction", 0.0), 0.0, 1.0))
+    required_esg = float(result.get("required_esg", float(np.mean(portfolio_esg))))
+
+    esg_gap_fraction = abs(float(result.get("esg_score1_input", 0.0)) - float(result.get("esg_score2_input", 0.0))) / 100.0
+    return_gap_fraction = abs(float(result.get("exp_return1_input", 0.0)) - float(result.get("exp_return2_input", 0.0))) / 100.0
+    adjustment_scale = 0.18 + 0.72 * esg_gap_fraction + 0.48 * return_gap_fraction
+    with_performance_full = portfolio_returns + esg_preference_fraction * adjustment_scale * (portfolio_esg - required_esg)
+
+    with_curve_risks = np.array(portfolio_risks * 100.0, dtype=float)
+    with_curve_returns = np.array(with_performance_full * 100.0, dtype=float)
+    with_indices = upper_branch_indices(portfolio_risks, with_performance_full)
+    with_frontier_risks = np.array(with_curve_risks[with_indices], dtype=float)
+    with_frontier_returns = np.array(with_curve_returns[with_indices], dtype=float)
+
+    with_sharpes = np.where(portfolio_risks > 1e-12, (with_performance_full - rf) / portfolio_risks, -np.inf)
+    with_tangency_idx = int(np.argmax(with_sharpes))
+
+    without_tangency_point = (
+        float(without_curve_risks[result["max_sharpe_idx"]]),
+        float(without_curve_returns[result["max_sharpe_idx"]]),
     )
-    optimal_plot = (
-        float(result["portfolio_risks"][result["optimal_idx"]] * 100.0),
-        float(with_performance_full[result["optimal_idx"]] * 100.0),
+    with_tangency_point = (
+        float(with_curve_risks[with_tangency_idx]),
+        float(with_curve_returns[with_tangency_idx]),
     )
 
-    comparison_count = min(len(without_risks), len(with_risks))
+    comparison_count = min(len(without_frontier_risks), len(with_frontier_risks))
     if comparison_count > 0:
-        without_sample_idx = np.linspace(0, len(without_risks) - 1, comparison_count).astype(int)
-        with_sample_idx = np.linspace(0, len(with_risks) - 1, comparison_count).astype(int)
-        risk_span = max(float(np.max(without_risks) - np.min(without_risks)), 1e-9)
-        return_span = max(float(np.max(without_returns) - np.min(without_returns)), 1e-9)
+        without_sample_idx = np.linspace(0, len(without_frontier_risks) - 1, comparison_count).astype(int)
+        with_sample_idx = np.linspace(0, len(with_frontier_risks) - 1, comparison_count).astype(int)
+        risk_span = max(float(np.max(without_frontier_risks) - np.min(without_frontier_risks)), 1e-9)
+        return_span = max(
+            float(
+                max(np.max(without_frontier_returns), np.max(with_frontier_returns))
+                - min(np.min(without_frontier_returns), np.min(with_frontier_returns))
+            ),
+            1e-9,
+        )
         visual_gap = float(
             np.mean(
                 np.sqrt(
-                    ((with_risks[with_sample_idx] - without_risks[without_sample_idx]) / risk_span) ** 2
-                    + ((with_returns[with_sample_idx] - without_returns[without_sample_idx]) / return_span) ** 2
+                    ((with_frontier_risks[with_sample_idx] - without_frontier_risks[without_sample_idx]) / risk_span) ** 2
+                    + ((with_frontier_returns[with_sample_idx] - without_frontier_returns[without_sample_idx]) / return_span) ** 2
                 )
             )
         )
@@ -1944,17 +1966,19 @@ def build_dual_frontier_display(result: dict) -> dict:
         visual_gap = 0.0
 
     return {
-        "without_weights": without_weights,
-        "without_risks": without_risks,
-        "without_returns": without_returns,
-        "without_esg": without_esg,
-        "with_weights": with_weights,
-        "with_risks": with_risks,
-        "with_returns": with_returns,
-        "with_esg": with_esg,
+        "without_curve_risks": without_curve_risks,
+        "without_curve_returns": without_curve_returns,
+        "without_frontier_risks": without_frontier_risks,
+        "without_frontier_returns": without_frontier_returns,
+        "with_curve_risks": with_curve_risks,
+        "with_curve_returns": with_curve_returns,
+        "with_frontier_risks": with_frontier_risks,
+        "with_frontier_returns": with_frontier_returns,
         "with_performance": np.array(with_performance_full * 100.0, dtype=float),
-        "max_sharpe_plot": max_sharpe_plot,
-        "optimal_plot": optimal_plot,
+        "rf_point": (0.0, float(rf * 100.0)),
+        "without_tangency_point": without_tangency_point,
+        "with_tangency_point": with_tangency_point,
+        "with_tangency_idx": with_tangency_idx,
         "visual_gap": visual_gap,
     }
 
@@ -1962,10 +1986,12 @@ def build_dual_frontier_display(result: dict) -> dict:
 def build_frontier_interpretation(result: dict) -> str:
     frontier_display = build_dual_frontier_display(result)
 
-    without_risks = frontier_display["without_risks"]
-    without_returns = frontier_display["without_returns"]
-    with_risks = frontier_display["with_risks"]
-    with_returns = frontier_display["with_returns"]
+    without_frontier_risks = frontier_display["without_frontier_risks"]
+    without_frontier_returns = frontier_display["without_frontier_returns"]
+    with_frontier_risks = frontier_display["with_frontier_risks"]
+    with_frontier_returns = frontier_display["with_frontier_returns"]
+    without_tangency_risk, without_tangency_return = frontier_display["without_tangency_point"]
+    with_tangency_risk, with_tangency_return = frontier_display["with_tangency_point"]
 
     def frontier_span_text(risks_arr: np.ndarray, returns_arr: np.ndarray) -> str:
         if len(risks_arr) == 0 or len(returns_arr) == 0:
@@ -1975,43 +2001,42 @@ def build_frontier_interpretation(result: dict) -> str:
             f"{float(np.min(returns_arr)):.2f}% to {float(np.max(returns_arr)):.2f}% portfolio performance"
         )
 
-    max_sharpe_risk = float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100.0)
-    max_sharpe_return = float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100.0)
     optimal_risk = float(result["opt_risk"] * 100.0)
     optimal_return = float(result["opt_return"] * 100.0)
     optimal_esg = float(result["opt_esg"] * 100.0)
     required_esg = float(result["required_esg"] * 100.0)
-
-    risk_change = optimal_risk - max_sharpe_risk
-    return_change = optimal_return - max_sharpe_return
     visual_gap = float(frontier_display.get("visual_gap", 0.0))
 
-    if return_change >= 0.15 and risk_change <= 0.15:
-        tradeoff_sentence = "The ESG-aware path is preserving a strong traditional investment profile while still improving sustainability alignment."
-    elif return_change >= 0.0 and risk_change > 0.15:
-        tradeoff_sentence = "The ESG-aware path is reaching for more upside, but investors are accepting a visibly higher level of portfolio risk to keep that stronger sustainability tilt."
-    elif return_change < 0.0 and risk_change <= 0.0:
-        tradeoff_sentence = "The ESG-aware path is behaving more defensively, with a lower expected return profile but a steadier risk posture and a stronger sustainability emphasis."
-    else:
-        tradeoff_sentence = "The ESG-aware path is changing the usual risk-return balance to keep the portfolio more aligned with ESG priorities."
+    tangency_gap = with_tangency_return - without_tangency_return
+    risk_gap = with_tangency_risk - without_tangency_risk
 
-    if visual_gap >= 0.22:
-        gap_sentence = "The two frontiers are now clearly separated, so the current ESG preference is materially changing the portfolio opportunity set shown on the chart."
-    elif visual_gap >= 0.10:
-        gap_sentence = "The ESG setting is creating a visible gap between the two frontiers, which means the sustainability preference is influencing the shape of the chart in a noticeable way."
+    if tangency_gap >= 0.10 and risk_gap <= 0.10:
+        tradeoff_sentence = "The ESG-adjusted tangency view is holding up well against the purely financial tangency point, so the sustainability preference is not materially weakening the headline opportunity."
+    elif tangency_gap < 0.0 and risk_gap <= 0.10:
+        tradeoff_sentence = "The ESG-adjusted tangency view is accepting some performance give-up in exchange for stronger sustainability alignment, while the risk profile remains close to the non-ESG case."
+    elif tangency_gap < 0.0 and risk_gap > 0.10:
+        tradeoff_sentence = "The ESG-adjusted tangency view is clearly shifting the opportunity set, with lower performance and higher risk than the non-ESG tangency point under the current assumptions."
     else:
-        gap_sentence = "The two frontiers remain relatively close together, which means the ESG preference is refining the decision rather than radically changing the opportunity set."
+        tradeoff_sentence = "The ESG-adjusted tangency view is changing the portfolio trade-off in a visible way, so investors should read the two frontier paths together rather than focusing on one point alone."
+
+    if visual_gap >= 0.18:
+        gap_sentence = "The two frontiers are now visibly separated, so the ESG input is meaningfully changing the chart."
+    elif visual_gap >= 0.08:
+        gap_sentence = "The two frontiers are moderately separated, which means the ESG input is having a noticeable but not extreme effect."
+    else:
+        gap_sentence = "The two frontiers remain fairly close, so the ESG input is refining the result more than transforming it."
 
     return f"""
     <div class="interpretation-card">
         <p class="interpretation-title">Portfolio Analysis</p>
         <p class="interpretation-subtitle">This section updates live as the inputs and efficient frontiers change.</p>
         <div class="interpretation-divider"></div>
-        <p class="interpretation-copy"><strong>Frontier without ESG consideration:</strong> the purely financial frontier currently spans {frontier_span_text(without_risks, without_returns)}.</p>
-        <p class="interpretation-copy"><strong>Frontier with ESG consideration:</strong> the ESG-aware frontier currently spans {frontier_span_text(with_risks, with_returns)}. This green frontier updates as the ESG preference changes, so it adapts live with the user’s input.</p>
-        <p class="interpretation-copy"><strong>Current portfolio positioning:</strong> the Max Sharpe Ratio portfolio is at {max_sharpe_return:.2f}% expected return and {max_sharpe_risk:.2f}% risk, while the ESG-aware recommendation is at {optimal_return:.2f}% expected return, {optimal_risk:.2f}% risk, and {optimal_esg:.2f}/100 ESG against a current target of {required_esg:.2f}/100. {tradeoff_sentence} {gap_sentence}</p>
+        <p class="interpretation-copy"><strong>Without ESG:</strong> the traditional mean-variance frontier currently spans {frontier_span_text(without_frontier_risks, without_frontier_returns)}, and its tangency portfolio sits at {without_tangency_return:.2f}% portfolio performance with {without_tangency_risk:.2f}% risk.</p>
+        <p class="interpretation-copy"><strong>With given ESG:</strong> the ESG-adjusted mean-variance frontier currently spans {frontier_span_text(with_frontier_risks, with_frontier_returns)}, and its tangency portfolio sits at {with_tangency_return:.2f}% portfolio performance with {with_tangency_risk:.2f}% risk. {tradeoff_sentence} {gap_sentence}</p>
+        <p class="interpretation-copy"><strong>Live recommendation:</strong> the recommendation panel still reflects the current ESG-aware optimum from your input settings, which is {optimal_return:.2f}% expected return, {optimal_risk:.2f}% risk, and {optimal_esg:.2f}/100 ESG against a current target of {required_esg:.2f}/100.</p>
     </div>
     """
+
 
 
 # -------------------------------------------------
@@ -2272,6 +2297,7 @@ def compute_builder_result(
         "esg_score1_input": float(esg_score1),
         "esg_score2_input": float(esg_score2),
         "correlation": float(correlation),
+        "risk_free_rate_input": float(risk_free_rate),
         "esg_preference_fraction": esg_preference_fraction,
         "weights": weights,
         "portfolio_returns": portfolio_returns,
@@ -2490,9 +2516,6 @@ def render_builder_popup() -> None:
                 st.button("Close", key="close_builder_popup_btn", use_container_width=True, on_click=hide_builder_popup)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            st.markdown(allocation_summary_html(result["asset1"], result["opt_w1"], result["asset2"], result["opt_w2"]), unsafe_allow_html=True)
-
-            st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
 
             metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
             with metric_c1:
@@ -2514,123 +2537,158 @@ def render_builder_popup() -> None:
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
 
-            fig, ax = plt.subplots(figsize=(9.4, 5.3), dpi=180, constrained_layout=True)
+            fig, ax = plt.subplots(figsize=(9.6, 5.6), dpi=180, constrained_layout=True)
             fig.patch.set_facecolor("white")
 
             frontier_display = build_dual_frontier_display(result)
-            without_frontier_risks = frontier_display["without_risks"]
-            without_frontier_returns = frontier_display["without_returns"]
-            with_frontier_risks = frontier_display["with_risks"]
-            with_frontier_returns = frontier_display["with_returns"]
+            without_curve_risks = frontier_display["without_curve_risks"]
+            without_curve_returns = frontier_display["without_curve_returns"]
+            without_frontier_risks = frontier_display["without_frontier_risks"]
+            without_frontier_returns = frontier_display["without_frontier_returns"]
+            with_curve_risks = frontier_display["with_curve_risks"]
+            with_curve_returns = frontier_display["with_curve_returns"]
+            with_frontier_risks = frontier_display["with_frontier_risks"]
+            with_frontier_returns = frontier_display["with_frontier_returns"]
+            rf_x, rf_y = frontier_display["rf_point"]
+            without_tangency_x, without_tangency_y = frontier_display["without_tangency_point"]
+            with_tangency_x, with_tangency_y = frontier_display["with_tangency_point"]
 
+            if len(without_curve_risks) > 0:
+                ax.plot(
+                    without_curve_risks,
+                    without_curve_returns,
+                    linewidth=1.8,
+                    color="#60a5fa",
+                    alpha=0.55,
+                    zorder=1,
+                )
             if len(without_frontier_risks) > 0:
                 ax.plot(
                     without_frontier_risks,
                     without_frontier_returns,
-                    linestyle="--",
-                    linewidth=2.8,
-                    color="#64748b",
-                    zorder=2,
-                    label="Frontier Without ESG Consideration",
+                    linewidth=2.6,
+                    color="#2563eb",
+                    zorder=3,
                 )
 
+            if len(with_curve_risks) > 0:
+                ax.plot(
+                    with_curve_risks,
+                    with_curve_returns,
+                    linewidth=1.8,
+                    color="#86efac",
+                    alpha=0.58,
+                    zorder=1,
+                )
             if len(with_frontier_risks) > 0:
                 ax.plot(
                     with_frontier_risks,
                     with_frontier_returns,
-                    linestyle="-",
-                    linewidth=3.0,
+                    linewidth=2.7,
                     color="#16a34a",
-                    zorder=3,
-                    label="Frontier With ESG Consideration",
+                    zorder=4,
                 )
 
-            max_sharpe_x, max_sharpe_y = frontier_display["max_sharpe_plot"]
-            optimal_x, optimal_y = frontier_display["optimal_plot"]
+            ax.plot(
+                [rf_x, without_tangency_x],
+                [rf_y, without_tangency_y],
+                linestyle=(0, (3, 3)),
+                linewidth=1.8,
+                color="#2563eb",
+                alpha=0.9,
+                zorder=2,
+            )
+            ax.plot(
+                [rf_x, with_tangency_x],
+                [rf_y, with_tangency_y],
+                linestyle=(0, (3, 3)),
+                linewidth=1.8,
+                color="#14b8a6",
+                alpha=0.9,
+                zorder=2,
+            )
 
+            ax.scatter(rf_x, rf_y, s=38, color="#94a3b8", edgecolors="white", linewidths=0.8, zorder=5)
             ax.scatter(
-                max_sharpe_x,
-                max_sharpe_y,
-                marker="*",
-                s=260,
-                color="#166534",
+                without_tangency_x,
+                without_tangency_y,
+                s=84,
+                color="#2563eb",
                 edgecolors="white",
-                linewidths=0.9,
-                label="Max Sharpe Ratio",
-                zorder=5,
+                linewidths=1.0,
+                zorder=6,
             )
             ax.scatter(
-                optimal_x,
-                optimal_y,
-                marker="X",
-                s=200,
-                color="#0f172a",
+                with_tangency_x,
+                with_tangency_y,
+                s=84,
+                color="#16a34a",
                 edgecolors="white",
-                linewidths=0.8,
-                label="Optimal ESG-aware",
+                linewidths=1.0,
                 zorder=6,
             )
 
             if len(without_frontier_risks) > 0:
-                without_label_pos = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.34)))
+                without_label_idx = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.58)))
                 ax.annotate(
-                    "Frontier Without\nESG Consideration",
-                    (without_frontier_risks[without_label_pos], without_frontier_returns[without_label_pos]),
-                    xytext=(-124, 20),
+                    "Mean-Variance Frontier\n(Without ESG)",
+                    (without_frontier_risks[without_label_idx], without_frontier_returns[without_label_idx]),
+                    xytext=(26, 18),
                     textcoords="offset points",
-                    fontsize=8.4,
-                    color="#475569",
+                    fontsize=8.6,
+                    color="#1d4ed8",
                     weight="bold",
-                    bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#cbd5e1", alpha=0.98),
-                    arrowprops=dict(arrowstyle="-", color="#64748b", lw=1.15, alpha=0.95),
+                    bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bfdbfe", alpha=0.98),
+                    arrowprops=dict(arrowstyle="-", color="#2563eb", lw=1.05, alpha=0.95),
                 )
 
             if len(with_frontier_risks) > 0:
-                with_label_pos = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.64)))
+                with_label_idx = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.68)))
                 ax.annotate(
-                    "Frontier With\nESG Consideration",
-                    (with_frontier_risks[with_label_pos], with_frontier_returns[with_label_pos]),
-                    xytext=(18, 18),
+                    "Mean-Variance Frontier\n(With Given ESG)",
+                    (with_frontier_risks[with_label_idx], with_frontier_returns[with_label_idx]),
+                    xytext=(20, -34),
                     textcoords="offset points",
-                    fontsize=8.4,
+                    fontsize=8.6,
                     color="#15803d",
                     weight="bold",
-                    bbox=dict(boxstyle="round,pad=0.32", fc="white", ec="#bbf7d0", alpha=0.98),
-                    arrowprops=dict(arrowstyle="-", color="#16a34a", lw=1.15, alpha=0.95),
+                    bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bbf7d0", alpha=0.98),
+                    arrowprops=dict(arrowstyle="-", color="#16a34a", lw=1.05, alpha=0.95),
                 )
 
             ax.annotate(
-                "Max Sharpe Ratio",
-                (max_sharpe_x, max_sharpe_y),
-                xytext=(-92, 12),
+                "Tangency Portfolio\n(Without ESG)",
+                (without_tangency_x, without_tangency_y),
+                xytext=(-118, 12),
                 textcoords="offset points",
-                fontsize=8.4,
-                color="#166534",
+                fontsize=8.5,
+                color="#1d4ed8",
                 weight="bold",
-                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
-                arrowprops=dict(arrowstyle="-", color="#166534", lw=1.0, alpha=0.9),
+                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bfdbfe", alpha=0.98),
+                arrowprops=dict(arrowstyle="->", color="#2563eb", lw=1.0, alpha=0.9),
             )
             ax.annotate(
-                "Optimal ESG-aware",
-                (optimal_x, optimal_y),
-                xytext=(14, -28),
+                "Tangency Portfolio\n(With Given ESG)",
+                (with_tangency_x, with_tangency_y),
+                xytext=(12, -34),
                 textcoords="offset points",
-                fontsize=8.4,
-                color="#0f172a",
+                fontsize=8.5,
+                color="#15803d",
                 weight="bold",
-                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#cbd5e1", alpha=0.98),
-                arrowprops=dict(arrowstyle="-", color="#0f172a", lw=1.0, alpha=0.9),
+                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
+                arrowprops=dict(arrowstyle="->", color="#16a34a", lw=1.0, alpha=0.9),
             )
 
+            all_x = np.concatenate([without_curve_risks, with_curve_risks, np.array([rf_x])]) if len(without_curve_risks) + len(with_curve_risks) > 0 else np.array([0.0])
+            all_y = np.concatenate([without_curve_returns, with_curve_returns, np.array([rf_y])]) if len(without_curve_returns) + len(with_curve_returns) > 0 else np.array([0.0])
+            x_span = max(float(np.max(all_x) - np.min(all_x)), 1.0)
+            y_span = max(float(np.max(all_y) - np.min(all_y)), 1.0)
+            ax.set_xlim(left=0.0, right=float(np.max(all_x) + 0.07 * x_span))
+            ax.set_ylim(bottom=float(min(rf_y, np.min(all_y)) - 0.08 * y_span), top=float(np.max(all_y) + 0.08 * y_span))
             ax.set_xlabel("Portfolio Risk (%)")
             ax.set_ylabel("Portfolio Performance (%)")
             ax.set_title("Efficient Frontiers")
-            ax.margins(x=0.10, y=0.12)
             style_modern_axes(ax)
-            legend = ax.legend(loc="upper right", frameon=True, fontsize=8.4)
-            legend.get_frame().set_facecolor("white")
-            legend.get_frame().set_edgecolor("#d7e8dc")
-            legend.get_frame().set_alpha(0.96)
             st.pyplot(fig)
             plt.close(fig)
             st.markdown(build_frontier_interpretation(result), unsafe_allow_html=True)
