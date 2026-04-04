@@ -1076,6 +1076,33 @@ def inject_css() -> None:
                 margin-bottom: 0.2rem;
             }
 
+            .interpretation-card {
+                background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(246,255,249,0.95));
+                border: 1px solid rgba(22,101,52,0.10);
+                border-radius: 18px;
+                padding: 1rem 1.08rem;
+                box-shadow: 0 10px 24px rgba(20,83,45,0.06);
+                margin-top: 0.45rem;
+            }
+
+            .interpretation-title {
+                color: #0b1c15;
+                font-size: 0.98rem;
+                font-weight: 850;
+                margin: 0 0 0.45rem 0;
+            }
+
+            .interpretation-copy {
+                color: #2f4f43;
+                font-size: 0.91rem;
+                line-height: 1.65;
+                margin: 0;
+            }
+
+            .interpretation-copy + .interpretation-copy {
+                margin-top: 0.55rem;
+            }
+
             .section-divider {
                 height: 1px;
                 background: rgba(22,101,52,0.10);
@@ -1635,6 +1662,70 @@ def build_frontier_plot_arrays(
             point_lookup[int(idx)] = (float(plotted_risks[pos]), float(plotted_returns[pos]))
 
     return plotted_risks, plotted_returns, point_lookup
+
+
+def build_frontier_interpretation(result: dict) -> str:
+    def signed_points(value: float) -> str:
+        if value > 1e-9:
+            return f"+{value:.2f} percentage points"
+        if value < -1e-9:
+            return f"{value:.2f} percentage points"
+        return "0.00 percentage points"
+
+    def risk_return_summary(indices: np.ndarray) -> tuple[float, float, float, float]:
+        if len(indices) == 0:
+            return 0.0, 0.0, 0.0, 0.0
+        frontier_risks = result["portfolio_risks"][indices] * 100
+        frontier_returns = result["portfolio_returns"][indices] * 100
+        min_risk = float(np.min(frontier_risks))
+        return_at_min_risk = float(frontier_returns[int(np.argmin(frontier_risks))])
+        max_return = float(np.max(frontier_returns))
+        risk_at_max_return = float(frontier_risks[int(np.argmax(frontier_returns))])
+        return min_risk, return_at_min_risk, risk_at_max_return, max_return
+
+    without_indices = result["efficient_idx_without_esg_full"]
+    with_indices = result["efficient_idx_with_esg"]
+
+    without_min_risk, without_min_risk_return, without_max_return_risk, without_max_return = risk_return_summary(without_indices)
+    with_min_risk, with_min_risk_return, with_max_return_risk, with_max_return = risk_return_summary(with_indices)
+
+    max_sharpe_risk = float(result["portfolio_risks"][result["max_sharpe_idx"]] * 100)
+    max_sharpe_return = float(result["portfolio_returns"][result["max_sharpe_idx"]] * 100)
+    optimal_risk = float(result["opt_risk"] * 100)
+    optimal_return = float(result["opt_return"] * 100)
+    optimal_esg = float(result["opt_esg"] * 100)
+    required_esg = float(result["required_esg"] * 100)
+
+    risk_change = optimal_risk - max_sharpe_risk
+    return_change = optimal_return - max_sharpe_return
+    overlap_ratio = float(result.get("frontier_overlap_ratio", 0.0))
+
+    if abs(risk_change) < 0.15 and abs(return_change) < 0.15:
+        tradeoff_sentence = "At the current settings, the ESG-aware solution sits very close to the max Sharpe Ratio point, so investors are achieving a stronger sustainability tilt with only a very small change in the traditional risk-return balance."
+    elif return_change >= 0 and risk_change <= 0:
+        tradeoff_sentence = "At the current settings, the ESG-aware solution improves sustainability while also moving toward a more attractive risk-return trade-off, with higher expected return and lower overall risk than the max Sharpe Ratio portfolio."
+    elif return_change >= 0 and risk_change > 0:
+        tradeoff_sentence = "At the current settings, the ESG-aware solution moves up the opportunity set: investors are taking on more portfolio risk in exchange for higher expected return and a stronger sustainability profile."
+    elif return_change < 0 and risk_change <= 0:
+        tradeoff_sentence = "At the current settings, the ESG-aware solution becomes more defensive: investors are sacrificing some expected return in exchange for lower portfolio risk and a stronger sustainability profile."
+    else:
+        tradeoff_sentence = "At the current settings, the ESG-aware solution reflects a stricter sustainability preference, so investors are accepting some extra risk and some lower expected return in order to keep the portfolio aligned with ESG priorities."
+
+    if overlap_ratio >= 0.80:
+        frontier_gap_sentence = "The two frontiers are still relatively close together, which means the present ESG setting is influencing the final portfolio choice more than it is widening the overall opportunity set."
+    elif overlap_ratio >= 0.40:
+        frontier_gap_sentence = "The two frontiers are meaningfully separated, showing that the ESG setting is filtering the opportunity set and changing which portfolios remain attractive to an investor."
+    else:
+        frontier_gap_sentence = "The gap between the two frontiers is pronounced, which means the current ESG requirement is materially reshaping the set of efficient portfolios available to the investor."
+
+    return f"""
+    <div class="interpretation-card">
+        <p class="interpretation-title">Interpretation For Investors</p>
+        <p class="interpretation-copy">The frontier without ESG shows the strongest return available at each level of risk when the portfolio is optimised on traditional mean-variance terms alone. With the current inputs, that frontier starts at roughly {without_min_risk:.2f}% risk for {without_min_risk_return:.2f}% expected return and extends to about {without_max_return_risk:.2f}% risk for {without_max_return:.2f}% expected return.</p>
+        <p class="interpretation-copy">The ESG-aware frontier reflects your live sustainability preference. Right now, the portfolio is being steered toward a minimum ESG level of {required_esg:.2f}/100. The selected ESG-aware portfolio is delivering {optimal_return:.2f}% expected return at {optimal_risk:.2f}% risk with an ESG score of {optimal_esg:.2f}/100, which is {signed_points(return_change)} in expected return and {signed_points(risk_change)} in risk relative to the max Sharpe Ratio portfolio.</p>
+        <p class="interpretation-copy">{tradeoff_sentence} {frontier_gap_sentence}</p>
+    </div>
+    """
 
 
 # -------------------------------------------------
@@ -2293,14 +2384,7 @@ def render_builder_popup() -> None:
             legend.get_frame().set_alpha(0.96)
             st.pyplot(fig)
             plt.close(fig)
-            st.markdown(
-                f"""
-                <div class="tool-note">
-                    The chart now shows a standard efficient frontier and a separate ESG frontier. The ESG frontier reflects the current ESG setting and requirement of at least {result["required_esg"] * 100:.1f}/100 while keeping both curves clearly distinguishable.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown(build_frontier_interpretation(result), unsafe_allow_html=True)
 
 
 
@@ -2479,15 +2563,17 @@ def render_builder_screen() -> None:
 
     col1, col2 = st.columns(2, gap="large")
     with col1:
-        asset1_value = st.text_input("Asset 1 name", key="builder_asset1")
-        st.number_input(f"{asset1_value} expected return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return1")
-        st.number_input(f"{asset1_value} standard deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev1")
-        st.number_input(f"{asset1_value} ESG score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score1")
+        asset1_value = st.text_input("Asset 1 Name", key="builder_asset1")
+        asset1_name_prefix = asset1_value.strip() if asset1_value.strip() else "Asset 1"
+        st.number_input(f"{asset1_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return1")
+        st.number_input(f"{asset1_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev1")
+        st.number_input(f"{asset1_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score1")
     with col2:
-        asset2_value = st.text_input("Asset 2 name", key="builder_asset2")
-        st.number_input(f"{asset2_value} expected return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return2")
-        st.number_input(f"{asset2_value} standard deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev2")
-        st.number_input(f"{asset2_value} ESG score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
+        asset2_value = st.text_input("Asset 2 Name", key="builder_asset2")
+        asset2_name_prefix = asset2_value.strip() if asset2_value.strip() else "Asset 2"
+        st.number_input(f"{asset2_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return2")
+        st.number_input(f"{asset2_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev2")
+        st.number_input(f"{asset2_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Step 2</div>', unsafe_allow_html=True)
