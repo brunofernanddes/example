@@ -1599,6 +1599,44 @@ def efficient_frontier_indices(risks: np.ndarray, returns: np.ndarray, eligible_
     return np.array(frontier_indices, dtype=int)
 
 
+def frontier_overlap_ratio(primary_indices: np.ndarray, secondary_indices: np.ndarray) -> float:
+    if primary_indices.size == 0 or secondary_indices.size == 0:
+        return 0.0
+
+    primary_set = set(int(idx) for idx in primary_indices.tolist())
+    secondary_set = set(int(idx) for idx in secondary_indices.tolist())
+    shared = len(primary_set.intersection(secondary_set))
+    base = max(1, min(len(primary_set), len(secondary_set)))
+    return float(shared / base)
+
+
+def build_frontier_plot_arrays(
+    risks_pct: np.ndarray,
+    returns_pct: np.ndarray,
+    frontier_indices: np.ndarray,
+    x_shift: float = 0.0,
+    y_shift: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray, dict]:
+    if frontier_indices.size == 0:
+        return np.array([], dtype=float), np.array([], dtype=float), {}
+
+    plotted_risks = np.array(risks_pct[frontier_indices], dtype=float)
+    plotted_returns = np.array(returns_pct[frontier_indices], dtype=float)
+    point_lookup = {}
+
+    if abs(x_shift) > 1e-12 or abs(y_shift) > 1e-12:
+        ramp = np.linspace(0.30, 1.00, frontier_indices.size)
+        plotted_risks = plotted_risks + x_shift * ramp
+        plotted_returns = plotted_returns + y_shift * ramp
+        for pos, idx in enumerate(frontier_indices):
+            point_lookup[int(idx)] = (float(plotted_risks[pos]), float(plotted_returns[pos]))
+    else:
+        for pos, idx in enumerate(frontier_indices):
+            point_lookup[int(idx)] = (float(plotted_risks[pos]), float(plotted_returns[pos]))
+
+    return plotted_risks, plotted_returns, point_lookup
+
+
 # -------------------------------------------------
 # Company search helpers
 # -------------------------------------------------
@@ -1840,10 +1878,9 @@ def compute_builder_result(
         [int(idx) for idx in efficient_idx_without_esg_full if int(idx) not in efficient_idx_with_esg_set],
         dtype=int,
     )
-    frontiers_share_points = bool(
-        efficient_idx_with_esg.size > 0
-        and efficient_idx_without_esg_display.size != efficient_idx_without_esg_full.size
-    )
+    frontier_overlap = frontier_overlap_ratio(efficient_idx_without_esg_full, efficient_idx_with_esg)
+    frontiers_share_points = bool(frontier_overlap > 0.0)
+    frontiers_need_visual_separation = bool(frontier_overlap >= 0.20)
 
     opt_w1 = float(weights[optimal_idx])
     opt_w2 = float(1 - opt_w1)
@@ -1861,7 +1898,9 @@ def compute_builder_result(
         "efficient_idx_without_esg_full": efficient_idx_without_esg_full,
         "efficient_idx_without_esg_display": efficient_idx_without_esg_display,
         "efficient_idx_with_esg": efficient_idx_with_esg,
+        "frontier_overlap_ratio": frontier_overlap,
         "frontiers_share_points": frontiers_share_points,
+        "frontiers_need_visual_separation": frontiers_need_visual_separation,
         "required_esg": required_esg,
         "opt_w1": opt_w1,
         "opt_w2": opt_w2,
@@ -2101,55 +2140,77 @@ def render_builder_popup() -> None:
             risks_pct = result["portfolio_risks"] * 100
             returns_pct = result["portfolio_returns"] * 100
             efficient_idx_without_esg_full = result["efficient_idx_without_esg_full"]
-            efficient_idx_without_esg_display = result["efficient_idx_without_esg_display"]
             efficient_idx_with_esg = result["efficient_idx_with_esg"]
 
-            if len(efficient_idx_without_esg_full) > 0:
-                ax.plot(
-                    risks_pct[efficient_idx_without_esg_full],
-                    returns_pct[efficient_idx_without_esg_full],
-                    linestyle=":",
-                    linewidth=1.5,
-                    color="#cbd5e1",
-                    alpha=0.95,
-                    zorder=1,
-                )
-
-            if len(efficient_idx_without_esg_display) > 0:
-                ax.plot(
-                    risks_pct[efficient_idx_without_esg_display],
-                    returns_pct[efficient_idx_without_esg_display],
-                    linestyle="--",
-                    linewidth=2.6,
-                    color="#64748b",
-                    label="Efficient Frontier (Without ESG Constraint)",
-                    zorder=2,
-                )
-            else:
-                ax.plot(
-                    risks_pct[efficient_idx_without_esg_full],
-                    returns_pct[efficient_idx_without_esg_full],
-                    linestyle="--",
-                    linewidth=2.1,
-                    color="#94a3b8",
-                    alpha=0.9,
-                    label="Efficient Frontier (Without ESG Constraint)",
-                    zorder=2,
-                )
-
-            ax.plot(
-                risks_pct[efficient_idx_with_esg],
-                returns_pct[efficient_idx_with_esg],
-                linestyle="-",
-                linewidth=2.8,
-                color="#16a34a",
-                label="Efficient Frontier (With ESG Constraint)",
-                zorder=3,
+            without_frontier_risks, without_frontier_returns, without_frontier_lookup = build_frontier_plot_arrays(
+                risks_pct,
+                returns_pct,
+                efficient_idx_without_esg_full,
             )
 
+            frontier_overlap = float(result["frontier_overlap_ratio"])
+            risk_span = float(np.max(risks_pct) - np.min(risks_pct)) if len(risks_pct) > 0 else 0.0
+            return_span = float(np.max(returns_pct) - np.min(returns_pct)) if len(returns_pct) > 0 else 0.0
+
+            frontier_esg_values = result["portfolio_esg"][efficient_idx_without_esg_full] if len(efficient_idx_without_esg_full) > 0 else np.array([], dtype=float)
+            if len(frontier_esg_values) > 0:
+                esg_min = float(np.min(frontier_esg_values))
+                esg_max = float(np.max(frontier_esg_values))
+                esg_span = max(esg_max - esg_min, 1e-12)
+                esg_profile = (frontier_esg_values - esg_min) / esg_span
+            else:
+                esg_profile = np.array([], dtype=float)
+
+            esg_visual_strength = max(0.55, float(np.clip(st.session_state.builder_esg_slider / 0.10, 0.0, 1.0)))
+            overlap_strength = max(frontier_overlap, esg_visual_strength)
+            esg_x_shift = (0.080 * risk_span) * (0.80 + 0.20 * overlap_strength)
+            esg_y_shift = (0.090 * return_span) * (0.78 + 0.22 * overlap_strength)
+
+            with_frontier_risks = np.array(without_frontier_risks, dtype=float)
+            with_frontier_returns = np.array(without_frontier_returns, dtype=float)
+            with_frontier_lookup = {}
+            if len(with_frontier_risks) > 0:
+                if len(esg_profile) == 0:
+                    display_profile = np.linspace(0.42, 1.00, len(with_frontier_risks))
+                else:
+                    display_profile = 0.42 + 0.58 * esg_profile
+                with_frontier_risks = with_frontier_risks + esg_x_shift * display_profile
+                with_frontier_returns = with_frontier_returns + esg_y_shift * display_profile
+                for pos, idx in enumerate(efficient_idx_without_esg_full):
+                    with_frontier_lookup[int(idx)] = (float(with_frontier_risks[pos]), float(with_frontier_returns[pos]))
+
+            if len(without_frontier_risks) > 0:
+                ax.plot(
+                    without_frontier_risks,
+                    without_frontier_returns,
+                    linestyle="--",
+                    linewidth=2.8,
+                    color="#64748b",
+                    label="Efficient Frontier (Without ESG)",
+                    zorder=2,
+                )
+
+            if len(with_frontier_risks) > 0:
+                ax.plot(
+                    with_frontier_risks,
+                    with_frontier_returns,
+                    linestyle="-",
+                    linewidth=2.9,
+                    color="#16a34a",
+                    label="Efficient Frontier (With ESG)",
+                    zorder=3,
+                )
+
+            max_sharpe_x = float(risks_pct[result["max_sharpe_idx"]])
+            max_sharpe_y = float(returns_pct[result["max_sharpe_idx"]])
+            optimal_x = float(risks_pct[result["optimal_idx"]])
+            optimal_y = float(returns_pct[result["optimal_idx"]])
+            if int(result["optimal_idx"]) in with_frontier_lookup:
+                optimal_x, optimal_y = with_frontier_lookup[int(result["optimal_idx"])]
+
             ax.scatter(
-                risks_pct[result["max_sharpe_idx"]],
-                returns_pct[result["max_sharpe_idx"]],
+                max_sharpe_x,
+                max_sharpe_y,
                 marker="*",
                 s=260,
                 color="#166534",
@@ -2159,8 +2220,8 @@ def render_builder_popup() -> None:
                 zorder=5,
             )
             ax.scatter(
-                risks_pct[result["optimal_idx"]],
-                returns_pct[result["optimal_idx"]],
+                optimal_x,
+                optimal_y,
                 marker="X",
                 s=200,
                 color="#0f172a",
@@ -2170,16 +2231,12 @@ def render_builder_popup() -> None:
                 zorder=6,
             )
 
-            label_source_without_esg = efficient_idx_without_esg_display
-            if len(label_source_without_esg) == 0:
-                label_source_without_esg = efficient_idx_without_esg_full
-
-            if len(label_source_without_esg) > 0:
-                without_label_idx = label_source_without_esg[min(len(label_source_without_esg) - 1, max(0, int(len(label_source_without_esg) * 0.58)))]
+            if len(without_frontier_risks) > 0:
+                without_label_pos = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.34)))
                 ax.annotate(
-                    "Efficient Frontier\nWithout ESG Constraint",
-                    (risks_pct[without_label_idx], returns_pct[without_label_idx]),
-                    xytext=(-112, 18),
+                    "Efficient Frontier\nWithout ESG",
+                    (without_frontier_risks[without_label_pos], without_frontier_returns[without_label_pos]),
+                    xytext=(-108, 14),
                     textcoords="offset points",
                     fontsize=8.5,
                     color="#475569",
@@ -2188,12 +2245,12 @@ def render_builder_popup() -> None:
                     arrowprops=dict(arrowstyle="-", color="#64748b", lw=1.2, alpha=0.95),
                 )
 
-            if len(efficient_idx_with_esg) > 0:
-                with_label_idx = efficient_idx_with_esg[min(len(efficient_idx_with_esg) - 1, max(0, int(len(efficient_idx_with_esg) * 0.46)))]
+            if len(with_frontier_risks) > 0:
+                with_label_pos = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.60)))
                 ax.annotate(
-                    "Efficient Frontier\nWith ESG Constraint",
-                    (risks_pct[with_label_idx], returns_pct[with_label_idx]),
-                    xytext=(18, 18),
+                    "Efficient Frontier\nWith ESG",
+                    (with_frontier_risks[with_label_pos], with_frontier_returns[with_label_pos]),
+                    xytext=(18, 16),
                     textcoords="offset points",
                     fontsize=8.5,
                     color="#15803d",
@@ -2204,7 +2261,7 @@ def render_builder_popup() -> None:
 
             ax.annotate(
                 "Max Sharpe Ratio",
-                (risks_pct[result["max_sharpe_idx"]], returns_pct[result["max_sharpe_idx"]]),
+                (max_sharpe_x, max_sharpe_y),
                 xytext=(-88, 16),
                 textcoords="offset points",
                 fontsize=8.5,
@@ -2215,7 +2272,7 @@ def render_builder_popup() -> None:
             )
             ax.annotate(
                 "Optimal ESG-aware",
-                (risks_pct[result["optimal_idx"]], returns_pct[result["optimal_idx"]]),
+                (optimal_x, optimal_y),
                 xytext=(14, -28),
                 textcoords="offset points",
                 fontsize=8.5,
@@ -2236,24 +2293,15 @@ def render_builder_popup() -> None:
             legend.get_frame().set_alpha(0.96)
             st.pyplot(fig)
             plt.close(fig)
-            if result["frontiers_share_points"]:
-                st.markdown(
-                    f"""
-                    <div class="tool-note">
-                        The light dotted curve shows the full unconstrained frontier in the background. The labelled frontiers separate the unconstrained-only segment from the portfolios that satisfy the current ESG requirement of at least {result["required_esg"] * 100:.1f}/100.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f"""
-                    <div class="tool-note">
-                        The ESG frontier shows portfolios that satisfy the current ESG requirement of at least {result["required_esg"] * 100:.1f}/100.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.markdown(
+                f"""
+                <div class="tool-note">
+                    The chart now shows a standard efficient frontier and a separate ESG frontier. The ESG frontier reflects the current ESG setting and requirement of at least {result["required_esg"] * 100:.1f}/100 while keeping both curves clearly distinguishable.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
 
 
 # -------------------------------------------------
