@@ -15,6 +15,20 @@ st.set_page_config(
 APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
+LEAF_LOGO_SVG = """
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img">
+    <defs>
+        <linearGradient id="leaf-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+            <stop offset="100%" stop-color="#dcfce7" stop-opacity="1"/>
+        </linearGradient>
+    </defs>
+    <path d="M51.5 11.2C36.3 11.4 24.7 17 18.1 26.2c-7.3 10.2-8.2 23.7 2 29.2 9.9 5.2 23.2.4 31-10.7 7.8-11.2 9.2-25-.4-33.5-.8.1-1.5 0-1.2 0Z" fill="url(#leaf-grad)"/>
+    <path d="M20.8 44.4c8.3-9.6 18.4-17.3 30.2-23.2" stroke="#14532d" stroke-width="3.2" stroke-linecap="round" opacity="0.24"/>
+    <path d="M21.7 44.2c7.3-3.2 13.5-7.8 18.7-13.7" stroke="#14532d" stroke-width="2.3" stroke-linecap="round" opacity="0.16"/>
+</svg>
+"""
+
 # -------------------------------------------------
 # Embedded company ESG data
 # Source: uploaded public companies ESG file
@@ -925,17 +939,21 @@ def inject_css() -> None:
             }
 
             .logo-box {
-                width: 50px;
-                height: 50px;
-                border-radius: 16px;
+                width: 58px;
+                height: 58px;
+                border-radius: 18px;
                 background: linear-gradient(135deg, var(--primary), var(--primary4));
-                color: white;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.05rem;
-                font-weight: 900;
-                box-shadow: 0 12px 28px rgba(22,163,74,0.24);
+                box-shadow: 0 14px 30px rgba(22,163,74,0.24);
+            }
+
+            .logo-box svg,
+            .splash-logo svg {
+                width: 68%;
+                height: 68%;
+                display: block;
             }
 
             .brand-title {
@@ -1345,9 +1363,43 @@ def inject_css() -> None:
 
             .home-cta-note {
                 color: var(--muted);
-                font-size: 0.96rem;
-                line-height: 1.65;
+                font-size: 0.97rem;
+                line-height: 1.68;
                 margin: 0.55rem 0 0 0;
+            }
+
+            .home-overview-panel {
+                background: linear-gradient(150deg, rgba(255,255,255,0.99), rgba(243,252,246,0.97));
+                border: 1px solid rgba(22,101,52,0.10);
+                border-radius: 24px;
+                padding: 1.25rem 1.2rem;
+                box-shadow: 0 16px 36px rgba(20,83,45,0.08);
+                min-height: 100%;
+            }
+
+            .home-overview-eyebrow {
+                color: var(--primary);
+                font-size: 0.8rem;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 0.45rem;
+            }
+
+            .home-overview-title {
+                color: var(--text);
+                font-size: 1.22rem;
+                font-weight: 850;
+                letter-spacing: -0.03em;
+                line-height: 1.2;
+                margin: 0 0 0.55rem 0;
+            }
+
+            .home-overview-copy {
+                color: var(--muted);
+                font-size: 0.95rem;
+                line-height: 1.72;
+                margin: 0;
             }
 
             div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -1360,15 +1412,15 @@ def inject_css() -> None:
 
             div.stButton > button,
             div[data-testid="stFormSubmitButton"] > button {
-                min-height: 3.45rem !important;
-                border-radius: 16px !important;
+                min-height: 4.15rem !important;
+                border-radius: 18px !important;
                 font-weight: 800 !important;
-                font-size: 1.02rem !important;
-                padding: 0.35rem 0.95rem !important;
+                font-size: 1.10rem !important;
+                padding: 0.45rem 1.05rem !important;
                 border: 1px solid var(--primary) !important;
                 background: linear-gradient(135deg, var(--primary), var(--primary3)) !important;
                 color: #ffffff !important;
-                box-shadow: 0 8px 18px rgba(20,83,45,0.18) !important;
+                box-shadow: 0 10px 22px rgba(20,83,45,0.18) !important;
                 transition: all 0.18s ease !important;
             }
 
@@ -1412,17 +1464,14 @@ def inject_css() -> None:
             }
 
             .splash-logo {
-                width: 100px;
-                height: 100px;
-                border-radius: 28px;
+                width: 104px;
+                height: 104px;
+                border-radius: 30px;
                 background: linear-gradient(135deg, var(--primary), var(--primary4));
-                color: white;
                 margin: 0 auto 1.15rem auto;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 2rem;
-                font-weight: 900;
                 box-shadow: 0 18px 42px rgba(22,163,74,0.24);
                 animation: brandFadeOut 0.8s ease 2s forwards;
             }
@@ -1600,7 +1649,7 @@ def render_splash_overlay() -> None:
         f"""
         <div class="splash-overlay">
             <div class="splash-card">
-                <div class="splash-logo">VW</div>
+                <div class="splash-logo">{LEAF_LOGO_SVG}</div>
                 <div class="splash-title">{APP_NAME}</div>
                 <div class="splash-copy">
                     {APP_TAGLINE}<br>
@@ -2745,7 +2794,7 @@ def render_home() -> None:
     st.markdown(
         f"""
         <div class="brand-row">
-            <div class="logo-box">VW</div>
+            <div class="logo-box">{LEAF_LOGO_SVG}</div>
             <div>
                 <p class="brand-title">{APP_NAME}</p>
                 <p class="brand-subtitle">{APP_TAGLINE}</p>
@@ -2789,11 +2838,20 @@ def render_home() -> None:
                     on_click=open_builder,
                 )
     with right:
-        render_stat("Environmental", "Climate, energy, and ecological impact")
-        st.markdown("<div style='height:0.65rem;'></div>", unsafe_allow_html=True)
-        render_stat("Social", "People, communities, and workplace outcomes")
-        st.markdown("<div style='height:0.65rem;'></div>", unsafe_allow_html=True)
-        render_stat("Governance", "Leadership, ethics, and accountability")
+        st.markdown(
+            """
+            <div class="home-overview-panel">
+                <div class="home-overview-eyebrow">App Overview</div>
+                <div class="home-overview-title">Build ESG-aware portfolios with a simple, guided workflow.</div>
+                <p class="home-overview-copy">
+                    This app helps investors compare financial return, portfolio risk, and sustainability priorities in one place.
+                    You can either receive a guided recommendation or build a fully customised portfolio using your own assumptions,
+                    then explore how the efficient frontiers and portfolio analysis change live as you adjust the inputs.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
     st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
