@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 # Page config
 # -------------------------------------------------
 st.set_page_config(
-    page_title="Verdant Wealth",
+    page_title="Leaf It To Us",
     page_icon="🌿",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-APP_NAME = "Verdant Wealth"
+APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
 # -------------------------------------------------
@@ -2140,6 +2140,26 @@ def render_home() -> None:
         render_stat("Governance", "Leadership, ethics, and accountability")
 
     st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="home-cta-shell">
+            <div class="section-label">Get Started</div>
+            <div class="section-title">Choose how you want to build your portfolio</div>
+            <div class="home-cta-note">
+                Start with a guided recommendation or move straight into a fully customised portfolio build.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    outer_left, btn1, btn2, outer_right = st.columns([0.70, 1.15, 1.15, 0.70], gap="medium")
+    with btn1:
+        st.button("Give Me a Portfolio Recommendation", key="home_recommendation_button", type="primary", use_container_width=True, on_click=open_recommendation)
+    with btn2:
+        st.button("Build Your Customised Portfolio", key="home_builder_button", use_container_width=True, on_click=open_builder)
+
+    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
     st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">An investment app that prioritises ESG preferences</div>', unsafe_allow_html=True)
     st.markdown(
@@ -2161,26 +2181,6 @@ def render_home() -> None:
         render_card("Social (S)", "Social factors focus on how organisations treat people, including labour standards, diversity, community impact, health, safety, and human rights.")
     with c3:
         render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
-
-    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="home-cta-shell">
-            <div class="section-label">Get Started</div>
-            <div class="section-title">Choose how you want to build your portfolio</div>
-            <div class="home-cta-note">
-                Start with a guided recommendation or move straight into a fully customised portfolio build.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    outer_left, btn1, btn2, outer_right = st.columns([0.70, 1.15, 1.15, 0.70], gap="medium")
-    with btn1:
-        st.button("Give Me a Portfolio Recommendation", key="home_recommendation_button", type="primary", use_container_width=True, on_click=open_recommendation)
-    with btn2:
-        st.button("Build Your Customised Portfolio", key="home_builder_button", use_container_width=True, on_click=open_builder)
 
 
 def render_recommendation_screen() -> None:
