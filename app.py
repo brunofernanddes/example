@@ -908,10 +908,11 @@ def inject_css() -> None:
                 --bg2: #e6f7ec;
                 --text: #081b14;
                 --muted: #36574a;
-                --primary: #FF0000;
+                --primary: #14532d;
                 --primary2: #166534;
                 --primary3: #15803d;
                 --primary4: #22c55e;
+                --primary5: #FF0000;
                 --shadow: 0 18px 50px rgba(20, 83, 45, 0.08);
                 --shadow-soft: 0 10px 24px rgba(20, 83, 45, 0.05);
             }
@@ -2851,7 +2852,7 @@ def render_home() -> None:
                 st.button(
                     "Give Me a Portfolio Recommendation",
                     key="home_recommendation_button",
-                    type="primary",
+                    type="primary5",
                     use_container_width=True,
                     on_click=open_recommendation,
                 )
