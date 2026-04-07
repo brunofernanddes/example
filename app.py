@@ -16,21 +16,19 @@ st.set_page_config(
 APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
-st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+left, right = st.columns([1.2, 8])
 
-LEAF_LOGO_SVG = """
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img">
-    <defs>
-        <linearGradient id="leaf-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
-            <stop offset="100%" stop-color="#dcfce7" stop-opacity="1"/>
-        </linearGradient>
-    </defs>
-    <path d="M51.5 11.2C36.3 11.4 24.7 17 18.1 26.2c-7.3 10.2-8.2 23.7 2 29.2 9.9 5.2 23.2.4 31-10.7 7.8-11.2 9.2-25-.4-33.5-.8.1-1.5 0-1.2 0Z" fill="url(#leaf-grad)"/>
-    <path d="M20.8 44.4c8.3-9.6 18.4-17.3 30.2-23.2" stroke="#14532d" stroke-width="3.2" stroke-linecap="round" opacity="0.24"/>
-    <path d="M21.7 44.2c7.3-3.2 13.5-7.8 18.7-13.7" stroke="#14532d" stroke-width="2.3" stroke-linecap="round" opacity="0.16"/>
-</svg>
-"""
+with left:
+    st.image("leaf_logo.png", width=72)
+
+with right:
+    st.markdown(
+        """
+        <div class="app-title">Leaf It To Us</div>
+        <div class="app-subtitle">Sustainable investing, built around you.</div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # -------------------------------------------------
 # Embedded company ESG data
