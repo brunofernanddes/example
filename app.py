@@ -30,6 +30,7 @@ LEAF_LOGO_SVG = """
     <path d="M21.7 44.2c7.3-3.2 13.5-7.8 18.7-13.7" stroke="#14532d" stroke-width="2.3" stroke-linecap="round" opacity="0.16"/>
 </svg>
 """
+st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
 
 # -------------------------------------------------
 # Embedded company ESG data
