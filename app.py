@@ -3740,20 +3740,20 @@ def render_home() -> None:
             }
 
             .brand-row {
-                gap: 1.15rem !important;
-                margin-bottom: 1.25rem !important;
+                gap: 0.75rem !important;
+                margin-bottom: 1.1rem !important;
             }
 
             .brand-row-logo-only {
                 justify-content: flex-start !important;
                 align-items: flex-start !important;
-                margin-bottom: 1.5rem !important;
+                margin-bottom: 1.15rem !important;
             }
 
             .logo-box {
-                width: 112px !important;
-                height: 112px !important;
-                border-radius: 28px !important;
+                width: 156px !important;
+                height: 156px !important;
+                border-radius: 34px !important;
             }
 
             .brand-title {
@@ -3778,17 +3778,24 @@ def render_home() -> None:
             }
 
             .home-overview-panel {
-                padding: 1.35rem 1.28rem !important;
-                border-radius: 26px !important;
+                padding: 1.65rem 1.55rem !important;
+                border-radius: 30px !important;
+                min-height: 29.4rem !important;
+                height: 100% !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: flex-start !important;
             }
 
             .home-overview-title {
-                font-size: 1.28rem !important;
+                font-size: 1.3rem !important;
             }
 
             .home-overview-copy {
-                font-size: 0.98rem !important;
-                line-height: 1.76 !important;
+                font-size: 1rem !important;
+                line-height: 1.82 !important;
             }
         </style>
         """,
@@ -3804,7 +3811,7 @@ def render_home() -> None:
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns([1.42, 0.88], gap="medium")
+    left, right = st.columns([1.34, 0.96], gap="medium")
     with left:
         hero_panel = st.container(border=True)
         with hero_panel:
