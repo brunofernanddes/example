@@ -1,3 +1,4 @@
+
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -2865,9 +2866,7 @@ def render_home() -> None:
                     on_click=open_builder,
                 )
     with right:
-         st.markdown('<div class="right-card">', unsafe_allow_html=True)
-        
-         st.markdown(
+        st.markdown(
             """
             <div class="home-overview-panel">
                 <div class="home-overview-eyebrow">App Overview</div>
@@ -2881,8 +2880,6 @@ def render_home() -> None:
             """,
             unsafe_allow_html=True,
         )
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
     st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
