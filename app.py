@@ -1458,7 +1458,7 @@ def inject_css() -> None:
                 font-size: 1.10rem !important;
                 padding: 0.45rem 1.05rem !important;
                 border: 1px solid var(--primary) !important;
-                background: linear-gradient(135deg, var(--primary), var(--primary3)) !important;
+                background: linear-gradient(135deg, #5b21b6, #7c3aed) !important;
                 color: #ffffff !important;
                 box-shadow: 0 10px 22px rgba(20,83,45,0.18) !important;
                 transition: all 0.18s ease !important;
@@ -1466,7 +1466,7 @@ def inject_css() -> None:
 
             div.stButton > button:hover,
             div[data-testid="stFormSubmitButton"] > button:hover {
-                background: linear-gradient(135deg, #0f3f22, var(--primary)) !important;
+                background: linear-gradient(135deg, #991b1b, #dc2626) !important;
                 color: #ffffff !important;
                 box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
                 transform: translateY(-1px);
