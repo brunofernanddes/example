@@ -3814,7 +3814,7 @@ def render_home() -> None:
             .brand-row-logo-only {
                 justify-content: flex-start !important;
                 align-items: flex-start !important;
-                margin-bottom: 0.25rem !important;
+                margin-bottom: -1.35rem !important;
                 width: 100% !important;
                 overflow: visible !important;
             }
@@ -3855,7 +3855,7 @@ def render_home() -> None:
             }
 
             .home-main-row {
-                margin-top: -0.25rem !important;
+                margin-top: -2.65rem !important;
             }
 
             .home-cta-note {
