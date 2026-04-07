@@ -1373,25 +1373,39 @@ def inject_css() -> None:
             .home-button-spacer {
                 height: 0.9rem;
             }
+.st-key-home_recommendation_button button,
+.st-key-home_builder_button button {
+    min-height: 11.2rem !important;
+    border-radius: 28px !important;
+    font-size: 1.55rem !important;
+    font-weight: 760 !important;
+    line-height: 1.24 !important;
+    padding: 1.9rem 1.25rem !important;
+    text-align: center !important;
+    white-space: normal !important;
+}
 
-            .st-key-home_recommendation_button button,
-            .st-key-home_builder_button button {
-                min-height: 11.2rem !important;
-                border-radius: 28px !important;
-                font-size: 1.55rem !important;
-                font-weight: 760 !important;
-                line-height: 1.24 !important;
-                padding: 1.9rem 1.25rem !important;
-                text-align: center !important;
-                box-shadow: 0 20px 38px rgba(20,83,45,0.18) !important;
-                white-space: normal !important;
-            }
+.st-key-home_recommendation_button button {
+    background: linear-gradient(135deg, #5b21b6, #7c3aed) !important;
+    border: 1px solid #5b21b6 !important;
+    box-shadow: 0 20px 38px rgba(91,33,182,0.22) !important;
+}
+.st-key-home_recommendation_button button:hover {
+    background: linear-gradient(135deg, #4c1d95, #6d28d9) !important;
+    box-shadow: 0 24px 44px rgba(91,33,182,0.30) !important;
+    transform: translateY(-2px) !important;
+}
 
-            .st-key-home_recommendation_button button:hover,
-            .st-key-home_builder_button button:hover {
-                transform: translateY(-2px) !important;
-                box-shadow: 0 24px 44px rgba(20,83,45,0.22) !important;
-            }
+.st-key-home_builder_button button {
+    background: linear-gradient(135deg, #991b1b, #dc2626) !important;
+    border: 1px solid #991b1b !important;
+    box-shadow: 0 20px 38px rgba(153,27,27,0.22) !important;
+}
+.st-key-home_builder_button button:hover {
+    background: linear-gradient(135deg, #7f1d1d, #b91c1c) !important;
+    box-shadow: 0 24px 44px rgba(153,27,27,0.30) !important;
+    transform: translateY(-2px) !important;
+}
 
             .st-key-home_recommendation_button button p,
             .st-key-home_builder_button button p,
