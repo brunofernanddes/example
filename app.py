@@ -2847,8 +2847,17 @@ def render_home() -> None:
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
-            
-            st.markdown("""
+
+            btn1, btn2 = st.columns(2, gap="large")
+            with btn1:
+                st.button(
+                    "Give Me a Portfolio Recommendation",
+                    key="home_recommendation_button",
+                    type="primary",
+                    use_container_width=True,
+                    on_click=open_recommendation,
+                )
+             st.markdown("""
                 <style>
                 div[data-testid="column"]:nth-of-type(1) button {
                     background-color: var(--primary5);
@@ -2860,16 +2869,7 @@ def render_home() -> None:
                     }
                     </style>
                     """, unsafe_allow_html=True)
-
-            btn1, btn2 = st.columns(2, gap="large")
-            with btn1:
-                st.button(
-                    "Give Me a Portfolio Recommendation",
-                    key="home_recommendation_button",
-                    type="primary",
-                    use_container_width=True,
-                    on_click=open_recommendation,
-                )
+            
             with btn2:
                 st.button(
                     "Build Your Customised Portfolio",
