@@ -2,7 +2,22 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# -------------------------------------------------
+st.markdown("""
+<style>
+/* Left button (red) */
+div.stButton > button:first-child {
+    background-color: #ef4444;
+    color: white;
+}
+
+/* Right button (purple) */
+div.stButton > button:last-child {
+    background-color: #8b5cf6;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+-------------------------------------------------
 # Page config
 # -------------------------------------------------
 st.set_page_config(
