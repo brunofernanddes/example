@@ -2857,20 +2857,6 @@ def render_home() -> None:
                     use_container_width=True,
                     on_click=open_recommendation,
                 )
-                
-             st.markdown("""
-                <style>
-                div[data-testid="column"]:nth-of-type(1) button {
-                    background-color: var(--primary5);
-                    color: white;
-                    }
-                    div[data-testid="column"]:nth-of-type(2) button {
-                    background-color: #8b5cf6;
-                    color: white;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-            
             with btn2:
                 st.button(
                     "Build Your Customised Portfolio",
