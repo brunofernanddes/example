@@ -830,7 +830,7 @@ AgE16OvCKGsflYASUAJKYNQTUIM+6odYO6gElEB1Cah2JTA8CKhBHx7joK1QAkpACSgBJTAoAmrQB4VP
 mIAa9GE8ONo0JaAElEB1Caj20URADfpoGk3tixJQAkpACayzBNSgr7NDrx1XAkpACVSXgGpfswTUoK9Z3lqbElACSkAJKIGqEFCDXhWsqlQJKAEloASqS0C1
 L0tADfqyRDSsBJSAElACSmAEElCDPgIHTZusBJSAElAC1SUwErX/fwAAAP//KTIuWQAAAAZJREFUAwBdzeu1EPPUJgAAAABJRU5ErkJggg==
 """
-
+st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
 
 # -------------------------------------------------
 # Embedded company ESG data
