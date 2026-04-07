@@ -1657,6 +1657,7 @@ def init_session_state() -> None:
         "builder_esg_slider": 0.05,
         "company_search_query": "",
         "selected_company_option": "",
+        "builder_scroll_to_top": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -1667,6 +1668,7 @@ def open_home() -> None:
     st.session_state.current_view = "home"
     st.session_state.show_recommendation_popup = False
     st.session_state.show_builder_popup = False
+    st.session_state.builder_scroll_to_top = False
 
 
 def open_recommendation() -> None:
@@ -1677,6 +1679,7 @@ def open_recommendation() -> None:
 def open_builder() -> None:
     st.session_state.current_view = "builder"
     st.session_state.show_recommendation_popup = False
+    st.session_state.builder_scroll_to_top = False
 
 
 def show_recommendation_popup() -> None:
@@ -1689,14 +1692,46 @@ def hide_recommendation_popup() -> None:
 
 def show_builder_popup() -> None:
     st.session_state.show_builder_popup = True
+    st.session_state.builder_scroll_to_top = True
 
 
 def hide_builder_popup() -> None:
     st.session_state.show_builder_popup = False
+    st.session_state.builder_scroll_to_top = False
 
 
 def mark_builder_risk_free_rate_touched() -> None:
     st.session_state.builder_risk_free_rate_touched = True
+
+
+def scroll_to_top_of_page() -> None:
+    scroll_script = """
+    <script>
+        (function() {
+            const parentWindow = window.parent || window;
+            const parentDocument = parentWindow.document;
+            const selectors = [
+                '[data-testid="stAppViewContainer"]',
+                'section.main',
+                '[data-testid="stMainBlockContainer"]',
+                '.main'
+            ];
+            selectors.forEach(function(selector) {
+                const node = parentDocument.querySelector(selector);
+                if (node && typeof node.scrollTo === 'function') {
+                    node.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+                }
+            });
+            if (typeof parentWindow.scrollTo === 'function') {
+                parentWindow.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+            }
+        })();
+    </script>
+    """
+    try:
+        st.components.v1.html(scroll_script, height=0)
+    except Exception:
+        st.markdown(scroll_script, unsafe_allow_html=True)
 
 
 # -------------------------------------------------
@@ -3756,13 +3791,13 @@ def render_home() -> None:
             }
 
             .logo-box {
-                width: min(214px, 22vw) !important;
-                height: min(214px, 22vw) !important;
-                min-width: 168px !important;
-                min-height: 168px !important;
+                width: clamp(196px, 24vw, 272px) !important;
+                height: clamp(196px, 24vw, 272px) !important;
+                min-width: 196px !important;
+                min-height: 196px !important;
                 max-width: 100% !important;
                 max-height: 100% !important;
-                border-radius: 34px !important;
+                border-radius: 38px !important;
                 overflow: visible !important;
             }
 
@@ -3946,6 +3981,10 @@ def render_builder_screen() -> None:
         "Build Your Customised Portfolio",
         "Build a personalised ESG-aware portfolio. The recommendation opens in a live popup-style panel on this same screen and updates as you change the inputs.",
     )
+
+    if st.session_state.builder_scroll_to_top:
+        scroll_to_top_of_page()
+        st.session_state.builder_scroll_to_top = False
 
     if st.session_state.show_builder_popup:
         render_builder_popup()
