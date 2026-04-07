@@ -16,6 +16,11 @@ st.set_page_config(
 APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
+from pathlib import Path
+
+logo_path = Path(__file__).parent / "leaf_logo.png"
+st.image(str(logo_path), width=72)
+
 left, right = st.columns([1.2, 8])
 
 with left:
