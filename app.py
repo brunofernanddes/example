@@ -2853,10 +2853,11 @@ def render_home() -> None:
                 st.button(
                     "Give Me a Portfolio Recommendation",
                     key="home_recommendation_button",
-                    type="primary",
+                    type="primary5",
                     use_container_width=True,
                     on_click=open_recommendation,
                 )
+                
              st.markdown("""
                 <style>
                 div[data-testid="column"]:nth-of-type(1) button {
