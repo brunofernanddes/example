@@ -831,7 +831,7 @@ RECOMMENDATIONS = {
 # Session state
 # -------------------------------------------------
 def init_session_state() -> None:
-defaults = {
+    defaults = {
 "current_view": "home",
 "show_splash": True,
 "show_recommendation_popup": False,
