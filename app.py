@@ -2849,7 +2849,7 @@ def render_home() -> None:
             st.markdown("""
 <style>
 div.stButton:nth-of-type(1) button {
-    background-color: #ef4444;
+    background-color: #FF0000;
     color: white;
 }
 </style>
