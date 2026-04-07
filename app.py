@@ -912,7 +912,6 @@ def inject_css() -> None:
                 --primary2: #166534;
                 --primary3: #15803d;
                 --primary4: #22c55e;
-                --primary5: #FF0000;
                 --shadow: 0 18px 50px rgba(20, 83, 45, 0.08);
                 --shadow-soft: 0 10px 24px rgba(20, 83, 45, 0.05);
             }
@@ -2847,13 +2846,12 @@ def render_home() -> None:
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
-
             btn1, btn2 = st.columns(2, gap="large")
             with btn1:
                 st.button(
                     "Give Me a Portfolio Recommendation",
                     key="home_recommendation_button",
-                    type="primary5",
+                    type="primary",
                     use_container_width=True,
                     on_click=open_recommendation,
                 )
@@ -3062,7 +3060,7 @@ def render_builder_screen() -> None:
         )
 
     st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
-    st.button("Generate Portfolio Recommendation", type="primary5", use_container_width=True, on_click=show_builder_popup)
+    st.button("Generate Portfolio Recommendation", type="primary", use_container_width=True, on_click=show_builder_popup)
 
 
 # -------------------------------------------------
