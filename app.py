@@ -1471,6 +1471,19 @@ def inject_css() -> None:
                 box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
                 transform: translateY(-1px);
             }
+.st-key-home_recommendation_button button {
+            background: linear-gradient(135deg, #c4b5fd, #a78bfa) !important;
+        }
+        .st-key-home_recommendation_button button:hover {
+            background: linear-gradient(135deg, #a78bfa, #8b5cf6) !important;
+        }
+
+        .st-key-home_builder_button button {
+            background: linear-gradient(135deg, #fca5a5, #f87171) !important;
+        }
+        .st-key-home_builder_button button:hover {
+            background: linear-gradient(135deg, #f87171, #ef4444) !important;
+        }
 
             div.stButton > button p,
             div.stButton > button span,
