@@ -3075,7 +3075,7 @@ def render_builder_screen() -> None:
         )
 
     st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
-    st.button("Generate Portfolio Recommendation", type="primary", use_container_width=True, on_click=show_builder_popup)
+    st.button("Generate Portfolio Recommendation", type="primary5", use_container_width=True, on_click=show_builder_popup)
 
 
 # -------------------------------------------------
