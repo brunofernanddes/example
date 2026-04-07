@@ -3079,10 +3079,7 @@ else:
 if st.session_state.show_splash:
     render_splash_overlay()
     st.session_state.show_splash = False
-
-Necmettin Oguz Ozturk
-
-​Swati Singh;​Stephanie Louisa Lo​
+​
 st.markdown("""
 <style>
 /* Left button (red) */
