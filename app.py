@@ -3671,10 +3671,10 @@ def render_home() -> None:
                 min-height: 16.3rem !important;
                 border-radius: 36px !important;
                 padding: 2.9rem 1.7rem !important;
-                border: 1px solid rgba(109,40,217,0.46) !important;
-                background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
-                background-color: #7c3aed !important;
-                box-shadow: 0 24px 46px rgba(109,40,217,0.24) !important;
+                border: 1px solid rgba(91,33,182,0.54) !important;
+                background: linear-gradient(135deg, #5b21b6, #6d28d9) !important;
+                background-color: #5b21b6 !important;
+                box-shadow: 0 24px 46px rgba(91,33,182,0.26) !important;
                 color: #ffffff !important;
                 display: flex !important;
                 align-items: center !important;
@@ -3687,10 +3687,10 @@ def render_home() -> None:
                 min-height: 16.3rem !important;
                 border-radius: 36px !important;
                 padding: 2.9rem 1.7rem !important;
-                border: 1px solid rgba(220,38,38,0.40) !important;
-                background: linear-gradient(135deg, #dc2626, #ef4444) !important;
-                background-color: #dc2626 !important;
-                box-shadow: 0 24px 46px rgba(220,38,38,0.22) !important;
+                border: 1px solid rgba(185,28,28,0.46) !important;
+                background: linear-gradient(135deg, #991b1b, #dc2626) !important;
+                background-color: #991b1b !important;
+                box-shadow: 0 24px 46px rgba(185,28,28,0.24) !important;
                 color: #ffffff !important;
                 display: flex !important;
                 align-items: center !important;
@@ -3702,9 +3702,9 @@ def render_home() -> None:
             div[data-testid="stButton"] > button[kind="primary"]:focus,
             div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover,
             div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:focus {
-                background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
-                background-color: #6d28d9 !important;
-                box-shadow: 0 28px 50px rgba(109,40,217,0.28) !important;
+                background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
+                background-color: #4c1d95 !important;
+                box-shadow: 0 28px 50px rgba(76,29,149,0.30) !important;
                 transform: translateY(-2px) !important;
             }
 
@@ -3712,9 +3712,9 @@ def render_home() -> None:
             div[data-testid="stButton"] > button[kind="secondary"]:focus,
             div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:hover,
             div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:focus {
-                background: linear-gradient(135deg, #b91c1c, #dc2626) !important;
-                background-color: #b91c1c !important;
-                box-shadow: 0 28px 50px rgba(220,38,38,0.26) !important;
+                background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
+                background-color: #7f1d1d !important;
+                box-shadow: 0 28px 50px rgba(127,29,29,0.28) !important;
                 transform: translateY(-2px) !important;
             }
 
@@ -3742,6 +3742,12 @@ def render_home() -> None:
             .brand-row {
                 gap: 1.15rem !important;
                 margin-bottom: 1.25rem !important;
+            }
+
+            .brand-row-logo-only {
+                justify-content: flex-start !important;
+                align-items: flex-start !important;
+                margin-bottom: 1.5rem !important;
             }
 
             .logo-box {
@@ -3791,12 +3797,8 @@ def render_home() -> None:
 
     st.markdown(
         f"""
-        <div class="brand-row">
+        <div class="brand-row brand-row-logo-only">
             <div class="logo-box"><img src="data:image/png;base64,{LEAF_LOGO_BASE64}" alt="Leaf It To Us logo"></div>
-            <div>
-                <p class="brand-title">{APP_NAME}</p>
-                <p class="brand-subtitle">{APP_TAGLINE}</p>
-            </div>
         </div>
         """,
         unsafe_allow_html=True,
