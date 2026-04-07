@@ -858,9 +858,8 @@ def init_session_state() -> None:
 "selected_company_option": "",
 }
 for key, value in defaults.items():
-if key not in st.session_state:
-st.session_state[key] = value
-
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 def open_home() -> None:
 st.session_state.current_view = "home"
