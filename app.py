@@ -3732,11 +3732,14 @@ def render_home() -> None:
             div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] div {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
-                font-size: 1.52rem !important;
+                font-size: 1.34rem !important;
                 font-weight: 760 !important;
-                line-height: 1.24 !important;
+                line-height: 1.18 !important;
                 text-align: center !important;
                 white-space: normal !important;
+                word-break: keep-all !important;
+                overflow-wrap: normal !important;
+                hyphens: none !important;
             }
 
             .brand-row {
@@ -3747,13 +3750,20 @@ def render_home() -> None:
             .brand-row-logo-only {
                 justify-content: flex-start !important;
                 align-items: flex-start !important;
-                margin-bottom: 1.15rem !important;
+                margin-bottom: 1.2rem !important;
+                width: 100% !important;
+                overflow: visible !important;
             }
 
             .logo-box {
-                width: 156px !important;
-                height: 156px !important;
+                width: min(214px, 22vw) !important;
+                height: min(214px, 22vw) !important;
+                min-width: 168px !important;
+                min-height: 168px !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
                 border-radius: 34px !important;
+                overflow: visible !important;
             }
 
             .brand-title {
@@ -3790,12 +3800,13 @@ def render_home() -> None:
             }
 
             .home-overview-title {
-                font-size: 1.3rem !important;
+                font-size: 1.42rem !important;
+                line-height: 1.28 !important;
             }
 
             .home-overview-copy {
-                font-size: 1rem !important;
-                line-height: 1.82 !important;
+                font-size: 1.12rem !important;
+                line-height: 1.92 !important;
             }
         </style>
         """,
