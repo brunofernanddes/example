@@ -1704,28 +1704,57 @@ def mark_builder_risk_free_rate_touched() -> None:
     st.session_state.builder_risk_free_rate_touched = True
 
 
-def scroll_to_top_of_page() -> None:
-    scroll_script = """
+def scroll_to_top_of_page(anchor_id: str = "builder-top-anchor") -> None:
+    scroll_script = f"""
     <script>
-        (function() {
+        (function() {{
+            const anchorId = {anchor_id!r};
             const parentWindow = window.parent || window;
             const parentDocument = parentWindow.document;
-            const selectors = [
-                '[data-testid="stAppViewContainer"]',
-                'section.main',
-                '[data-testid="stMainBlockContainer"]',
-                '.main'
-            ];
-            selectors.forEach(function(selector) {
-                const node = parentDocument.querySelector(selector);
-                if (node && typeof node.scrollTo === 'function') {
-                    node.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-                }
-            });
-            if (typeof parentWindow.scrollTo === 'function') {
-                parentWindow.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-            }
-        })();
+            let attempts = 0;
+            const maxAttempts = 40;
+
+            function performScroll() {{
+                const anchor = parentDocument.getElementById(anchorId);
+                if (anchor && typeof anchor.scrollIntoView === 'function') {{
+                    anchor.scrollIntoView({{block: 'start', inline: 'nearest', behavior: 'auto'}});
+                }}
+
+                const nodes = [
+                    parentDocument.scrollingElement,
+                    parentDocument.documentElement,
+                    parentDocument.body,
+                    parentDocument.querySelector('[data-testid="stAppViewContainer"]'),
+                    parentDocument.querySelector('section.main'),
+                    parentDocument.querySelector('[data-testid="stMainBlockContainer"]'),
+                    parentDocument.querySelector('.main')
+                ].filter(Boolean);
+
+                nodes.forEach(function(node) {{
+                    try {{
+                        if (typeof node.scrollTo === 'function') {{
+                            node.scrollTo({{ top: 0, left: 0, behavior: 'auto' }});
+                        }}
+                        node.scrollTop = 0;
+                    }} catch (error) {{}}
+                }});
+
+                try {{
+                    if (typeof parentWindow.scrollTo === 'function') {{
+                        parentWindow.scrollTo({{ top: 0, left: 0, behavior: 'auto' }});
+                    }}
+                }} catch (error) {{}}
+
+                attempts += 1;
+                if (attempts < maxAttempts) {{
+                    parentWindow.requestAnimationFrame(function() {{
+                        parentWindow.setTimeout(performScroll, 60);
+                    }});
+                }}
+            }}
+
+            parentWindow.setTimeout(performScroll, 0);
+        }})();
     </script>
     """
     try:
@@ -3785,20 +3814,31 @@ def render_home() -> None:
             .brand-row-logo-only {
                 justify-content: flex-start !important;
                 align-items: flex-start !important;
-                margin-bottom: 1.2rem !important;
+                margin-bottom: 0.25rem !important;
                 width: 100% !important;
                 overflow: visible !important;
             }
 
             .logo-box {
-                width: clamp(196px, 24vw, 272px) !important;
-                height: clamp(196px, 24vw, 272px) !important;
-                min-width: 196px !important;
-                min-height: 196px !important;
+                width: clamp(248px, 27vw, 356px) !important;
+                height: auto !important;
+                min-width: 248px !important;
+                min-height: 0 !important;
                 max-width: 100% !important;
-                max-height: 100% !important;
-                border-radius: 38px !important;
+                max-height: none !important;
+                border-radius: 0 !important;
                 overflow: visible !important;
+                display: block !important;
+                line-height: 0 !important;
+                padding: 0 !important;
+            }
+
+            .brand-row-logo-only .logo-box img {
+                width: 100% !important;
+                height: auto !important;
+                max-width: 100% !important;
+                object-fit: contain !important;
+                display: block !important;
             }
 
             .brand-title {
@@ -3812,6 +3852,10 @@ def render_home() -> None:
             .home-cta-shell {
                 max-width: 980px !important;
                 margin: 0 auto 0.55rem auto !important;
+            }
+
+            .home-main-row {
+                margin-top: -0.25rem !important;
             }
 
             .home-cta-note {
@@ -3857,6 +3901,7 @@ def render_home() -> None:
         unsafe_allow_html=True,
     )
 
+    st.markdown('<div class="home-main-row">', unsafe_allow_html=True)
     left, right = st.columns([1.34, 0.96], gap="medium")
     with left:
         hero_panel = st.container(border=True)
@@ -3906,6 +3951,7 @@ def render_home() -> None:
             """,
             unsafe_allow_html=True,
         )
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
     st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
@@ -3976,15 +4022,12 @@ def render_recommendation_screen() -> None:
 
 def render_builder_screen() -> None:
     inject_tool_text_css()
+    st.markdown('<div id="builder-top-anchor"></div>', unsafe_allow_html=True)
     st.button("← Back", on_click=open_home, use_container_width=False)
     render_page_header(
         "Build Your Customised Portfolio",
         "Build a personalised ESG-aware portfolio. The recommendation opens in a live popup-style panel on this same screen and updates as you change the inputs.",
     )
-
-    if st.session_state.builder_scroll_to_top:
-        scroll_to_top_of_page()
-        st.session_state.builder_scroll_to_top = False
 
     if st.session_state.show_builder_popup:
         render_builder_popup()
@@ -4094,6 +4137,10 @@ def render_builder_screen() -> None:
 
     st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
     st.button("Generate Portfolio Recommendation", type="primary", use_container_width=True, on_click=show_builder_popup)
+
+    if st.session_state.builder_scroll_to_top:
+        scroll_to_top_of_page("builder-top-anchor")
+        st.session_state.builder_scroll_to_top = False
 
 
 # -------------------------------------------------
