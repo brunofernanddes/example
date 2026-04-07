@@ -1450,27 +1450,42 @@ def inject_css() -> None:
                 padding: 0.2rem !important;
             }
 
-            div.stButton > button,
-            div[data-testid="stFormSubmitButton"] > button {
-                min-height: 4.15rem !important;
-                border-radius: 18px !important;
-                font-weight: 800 !important;
-                font-size: 1.10rem !important;
-                padding: 0.45rem 1.05rem !important;
-                border: 1px solid var(--primary) !important;
-                background: linear-gradient(135deg, #166534, #16a34a) !important;
-                color: #ffffff !important;
-                box-shadow: 0 10px 22px rgba(20,83,45,0.18) !important;
-                transition: all 0.18s ease !important;
-            }
+           div.stButton button, div[data-testid="stFormSubmitButton"] button {
+    min-height: 4.15rem !important;
+    border-radius: 18px !important;
+    font-weight: 800 !important;
+    font-size: 1.10rem !important;
+    padding: 0.45rem 1.05rem !important;
+    border: 1px solid var(--primary) !important;
+    background: linear-gradient(135deg, #166534, #16a34a) !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 22px rgba(20,83,45,0.18) !important;
+    transition: all 0.18s ease !important;
+}
+div.stButton button:hover, div[data-testid="stFormSubmitButton"] button:hover {
+    background: linear-gradient(135deg, #14532d, #15803d) !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
+    transform: translateY(-1px);
+}
 
-            div.stButton > button:hover,
-            div[data-testid="stFormSubmitButton"] > button:hover {
-                background: linear-gradient(135deg, #14532d, #15803d) !important;
-                color: #ffffff !important;
-                box-shadow: 0 12px 24px rgba(20,83,45,0.24) !important;
-                transform: translateY(-1px);
-            }
+.st-key-home_recommendation_button button {
+    background: linear-gradient(135deg, #c4b5fd, #a78bfa) !important;
+    border: 1px solid #a78bfa !important;
+    box-shadow: 0 10px 22px rgba(167,139,250,0.25) !important;
+}
+.st-key-home_recommendation_button button:hover {
+    background: linear-gradient(135deg, #a78bfa, #8b5cf6) !important;
+}
+
+.st-key-home_builder_button button {
+    background: linear-gradient(135deg, #fca5a5, #f87171) !important;
+    border: 1px solid #f87171 !important;
+    box-shadow: 0 10px 22px rgba(248,113,113,0.25) !important;
+}
+.st-key-home_builder_button button:hover {
+    background: linear-gradient(135deg, #f87171, #ef4444) !important;
+}
 
             div.stButton > button p,
             div.stButton > button span,
