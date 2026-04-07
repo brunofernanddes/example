@@ -862,40 +862,39 @@ for key, value in defaults.items():
         st.session_state[key] = value
 
 def open_home() -> None:
-st.session_state.current_view = "home"
-st.session_state.show_recommendation_popup = False
-st.session_state.show_builder_popup = False
+    st.session_state.current_view = "home"
+    st.session_state.show_recommendation_popup = False
+    st.session_state.show_builder_popup = False
 
 
 def open_recommendation() -> None:
-st.session_state.current_view = "recommendation"
-st.session_state.show_builder_popup = False
+    st.session_state.current_view = "recommendation"
+    st.session_state.show_builder_popup = False
 
 
 def open_builder() -> None:
-st.session_state.current_view = "builder"
-st.session_state.show_recommendation_popup = False
+    st.session_state.current_view = "builder"
+    st.session_state.show_recommendation_popup = False
 
 
 def show_recommendation_popup() -> None:
-st.session_state.show_recommendation_popup = True
+    st.session_state.show_recommendation_popup = True
 
 
 def hide_recommendation_popup() -> None:
-st.session_state.show_recommendation_popup = False
+    st.session_state.show_recommendation_popup = False
 
 
 def show_builder_popup() -> None:
-st.session_state.show_builder_popup = True
+    st.session_state.show_builder_popup = True
 
 
 def hide_builder_popup() -> None:
-st.session_state.show_builder_popup = False
+    st.session_state.show_builder_popup = False
 
 
 def mark_builder_risk_free_rate_touched() -> None:
-st.session_state.builder_risk_free_rate_touched = True
-
+    st.session_state.builder_risk_free_rate_touched = True 
 
 # -------------------------------------------------
 # Styling
