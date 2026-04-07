@@ -2864,6 +2864,8 @@ def render_home() -> None:
                     use_container_width=True,
                     on_click=open_builder,
                 )
+st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+    
     with right:
         st.markdown(
             """
