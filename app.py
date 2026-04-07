@@ -2852,7 +2852,7 @@ def render_home() -> None:
             btn1, btn2 = st.columns(2, gap="large")
             with btn1:
                 st.button(
-                    "Give Me a Portfolio Recommendation",
+                    "Give Me A Portfolio Recommendation",
                     key="home_recommendation_button",
                     type="primary",
                     use_container_width=True,
