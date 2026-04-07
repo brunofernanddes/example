@@ -1390,8 +1390,10 @@ def inject_css() -> None:
 
             .st-key-home_recommendation_button button:hover,
             .st-key-home_builder_button button:hover {
+                background: #c3b1e1 !important;
+                border: 1px solid #c3b1e1 !important;
                 transform: translateY(-2px) !important;
-                box-shadow: 0 24px 44px rgba(20,83,45,0.22) !important;
+                box-shadow: 0 20px 38px rgba(195,177,225,0.35) !important;
             }
 
             .st-key-home_recommendation_button button p,
