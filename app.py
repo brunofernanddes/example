@@ -3666,138 +3666,123 @@ def render_home() -> None:
     st.markdown(
         """
         <style>
-            .brand-row {
-                gap: 1.25rem !important;
-                margin-bottom: 1.35rem !important;
+            div[data-testid="stButton"] > button[kind="primary"],
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
+                min-height: 16.3rem !important;
+                border-radius: 36px !important;
+                padding: 2.9rem 1.7rem !important;
+                border: 1px solid rgba(109,40,217,0.46) !important;
+                background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
+                background-color: #7c3aed !important;
+                box-shadow: 0 24px 46px rgba(109,40,217,0.24) !important;
+                color: #ffffff !important;
+                display: flex !important;
                 align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="secondary"],
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] {
+                min-height: 16.3rem !important;
+                border-radius: 36px !important;
+                padding: 2.9rem 1.7rem !important;
+                border: 1px solid rgba(220,38,38,0.40) !important;
+                background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+                background-color: #dc2626 !important;
+                box-shadow: 0 24px 46px rgba(220,38,38,0.22) !important;
+                color: #ffffff !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="primary"]:hover,
+            div[data-testid="stButton"] > button[kind="primary"]:focus,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:focus {
+                background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
+                background-color: #6d28d9 !important;
+                box-shadow: 0 28px 50px rgba(109,40,217,0.28) !important;
+                transform: translateY(-2px) !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="secondary"]:hover,
+            div[data-testid="stButton"] > button[kind="secondary"]:focus,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:hover,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:focus {
+                background: linear-gradient(135deg, #b91c1c, #dc2626) !important;
+                background-color: #b91c1c !important;
+                box-shadow: 0 28px 50px rgba(220,38,38,0.26) !important;
+                transform: translateY(-2px) !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="primary"] p,
+            div[data-testid="stButton"] > button[kind="primary"] span,
+            div[data-testid="stButton"] > button[kind="primary"] div,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] p,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] span,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] div,
+            div[data-testid="stButton"] > button[kind="secondary"] p,
+            div[data-testid="stButton"] > button[kind="secondary"] span,
+            div[data-testid="stButton"] > button[kind="secondary"] div,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] p,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] span,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] div {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                font-size: 1.52rem !important;
+                font-weight: 760 !important;
+                line-height: 1.24 !important;
+                text-align: center !important;
+                white-space: normal !important;
+            }
+
+            .brand-row {
+                gap: 1.15rem !important;
+                margin-bottom: 1.25rem !important;
             }
 
             .logo-box {
-                width: 138px !important;
-                height: 138px !important;
-                border-radius: 34px !important;
+                width: 112px !important;
+                height: 112px !important;
+                border-radius: 28px !important;
             }
 
             .brand-title {
-                font-size: 2.05rem !important;
-                line-height: 1.02 !important;
-                font-weight: 900 !important;
-                letter-spacing: -0.04em !important;
-                margin: 0 !important;
+                font-size: 1.18rem !important;
+            }
+
+            .brand-subtitle {
+                font-size: 0.98rem !important;
             }
 
             .home-cta-shell {
                 max-width: 980px !important;
-                margin: 0 auto 0.45rem auto !important;
+                margin: 0 auto 0.55rem auto !important;
             }
 
             .home-cta-note {
                 font-size: 1.06rem !important;
-                line-height: 1.65 !important;
             }
 
             .home-button-spacer {
                 height: 1.35rem !important;
             }
 
-            .home-button-purple div[data-testid="stButton"] > button,
-            .home-button-purple div[data-testid="stButton"] > button[kind="primary"],
-            .home-button-purple div[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
-                min-height: 17.9rem !important;
-                border-radius: 38px !important;
-                padding: 2.7rem 1.85rem !important;
-                border: 1px solid rgba(88,28,135,0.58) !important;
-                background: linear-gradient(135deg, #581c87, #6d28d9) !important;
-                background-color: #581c87 !important;
-                box-shadow: 0 24px 48px rgba(88,28,135,0.28) !important;
-                color: #ffffff !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-                transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease !important;
-            }
-
-            .home-button-red div[data-testid="stButton"] > button,
-            .home-button-red div[data-testid="stButton"] > button[kind="secondary"],
-            .home-button-red div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] {
-                min-height: 17.9rem !important;
-                border-radius: 38px !important;
-                padding: 2.7rem 1.85rem !important;
-                border: 1px solid rgba(153,27,27,0.56) !important;
-                background: linear-gradient(135deg, #991b1b, #b91c1c) !important;
-                background-color: #991b1b !important;
-                box-shadow: 0 24px 48px rgba(153,27,27,0.25) !important;
-                color: #ffffff !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-                transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease !important;
-            }
-
-            .home-button-purple div[data-testid="stButton"] > button:hover,
-            .home-button-purple div[data-testid="stButton"] > button:focus {
-                background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
-                background-color: #4c1d95 !important;
-                box-shadow: 0 28px 54px rgba(88,28,135,0.34) !important;
-                transform: translateY(-2px) !important;
-            }
-
-            .home-button-red div[data-testid="stButton"] > button:hover,
-            .home-button-red div[data-testid="stButton"] > button:focus {
-                background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
-                background-color: #7f1d1d !important;
-                box-shadow: 0 28px 54px rgba(153,27,27,0.31) !important;
-                transform: translateY(-2px) !important;
-            }
-
-            .home-button-purple div[data-testid="stButton"] > button p,
-            .home-button-purple div[data-testid="stButton"] > button span,
-            .home-button-purple div[data-testid="stButton"] > button div,
-            .home-button-red div[data-testid="stButton"] > button p,
-            .home-button-red div[data-testid="stButton"] > button span,
-            .home-button-red div[data-testid="stButton"] > button div {
-                color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-                font-size: 1.52rem !important;
-                font-weight: 770 !important;
-                line-height: 1.28 !important;
-                text-align: center !important;
-                white-space: normal !important;
-            }
-
-            .home-overview-offset {
-                height: 10.35rem !important;
-            }
-
             .home-overview-panel {
-                background: linear-gradient(150deg, rgba(255,255,255,0.99), rgba(246,252,248,0.98)) !important;
-                border: 1px solid rgba(22,101,52,0.11) !important;
-                border-radius: 38px !important;
-                padding: 1.7rem 1.55rem !important;
-                box-shadow: 0 18px 38px rgba(20,83,45,0.08) !important;
-                min-height: 17.9rem !important;
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: center !important;
-                box-sizing: border-box !important;
-            }
-
-            .home-overview-eyebrow {
-                margin-bottom: 0.55rem !important;
+                padding: 1.35rem 1.28rem !important;
+                border-radius: 26px !important;
             }
 
             .home-overview-title {
-                font-size: 1.3rem !important;
-                line-height: 1.24 !important;
-                margin: 0 0 0.65rem 0 !important;
+                font-size: 1.28rem !important;
             }
 
             .home-overview-copy {
-                font-size: 1.0rem !important;
-                line-height: 1.78 !important;
-                margin: 0 !important;
+                font-size: 0.98rem !important;
+                line-height: 1.76 !important;
             }
         </style>
         """,
@@ -3810,13 +3795,14 @@ def render_home() -> None:
             <div class="logo-box"><img src="data:image/png;base64,{LEAF_LOGO_BASE64}" alt="Leaf It To Us logo"></div>
             <div>
                 <p class="brand-title">{APP_NAME}</p>
+                <p class="brand-subtitle">{APP_TAGLINE}</p>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns([1.5, 0.88], gap="medium")
+    left, right = st.columns([1.42, 0.88], gap="medium")
     with left:
         hero_panel = st.container(border=True)
         with hero_panel:
@@ -3835,7 +3821,6 @@ def render_home() -> None:
             st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
             btn1, btn2 = st.columns(2, gap="large")
             with btn1:
-                st.markdown('<div class="home-button-purple">', unsafe_allow_html=True)
                 st.button(
                     "Give Me a Portfolio Recommendation",
                     key="home_recommendation_button",
@@ -3843,9 +3828,7 @@ def render_home() -> None:
                     use_container_width=True,
                     on_click=open_recommendation,
                 )
-                st.markdown('</div>', unsafe_allow_html=True)
             with btn2:
-                st.markdown('<div class="home-button-red">', unsafe_allow_html=True)
                 st.button(
                     "Build Your Customised Portfolio",
                     key="home_builder_button",
@@ -3853,9 +3836,7 @@ def render_home() -> None:
                     use_container_width=True,
                     on_click=open_builder,
                 )
-                st.markdown('</div>', unsafe_allow_html=True)
     with right:
-        st.markdown('<div class="home-overview-offset"></div>', unsafe_allow_html=True)
         st.markdown(
             """
             <div class="home-overview-panel">
@@ -3893,6 +3874,7 @@ def render_home() -> None:
         render_card("Social (S)", "Social factors focus on how organisations treat people, including labour standards, diversity, community impact, health, safety, and human rights.")
     with c3:
         render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
+
 
 def render_recommendation_screen() -> None:
     inject_tool_text_css()
