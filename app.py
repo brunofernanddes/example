@@ -912,7 +912,6 @@ def inject_css() -> None:
                 --primary2: #166534;
                 --primary3: #15803d;
                 --primary4: #22c55e;
-                --yarrak: #FF0000;
                 --shadow: 0 18px 50px rgba(20, 83, 45, 0.08);
                 --shadow-soft: 0 10px 24px rgba(20, 83, 45, 0.05);
             }
@@ -2852,7 +2851,7 @@ def render_home() -> None:
                 st.button(
                     "Give Me a Portfolio Recommendation",
                     key="home_recommendation_button",
-                    type="yarrak",
+                    type="primary",
                     use_container_width=True,
                     on_click=open_recommendation,
                 )
