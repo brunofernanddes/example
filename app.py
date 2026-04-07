@@ -16,6 +16,8 @@ st.set_page_config(
 APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
+st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+
 LEAF_LOGO_SVG = """
 <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img">
     <defs>
