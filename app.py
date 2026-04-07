@@ -2846,6 +2846,15 @@ def render_home() -> None:
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
+            st.markdown("""
+<style>
+div.stButton:nth-of-type(1) button {
+    background-color: #ef4444;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+
             btn1, btn2 = st.columns(2, gap="large")
             with btn1:
                 st.button(
