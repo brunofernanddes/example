@@ -3751,9 +3751,9 @@ def render_home() -> None:
             }
 
             .logo-box {
-                width: 148px !important;
-                height: 148px !important;
-                border-radius: 34px !important;
+                width: 112px !important;
+                height: 112px !important;
+                border-radius: 28px !important;
             }
 
             .brand-title {
@@ -3778,13 +3778,8 @@ def render_home() -> None:
             }
 
             .home-overview-panel {
-                padding: 1.45rem 1.35rem !important;
+                padding: 1.35rem 1.28rem !important;
                 border-radius: 26px !important;
-                min-height: 33.2rem !important;
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: flex-start !important;
-                box-sizing: border-box !important;
             }
 
             .home-overview-title {
