@@ -3664,6 +3664,132 @@ def render_builder_popup() -> None:
 # -------------------------------------------------
 def render_home() -> None:
     st.markdown(
+        """
+        <style>
+            div[data-testid="stButton"] > button[kind="primary"],
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
+                min-height: 16.3rem !important;
+                border-radius: 36px !important;
+                padding: 2.9rem 1.7rem !important;
+                border: 1px solid rgba(109,40,217,0.46) !important;
+                background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
+                background-color: #7c3aed !important;
+                box-shadow: 0 24px 46px rgba(109,40,217,0.24) !important;
+                color: #ffffff !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="secondary"],
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] {
+                min-height: 16.3rem !important;
+                border-radius: 36px !important;
+                padding: 2.9rem 1.7rem !important;
+                border: 1px solid rgba(220,38,38,0.40) !important;
+                background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+                background-color: #dc2626 !important;
+                box-shadow: 0 24px 46px rgba(220,38,38,0.22) !important;
+                color: #ffffff !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="primary"]:hover,
+            div[data-testid="stButton"] > button[kind="primary"]:focus,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:focus {
+                background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
+                background-color: #6d28d9 !important;
+                box-shadow: 0 28px 50px rgba(109,40,217,0.28) !important;
+                transform: translateY(-2px) !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="secondary"]:hover,
+            div[data-testid="stButton"] > button[kind="secondary"]:focus,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:hover,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:focus {
+                background: linear-gradient(135deg, #b91c1c, #dc2626) !important;
+                background-color: #b91c1c !important;
+                box-shadow: 0 28px 50px rgba(220,38,38,0.26) !important;
+                transform: translateY(-2px) !important;
+            }
+
+            div[data-testid="stButton"] > button[kind="primary"] p,
+            div[data-testid="stButton"] > button[kind="primary"] span,
+            div[data-testid="stButton"] > button[kind="primary"] div,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] p,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] span,
+            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] div,
+            div[data-testid="stButton"] > button[kind="secondary"] p,
+            div[data-testid="stButton"] > button[kind="secondary"] span,
+            div[data-testid="stButton"] > button[kind="secondary"] div,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] p,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] span,
+            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] div {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                font-size: 1.52rem !important;
+                font-weight: 760 !important;
+                line-height: 1.24 !important;
+                text-align: center !important;
+                white-space: normal !important;
+            }
+
+            .brand-row {
+                gap: 1.15rem !important;
+                margin-bottom: 1.25rem !important;
+            }
+
+            .logo-box {
+                width: 112px !important;
+                height: 112px !important;
+                border-radius: 28px !important;
+            }
+
+            .brand-title {
+                font-size: 1.18rem !important;
+            }
+
+            .brand-subtitle {
+                font-size: 0.98rem !important;
+            }
+
+            .home-cta-shell {
+                max-width: 980px !important;
+                margin: 0 auto 0.55rem auto !important;
+            }
+
+            .home-cta-note {
+                font-size: 1.06rem !important;
+            }
+
+            .home-button-spacer {
+                height: 1.35rem !important;
+            }
+
+            .home-overview-panel {
+                padding: 1.35rem 1.28rem !important;
+                border-radius: 26px !important;
+            }
+
+            .home-overview-title {
+                font-size: 1.28rem !important;
+            }
+
+            .home-overview-copy {
+                font-size: 0.98rem !important;
+                line-height: 1.76 !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
         f"""
         <div class="brand-row">
             <div class="logo-box"><img src="data:image/png;base64,{LEAF_LOGO_BASE64}" alt="Leaf It To Us logo"></div>
@@ -3676,7 +3802,7 @@ def render_home() -> None:
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns([1.62, 0.58], gap="large")
+    left, right = st.columns([1.42, 0.88], gap="medium")
     with left:
         hero_panel = st.container(border=True)
         with hero_panel:
@@ -3706,6 +3832,7 @@ def render_home() -> None:
                 st.button(
                     "Build Your Customised Portfolio",
                     key="home_builder_button",
+                    type="secondary",
                     use_container_width=True,
                     on_click=open_builder,
                 )
