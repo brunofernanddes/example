@@ -912,6 +912,7 @@ def inject_css() -> None:
                 --primary2: #166534;
                 --primary3: #15803d;
                 --primary4: #22c55e;
+                --primary5: #FF0000;
                 --shadow: 0 18px 50px rgba(20, 83, 45, 0.08);
                 --shadow-soft: 0 10px 24px rgba(20, 83, 45, 0.05);
             }
@@ -2846,6 +2847,21 @@ def render_home() -> None:
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
+
+            
+st.markdown("""
+<style>
+div[data-testid="column"]:nth-of-type(1) button {
+    background-color: var(--primary5);
+    color: white;
+}
+div[data-testid="column"]:nth-of-type(2) button {
+    background-color: #8b5cf6;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+
             btn1, btn2 = st.columns(2, gap="large")
             with btn1:
                 st.button(
