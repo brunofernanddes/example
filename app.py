@@ -18,7 +18,7 @@ APP_TAGLINE = "Sustainable investing, built around you."
 st.markdown("<div style='margin-top: 90px;'></div>", unsafe_allow_html=True)
 
 LEAF_LOGO_SVG = """
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img">
+<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img">
     <defs>
         <linearGradient id="leaf-grad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
