@@ -830,7 +830,7 @@ AgE16OvCKGsflYASUAJKYNQTUIM+6odYO6gElEB1Cah2JTA8CKhBHx7joK1QAkpACSgBJTAoAmrQB4VP
 mIAa9GE8ONo0JaAElEB1Caj20URADfpoGk3tixJQAkpACayzBNSgr7NDrx1XAkpACVSXgGpfswTUoK9Z3lqbElACSkAJKIGqEFCDXhWsqlQJKAEloASqS0C1
 L0tADfqyRDSsBJSAElACSmAEElCDPgIHTZusBJSAElAC1SUwErX/fwAAAP//KTIuWQAAAAZJREFUAwBdzeu1EPPUJgAAAABJRU5ErkJggg==
 """
-st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+
 
 # -------------------------------------------------
 # Embedded company ESG data
@@ -1737,20 +1737,21 @@ def inject_css() -> None:
             .brand-row {
                 display: flex;
                 align-items: center;
-                gap: 0.95rem;
+                gap: 1.05rem;
                 margin-bottom: 1.1rem;
             }
 
             .logo-box {
-                width: 82px;
-                height: 82px;
-                border-radius: 22px;
+                width: 96px;
+                height: 96px;
+                border-radius: 24px;
                 background: transparent;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 box-shadow: none;
                 padding: 0;
+                flex: 0 0 auto;
             }
 
             .logo-box img,
@@ -2175,21 +2176,35 @@ def inject_css() -> None:
             }
 
             .home-button-spacer {
-                height: 1.1rem;
+                height: 1.2rem;
+            }
+
+            div.st-key-home_recommendation_button,
+            div.st-key-home_builder_button {
+                height: 100%;
+            }
+
+            div.st-key-home_recommendation_button > div,
+            div.st-key-home_builder_button > div {
+                height: 100%;
             }
 
             div.st-key-home_recommendation_button button,
             div.st-key-home_builder_button button {
-                min-height: 13.8rem !important;
-                border-radius: 32px !important;
+                min-height: 15.2rem !important;
+                height: 100% !important;
+                border-radius: 34px !important;
                 font-size: 1.58rem !important;
                 font-weight: 760 !important;
                 line-height: 1.22 !important;
                 letter-spacing: -0.02em !important;
-                padding: 2.25rem 1.4rem !important;
+                padding: 2.55rem 1.45rem !important;
                 text-align: center !important;
                 white-space: normal !important;
                 transition: all 0.18s ease !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
             }
 
             div.st-key-home_recommendation_button button {
@@ -2205,16 +2220,21 @@ def inject_css() -> None:
             }
 
             div.st-key-home_recommendation_button button:hover,
-            div.st-key-home_builder_button button:hover {
+            div.st-key-home_builder_button button:hover,
+            div.st-key-home_recommendation_button button:focus,
+            div.st-key-home_builder_button button:focus {
                 transform: translateY(-2px) !important;
+                outline: none !important;
             }
 
-            div.st-key-home_recommendation_button button:hover {
+            div.st-key-home_recommendation_button button:hover,
+            div.st-key-home_recommendation_button button:focus {
                 background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
                 box-shadow: 0 26px 46px rgba(109,40,217,0.27) !important;
             }
 
-            div.st-key-home_builder_button button:hover {
+            div.st-key-home_builder_button button:hover,
+            div.st-key-home_builder_button button:focus {
                 background: linear-gradient(135deg, #b91c1c, #dc2626) !important;
                 box-shadow: 0 26px 46px rgba(220,38,38,0.25) !important;
             }
@@ -3656,7 +3676,7 @@ def render_home() -> None:
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns([1.52, 0.62], gap="large")
+    left, right = st.columns([1.62, 0.58], gap="large")
     with left:
         hero_panel = st.container(border=True)
         with hero_panel:
