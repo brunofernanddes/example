@@ -17,7 +17,7 @@ div.stButton > button:last-child {
 }
 </style>
 """, unsafe_allow_html=True)
--------------------------------------------------
+
 # Page config
 # -------------------------------------------------
 st.set_page_config(
