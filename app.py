@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
+# -------------------------------------------------
 # Page config
 # -------------------------------------------------
 st.set_page_config(
@@ -3078,3 +3079,22 @@ else:
 if st.session_state.show_splash:
     render_splash_overlay()
     st.session_state.show_splash = False
+
+Necmettin Oguz Ozturk
+
+​Swati Singh;​Stephanie Louisa Lo​
+st.markdown("""
+<style>
+/* Left button (red) */
+div.stButton > button:first-child {
+    background-color: #ef4444;
+    color: white;
+}
+
+/* Right button (purple) */
+div.stButton > button:last-child {
+    background-color: #8b5cf6;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
