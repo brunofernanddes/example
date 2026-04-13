@@ -3289,6 +3289,180 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect:
     }
 
 
+def evaluate_builder_point(
+    x1: float,
+    x2: float,
+    mu_excess: np.ndarray,
+    sigma: np.ndarray,
+    esg_vector: np.ndarray,
+    gamma: float,
+    lambda_pref: float,
+) -> dict:
+    x1 = float(max(x1, 0.0))
+    x2 = float(max(x2, 0.0))
+    risky_share = float(x1 + x2)
+
+    excess_return = float(x1 * mu_excess[0] + x2 * mu_excess[1])
+    variance = float(
+        (x1 ** 2) * sigma[0, 0]
+        + (x2 ** 2) * sigma[1, 1]
+        + 2.0 * x1 * x2 * sigma[0, 1]
+    )
+    variance = max(variance, 0.0)
+    risk = float(np.sqrt(variance))
+
+    if risky_share > 1e-12:
+        avg_esg = float((x1 * esg_vector[0] + x2 * esg_vector[1]) / risky_share)
+        objective = float(excess_return - 0.5 * gamma * variance + lambda_pref * avg_esg)
+        w1 = float(x1 / risky_share)
+        w2 = float(x2 / risky_share)
+    else:
+        avg_esg = 0.0
+        objective = 0.0
+        w1 = 0.0
+        w2 = 0.0
+
+    sharpe = float(excess_return / risk) if risk > 1e-12 else 0.0
+
+    return {
+        "x1": x1,
+        "x2": x2,
+        "w1": w1,
+        "w2": w2,
+        "risky_share": risky_share,
+        "rf_weight": float(1.0 - risky_share),
+        "excess_return": excess_return,
+        "variance": variance,
+        "risk": risk,
+        "avg_esg": avg_esg,
+        "sharpe": sharpe,
+        "objective": objective,
+    }
+
+
+
+def solve_builder_optimum(
+    mu_excess: np.ndarray,
+    sigma: np.ndarray,
+    esg_vector: np.ndarray,
+    gamma: float,
+    lambda_pref: float,
+) -> dict:
+    # Audit rule: when lambda = 0, the problem should collapse to the standard
+    # mean-variance benchmark. Solve that case exactly so that risk-aversion tests
+    # behave correctly and doubling gamma roughly halves the risky exposure.
+    if lambda_pref <= 1e-12:
+        candidates = [
+            evaluate_builder_point(0.0, 0.0, mu_excess, sigma, esg_vector, gamma, lambda_pref)
+        ]
+
+        variance_floor = 1e-12
+        var11 = max(float(sigma[0, 0]), variance_floor)
+        var22 = max(float(sigma[1, 1]), variance_floor)
+
+        x1_only = max(float(mu_excess[0]) / (gamma * var11), 0.0)
+        x2_only = max(float(mu_excess[1]) / (gamma * var22), 0.0)
+        candidates.append(evaluate_builder_point(x1_only, 0.0, mu_excess, sigma, esg_vector, gamma, lambda_pref))
+        candidates.append(evaluate_builder_point(0.0, x2_only, mu_excess, sigma, esg_vector, gamma, lambda_pref))
+
+        try:
+            interior = np.linalg.pinv(sigma) @ (mu_excess / max(gamma, 1e-12))
+            interior = np.maximum(interior, 0.0)
+            candidates.append(
+                evaluate_builder_point(
+                    float(interior[0]),
+                    float(interior[1]),
+                    mu_excess,
+                    sigma,
+                    esg_vector,
+                    gamma,
+                    lambda_pref,
+                )
+            )
+        except Exception:
+            pass
+
+        best = max(candidates, key=lambda item: item["objective"])
+        return dict(best)
+
+    # For lambda > 0, search over the risky-sleeve composition directly.
+    # Write x = t * w where w is the share placed in asset 1 within the risky sleeve
+    # and t is the total risky exposure. For a fixed sleeve mix, the objective is
+    # concave in t, so the best t can be computed analytically.
+    def evaluate_mix_grid(weight_grid: np.ndarray, leverage_cap: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        sleeve_mu = weight_grid * mu_excess[0] + (1.0 - weight_grid) * mu_excess[1]
+        sleeve_variance = (
+            (weight_grid ** 2) * sigma[0, 0]
+            + ((1.0 - weight_grid) ** 2) * sigma[1, 1]
+            + 2.0 * weight_grid * (1.0 - weight_grid) * sigma[0, 1]
+        )
+        sleeve_variance = np.maximum(sleeve_variance, 1e-12)
+        sleeve_esg = weight_grid * esg_vector[0] + (1.0 - weight_grid) * esg_vector[1]
+
+        total_risky_star = np.maximum(sleeve_mu / (gamma * sleeve_variance), 0.0)
+        total_risky_star = np.clip(total_risky_star, 0.0, leverage_cap)
+
+        utility = (
+            total_risky_star * sleeve_mu
+            - 0.5 * gamma * sleeve_variance * (total_risky_star ** 2)
+            + lambda_pref * sleeve_esg
+        )
+
+        # If expected excess returns are poor but lambda is positive, the formal objective
+        # favours an infinitesimal tilt toward the greener risky sleeve. Use a tiny positive
+        # risky allocation to approximate that edge case without destabilising the app.
+        tiny_share = 1e-6
+        tiny_utility = (
+            tiny_share * sleeve_mu
+            - 0.5 * gamma * sleeve_variance * (tiny_share ** 2)
+            + lambda_pref * sleeve_esg
+        )
+        use_tiny = tiny_utility > utility
+        total_risky_star = np.where(use_tiny, tiny_share, total_risky_star)
+        utility = np.where(use_tiny, tiny_utility, utility)
+        return sleeve_mu, sleeve_variance, sleeve_esg, total_risky_star, utility
+
+    leverage_cap = 100.0
+    try:
+        analytic_hint = np.linalg.pinv(sigma) @ (mu_excess / max(gamma, 1e-12))
+        positive_hint = np.maximum(analytic_hint, 0.0)
+        if np.any(np.isfinite(positive_hint)):
+            leverage_cap = max(
+                leverage_cap,
+                float(np.sum(positive_hint)) * 3.0,
+                float(np.max(positive_hint)) * 4.0,
+            )
+    except Exception:
+        pass
+    leverage_cap = float(np.clip(leverage_cap, 10.0, 250.0))
+
+    best_weight = 0.5
+    best_total_risky = 0.0
+    best_utility = -np.inf
+
+    left = 0.0
+    right = 1.0
+    for refinement_count in range(4):
+        grid_size = 3001 if refinement_count == 0 else 2001
+        weight_grid = np.linspace(left, right, grid_size)
+        _, _, _, total_risky_star, utility = evaluate_mix_grid(weight_grid, leverage_cap)
+        best_idx = int(np.argmax(utility))
+        best_weight = float(weight_grid[best_idx])
+        best_total_risky = float(total_risky_star[best_idx])
+        best_utility = float(utility[best_idx])
+
+        if refinement_count < 3:
+            step = float(weight_grid[1] - weight_grid[0]) if len(weight_grid) > 1 else 0.001
+            span = max(step * 12.0, (right - left) * 0.08)
+            left = max(0.0, best_weight - span)
+            right = min(1.0, best_weight + span)
+
+    best_x1 = float(best_total_risky * best_weight)
+    best_x2 = float(best_total_risky * (1.0 - best_weight))
+    return evaluate_builder_point(best_x1, best_x2, mu_excess, sigma, esg_vector, gamma, lambda_pref)
+
+
+
 def compute_builder_result(
     asset1: str,
     asset2: str,
@@ -3350,7 +3524,9 @@ def compute_builder_result(
     max_sharpe_idx = int(np.argmax(portfolio_sharpes))
 
     esg_preference_fraction = float(np.clip(lambda_pref / 0.10, 0.0, 1.0))
-    required_esg = float(np.min(portfolio_esg) + esg_preference_fraction * (np.max(portfolio_esg) - np.min(portfolio_esg)))
+    required_esg = float(
+        np.min(portfolio_esg) + esg_preference_fraction * (np.max(portfolio_esg) - np.min(portfolio_esg))
+    )
     esg_constrained_mask = portfolio_esg >= (required_esg - 1e-12)
 
     efficient_idx_without_esg_full = efficient_frontier_indices(portfolio_risks, portfolio_returns)
@@ -3367,59 +3543,20 @@ def compute_builder_result(
     frontiers_share_points = bool(frontier_overlap > 0.0)
     frontiers_need_visual_separation = bool(frontier_overlap >= 0.20)
 
-    # Search the risky-asset weights directly, allowing the leftover wealth to sit in the risk-free asset.
-    # The grid also permits total risky exposure above 100%, which corresponds to borrowing at the risk-free rate.
-    try:
-        analytic_hint = np.linalg.pinv(sigma) @ mu_excess / max(gamma, 1e-9)
-        positive_hint = np.maximum(analytic_hint, 0.0)
-        gross_hint = float(np.sum(positive_hint))
-        max_weight = max(1.50, gross_hint * 2.25, float(np.max(positive_hint)) * 2.50)
-    except Exception:
-        max_weight = 1.50
-    max_weight = float(np.clip(max_weight, 1.50, 3.00))
+    optimum = solve_builder_optimum(mu_excess, sigma, esg_vector, gamma, lambda_pref)
 
-    risky_grid = np.linspace(0.0, max_weight, 401)
-    x1_grid, x2_grid = np.meshgrid(risky_grid, risky_grid, indexing="ij")
-    risky_sum_grid = x1_grid + x2_grid
-
-    excess_return_grid = x1_grid * mu_excess[0] + x2_grid * mu_excess[1]
-    variance_grid = (
-        (x1_grid ** 2) * sigma[0, 0]
-        + (x2_grid ** 2) * sigma[1, 1]
-        + 2.0 * x1_grid * x2_grid * sigma[0, 1]
-    )
-    risk_grid = np.sqrt(np.maximum(variance_grid, 0.0))
-
-    numerator_esg_grid = x1_grid * esg_vector[0] + x2_grid * esg_vector[1]
-    avg_esg_grid = np.divide(
-        numerator_esg_grid,
-        risky_sum_grid,
-        out=np.zeros_like(numerator_esg_grid),
-        where=risky_sum_grid > 1e-12,
-    )
-
-    utility_grid = excess_return_grid - 0.5 * gamma * variance_grid + lambda_pref * avg_esg_grid
-    utility_grid = np.where(risky_sum_grid > 1e-12, utility_grid, 0.0)
-
-    optimal_flat_idx = int(np.argmax(utility_grid))
-    opt_row, opt_col = np.unravel_index(optimal_flat_idx, utility_grid.shape)
-    opt_x1 = float(x1_grid[opt_row, opt_col])
-    opt_x2 = float(x2_grid[opt_row, opt_col])
-    opt_risky_share = float(risky_sum_grid[opt_row, opt_col])
-    opt_rf_weight = float(1.0 - opt_risky_share)
-    opt_excess_return = float(excess_return_grid[opt_row, opt_col])
+    opt_x1 = float(optimum["x1"])
+    opt_x2 = float(optimum["x2"])
+    opt_w1 = float(optimum["w1"])
+    opt_w2 = float(optimum["w2"])
+    opt_risky_share = float(optimum["risky_share"])
+    opt_rf_weight = float(optimum["rf_weight"])
+    opt_excess_return = float(optimum["excess_return"])
     opt_return = float(rf + opt_excess_return)
-    opt_risk = float(risk_grid[opt_row, opt_col])
-    opt_esg = float(avg_esg_grid[opt_row, opt_col])
-    opt_sharpe = float(opt_excess_return / opt_risk) if opt_risk > 1e-12 else 0.0
-    opt_objective = float(utility_grid[opt_row, opt_col])
-
-    if opt_risky_share > 1e-12:
-        opt_w1 = float(opt_x1 / opt_risky_share)
-        opt_w2 = float(opt_x2 / opt_risky_share)
-    else:
-        opt_w1 = 0.0
-        opt_w2 = 0.0
+    opt_risk = float(optimum["risk"])
+    opt_esg = float(optimum["avg_esg"])
+    opt_sharpe = float(optimum["sharpe"])
+    opt_objective = float(optimum["objective"])
 
     return {
         "asset1": asset1,
