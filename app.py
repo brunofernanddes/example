@@ -3179,6 +3179,10 @@ def build_dual_frontier_display(result: dict) -> dict:
             'with_curve_returns': np.array([], dtype=float),
             'without_tangency_point': (0.0, 0.0),
             'with_tangency_point': (0.0, 0.0),
+            'without_tangency_esg': 0.0,
+            'with_tangency_esg': 0.0,
+            'without_tangency_sharpe': 0.0,
+            'with_tangency_sharpe': 0.0,
             'without_cml_risks': np.array([], dtype=float),
             'without_cml_returns': np.array([], dtype=float),
             'with_cml_risks': np.array([], dtype=float),
@@ -3202,6 +3206,10 @@ def build_dual_frontier_display(result: dict) -> dict:
         float(without_curve_risks[without_tangency_idx]),
         float(without_curve_returns[without_tangency_idx]),
     )
+    without_tangency_esg = float(risky_esg_scores_pct[without_tangency_idx])
+    without_tangency_sharpe = 0.0
+    if without_tangency_point[0] > 1e-9:
+        without_tangency_sharpe = float((without_tangency_point[1] - rf_pct) / without_tangency_point[0])
 
     esg_preference_fraction = float(result.get('esg_preference_fraction', 0.0))
     min_esg_pct = float(np.min(risky_esg_scores_pct))
@@ -3244,6 +3252,10 @@ def build_dual_frontier_display(result: dict) -> dict:
         float(with_curve_risks[with_tangency_local_idx]),
         float(with_curve_returns[with_tangency_local_idx]),
     )
+    with_tangency_esg = float(risky_esg_scores_pct[esg_slice][with_tangency_local_idx])
+    with_tangency_sharpe = 0.0
+    if with_tangency_point[0] > 1e-9:
+        with_tangency_sharpe = float((with_tangency_point[1] - rf_pct) / with_tangency_point[0])
 
     without_frontier_risks, without_frontier_returns = _extract_upper_branch_from_full_curve(
         without_curve_risks,
@@ -3265,6 +3277,10 @@ def build_dual_frontier_display(result: dict) -> dict:
         'with_curve_returns': with_curve_returns,
         'without_tangency_point': without_tangency_point,
         'with_tangency_point': with_tangency_point,
+        'without_tangency_esg': without_tangency_esg,
+        'with_tangency_esg': with_tangency_esg,
+        'without_tangency_sharpe': without_tangency_sharpe,
+        'with_tangency_sharpe': with_tangency_sharpe,
         'without_cml_risks': np.array([0.0, without_tangency_point[0]], dtype=float),
         'without_cml_returns': np.array([rf_pct, without_tangency_point[1]], dtype=float),
         'with_cml_risks': np.array([0.0, with_tangency_point[0]], dtype=float),
@@ -3280,14 +3296,15 @@ def build_frontier_interpretation(result: dict) -> str:
     opt_x1 = float(result.get("opt_w1", 0.0))
     opt_x2 = float(result.get("opt_w2", 0.0))
     opt_rf_weight = float(result.get("opt_rf_weight", 1.0 - opt_x1 - opt_x2))
-    opt_return = float(result.get("opt_return", 0.0) * 100.0)
-    opt_risk = float(result.get("opt_risk", 0.0) * 100.0)
-    opt_esg = float(result.get("opt_esg", 0.0))
-    opt_sharpe = float(result.get("opt_sharpe", 0.0))
 
-    base_return = float(result.get("current_non_esg_return_pct", opt_return))
-    base_risk = float(result.get("current_non_esg_risk_pct", opt_risk))
-    base_esg = float(result.get("current_non_esg_esg_pct", opt_esg))
+    chart_return = float(result.get("display_expected_return_pct", result.get("opt_return", 0.0) * 100.0))
+    chart_risk = float(result.get("display_portfolio_risk_pct", result.get("opt_risk", 0.0) * 100.0))
+    chart_esg = float(result.get("display_portfolio_esg_pct", result.get("opt_esg", 0.0)))
+    chart_sharpe = float(result.get("display_sharpe_ratio", result.get("opt_sharpe", 0.0)))
+
+    base_return = float(result.get("display_without_esg_return_pct", result.get("current_non_esg_return_pct", chart_return)))
+    base_risk = float(result.get("display_without_esg_risk_pct", result.get("current_non_esg_risk_pct", chart_risk)))
+    base_esg = float(result.get("display_without_esg_esg_pct", result.get("current_non_esg_esg_pct", chart_esg)))
     correlation = float(result.get("correlation", 0.0))
 
     if opt_x1 + opt_x2 <= 1e-12:
@@ -3306,12 +3323,12 @@ def build_frontier_interpretation(result: dict) -> str:
     else:
         capital_sentence = "The portfolio is using almost all available capital in the risky assets."
 
-    performance_sentence = f"At your current settings, the recommended portfolio is targeting <strong>{opt_return:.2f}% expected return</strong> with <strong>{opt_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{opt_sharpe:.2f}</strong>."
+    performance_sentence = f"On the frontier chart, the highlighted ESG-aware portfolio is showing <strong>{chart_return:.2f}% expected return</strong> at <strong>{chart_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{chart_sharpe:.2f}</strong>."
 
-    esg_lift = opt_esg - base_esg
-    return_gap = opt_return - base_return
-    risk_gap = opt_risk - base_risk
-    esg_sentence = f"The recommended portfolio has a risky-sleeve ESG score of <strong>{opt_esg:.2f}/100</strong>."
+    esg_lift = chart_esg - base_esg
+    return_gap = chart_return - base_return
+    risk_gap = chart_risk - base_risk
+    esg_sentence = f"That highlighted portfolio has a risky-sleeve ESG score of <strong>{chart_esg:.2f}/100</strong>."
 
     if abs(esg_lift) < 0.10 and abs(return_gap) < 0.15 and abs(risk_gap) < 0.15:
         tradeoff_sentence = "Compared with the non-ESG solution, the recommendation is financially very similar, so ESG is not changing the portfolio much at these settings."
@@ -4116,22 +4133,40 @@ def render_builder_popup() -> None:
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
+            frontier_display = build_dual_frontier_display(result)
+            display_return_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[1])
+            display_risk_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[0])
+            display_esg_pct = float(frontier_display.get("with_tangency_esg", result.get("opt_esg", 0.0)))
+            display_sharpe = float(frontier_display.get("with_tangency_sharpe", result.get("opt_sharpe", 0.0)))
+
+            display_result = dict(result)
+            display_result.update({
+                "display_expected_return_pct": display_return_pct,
+                "display_portfolio_risk_pct": display_risk_pct,
+                "display_portfolio_esg_pct": display_esg_pct,
+                "display_sharpe_ratio": display_sharpe,
+                "display_without_esg_return_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[1]),
+                "display_without_esg_risk_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[0]),
+                "display_without_esg_esg_pct": float(frontier_display.get("without_tangency_esg", result.get("current_non_esg_esg_pct", 0.0))),
+                "display_without_esg_sharpe": float(frontier_display.get("without_tangency_sharpe", result.get("current_non_esg_sharpe", 0.0))),
+            })
+
             metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
             with metric_c1:
-                st.markdown(result_tile("Expected Return", f'{result["opt_return"]:.2%}'), unsafe_allow_html=True)
+                st.markdown(result_tile("Expected Return", f'{display_return_pct:.2f}%'), unsafe_allow_html=True)
             with metric_c2:
                 st.markdown(
                     result_tile(
                         "Portfolio Risk",
-                        f'{result["opt_risk"]:.2%}',
+                        f'{display_risk_pct:.2f}%',
                         tooltip="Portfolio risk is characterised by standard deviation.",
                     ),
                     unsafe_allow_html=True,
                 )
             with metric_c3:
-                st.markdown(result_tile("Portfolio ESG Score", f'{result["opt_esg"]:.2f}/100'), unsafe_allow_html=True)
+                st.markdown(result_tile("Portfolio ESG Score", f'{display_esg_pct:.2f}/100'), unsafe_allow_html=True)
             with metric_c4:
-                st.markdown(result_tile("Sharpe Ratio", f'{result["opt_sharpe"]:.2f}'), unsafe_allow_html=True)
+                st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
@@ -4139,7 +4174,6 @@ def render_builder_popup() -> None:
             fig, ax = plt.subplots(figsize=(9.6, 5.6), dpi=180, constrained_layout=True)
             fig.patch.set_facecolor("white")
 
-            frontier_display = build_dual_frontier_display(result)
             without_curve_risks = frontier_display["without_curve_risks"]
             without_curve_returns = frontier_display["without_curve_returns"]
             without_frontier_risks = frontier_display["without_frontier_risks"]
@@ -4275,7 +4309,7 @@ def render_builder_popup() -> None:
                 )
 
             ax.annotate(
-                "Current Optimal Portfolio\n(Without ESG)",
+                "Tangency Portfolio\n(Without ESG)",
                 (without_tangency_x, without_tangency_y),
                 xytext=(-118, 12),
                 textcoords="offset points",
@@ -4286,7 +4320,7 @@ def render_builder_popup() -> None:
                 arrowprops=dict(arrowstyle="->", color="#2563eb", lw=1.0, alpha=0.9),
             )
             ax.annotate(
-                "Current Optimal Portfolio\n(With ESG)",
+                "Tangency Portfolio\n(With Given ESG)",
                 (with_tangency_x, with_tangency_y),
                 xytext=(12, -34),
                 textcoords="offset points",
@@ -4309,7 +4343,7 @@ def render_builder_popup() -> None:
             style_modern_axes(ax)
             st.pyplot(fig)
             plt.close(fig)
-            st.markdown(build_frontier_interpretation(result), unsafe_allow_html=True)
+            st.markdown(build_frontier_interpretation(display_result), unsafe_allow_html=True)
 
 
 
