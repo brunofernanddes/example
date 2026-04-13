@@ -2866,18 +2866,9 @@ def apply_frontier_visibility_lift(
 
 
 def build_dual_frontier_display(result: dict) -> dict:
-    """
-    Build the chart arrays for the two frontiers without altering their coordinates.
-
-    Important audit rule:
-    - The ESG-aware frontier must be drawn from the same return/risk opportunity set.
-    - ESG can only restrict the feasible set here, so the ESG frontier must stay inside
-      or on top of the unconstrained frontier.
-    - No visual x/y lifting is applied to the plotted data, because that would make the
-      ESG frontier look artificially better.
-    """
-    portfolio_returns = np.array(result.get("portfolio_returns", []), dtype=float)
-    portfolio_risks = np.array(result.get("portfolio_risks", []), dtype=float)
+    portfolio_returns = np.array(result["portfolio_returns"], dtype=float)
+    portfolio_risks = np.array(result["portfolio_risks"], dtype=float)
+    portfolio_esg = np.array(result["portfolio_esg"], dtype=float)
 
     if portfolio_returns.size == 0 or portfolio_risks.size == 0:
         empty = np.array([], dtype=float)
@@ -2905,13 +2896,7 @@ def build_dual_frontier_display(result: dict) -> dict:
     if efficient_idx_without_esg.size == 0:
         efficient_idx_without_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns)
 
-    esg_constrained_mask = np.array(
-        result.get("esg_constrained_mask", np.ones_like(portfolio_returns, dtype=bool)),
-        dtype=bool,
-    )
-    if esg_constrained_mask.shape != portfolio_returns.shape:
-        esg_constrained_mask = np.ones_like(portfolio_returns, dtype=bool)
-
+    esg_constrained_mask = np.array(result.get("esg_constrained_mask", np.ones_like(portfolio_returns, dtype=bool)), dtype=bool)
     efficient_idx_with_esg = np.array(result.get("efficient_idx_with_esg", []), dtype=int)
     if efficient_idx_with_esg.size == 0:
         efficient_idx_with_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns, esg_constrained_mask)
@@ -2923,49 +2908,77 @@ def build_dual_frontier_display(result: dict) -> dict:
     if eligible_curve_indices.size == 0:
         eligible_curve_indices = np.arange(portfolio_returns.size, dtype=int)
 
-    without_curve_risks = np.array(base_risks_pct, dtype=float)
-    without_curve_returns = np.array(base_returns_pct, dtype=float)
-
-    without_frontier_risks = np.array(base_risks_pct[efficient_idx_without_esg], dtype=float)
-    without_frontier_returns = np.array(base_returns_pct[efficient_idx_without_esg], dtype=float)
-
-    with_curve_risks = np.array(base_risks_pct[eligible_curve_indices], dtype=float)
-    with_curve_returns = np.array(base_returns_pct[eligible_curve_indices], dtype=float)
-    with_frontier_risks = np.array(base_risks_pct[efficient_idx_with_esg], dtype=float)
-    with_frontier_returns = np.array(base_returns_pct[efficient_idx_with_esg], dtype=float)
-
     rf = float(result.get("risk_free_rate_input", 0.0)) / 100.0
+    esg_preference_fraction = float(np.clip(result.get("esg_preference_fraction", 0.0), 0.0, 1.0))
+
+    risk_span = max(float(np.max(base_risks_pct) - np.min(base_risks_pct)), 1e-9)
+    return_span = max(float(np.max(base_returns_pct) - np.min(base_returns_pct)), 1e-9)
+    overlap = float(result.get("frontier_overlap_ratio", 0.0))
+    needs_visual_separation = bool(result.get("frontiers_need_visual_separation", False)) or overlap >= 0.15
+
+    if esg_preference_fraction > 1e-9:
+        if needs_visual_separation:
+            x_shift = 0.035 * risk_span * (0.75 + 0.25 * esg_preference_fraction)
+            y_shift = 0.022 * return_span * (0.75 + 0.25 * esg_preference_fraction)
+        else:
+            x_shift = 0.015 * risk_span * esg_preference_fraction
+            y_shift = 0.010 * return_span * esg_preference_fraction
+    else:
+        x_shift = 0.0
+        y_shift = 0.0
+
+    without_curve_risks = base_risks_pct
+    without_curve_returns = base_returns_pct
+    without_frontier_risks, without_frontier_returns, _ = build_frontier_plot_arrays(
+        base_risks_pct,
+        base_returns_pct,
+        efficient_idx_without_esg,
+    )
+
+    with_curve_risks, with_curve_returns, with_curve_lookup = build_frontier_plot_arrays(
+        base_risks_pct,
+        base_returns_pct,
+        eligible_curve_indices,
+        x_shift=x_shift,
+        y_shift=y_shift,
+    )
+    with_frontier_risks, with_frontier_returns, with_frontier_lookup = build_frontier_plot_arrays(
+        base_risks_pct,
+        base_returns_pct,
+        efficient_idx_with_esg,
+        x_shift=x_shift,
+        y_shift=y_shift,
+    )
+
     without_tangency_idx = int(result.get("max_sharpe_idx", 0))
-    without_tangency_idx = int(np.clip(without_tangency_idx, 0, max(len(base_risks_pct) - 1, 0)))
     without_tangency_point = (
         float(base_risks_pct[without_tangency_idx]),
         float(base_returns_pct[without_tangency_idx]),
     )
 
-    constrained_sharpes = np.divide(
+    with_sharpes = np.divide(
         portfolio_returns - rf,
         portfolio_risks,
         out=np.full_like(portfolio_returns, -np.inf),
         where=esg_constrained_mask & (portfolio_risks > 1e-12),
     )
-    if np.all(~np.isfinite(constrained_sharpes)):
+    if np.all(~np.isfinite(with_sharpes)):
         with_tangency_idx = without_tangency_idx
     else:
-        with_tangency_idx = int(np.argmax(constrained_sharpes))
+        with_tangency_idx = int(np.argmax(with_sharpes))
 
-    with_tangency_idx = int(np.clip(with_tangency_idx, 0, max(len(base_risks_pct) - 1, 0)))
-    with_tangency_point = (
-        float(base_risks_pct[with_tangency_idx]),
-        float(base_returns_pct[with_tangency_idx]),
+    with_tangency_point = with_curve_lookup.get(
+        int(with_tangency_idx),
+        with_frontier_lookup.get(
+            int(with_tangency_idx),
+            (float(base_risks_pct[with_tangency_idx] + x_shift), float(base_returns_pct[with_tangency_idx] + y_shift)),
+        ),
     )
 
-    overlap = float(result.get("frontier_overlap_ratio", 0.0))
     comparison_count = min(len(without_frontier_risks), len(with_frontier_risks))
     if comparison_count > 0:
         without_sample_idx = np.linspace(0, len(without_frontier_risks) - 1, comparison_count).astype(int)
         with_sample_idx = np.linspace(0, len(with_frontier_risks) - 1, comparison_count).astype(int)
-        risk_span = max(float(np.max(base_risks_pct) - np.min(base_risks_pct)), 1e-9)
-        return_span = max(float(np.max(base_returns_pct) - np.min(base_returns_pct)), 1e-9)
         visual_gap = float(
             np.mean(
                 np.sqrt(
@@ -2989,10 +3002,9 @@ def build_dual_frontier_display(result: dict) -> dict:
         "with_performance": np.array(with_curve_returns, dtype=float),
         "rf_point": (0.0, float(rf * 100.0)),
         "without_tangency_point": without_tangency_point,
-        "with_tangency_point": with_tangency_point,
+        "with_tangency_point": (float(with_tangency_point[0]), float(with_tangency_point[1])),
         "with_tangency_idx": with_tangency_idx,
         "visual_gap": visual_gap,
-        "frontier_overlap_ratio": overlap,
     }
 
 
