@@ -2680,15 +2680,55 @@ def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     """
 
 
-def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float) -> str:
+def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float, risk_free_weight: float) -> str:
+    safe_asset1 = str(asset1).strip() or "Asset 1"
+    safe_asset2 = str(asset2).strip() or "Asset 2"
+
+    safe_weight1 = max(float(weight1), 0.0)
+    safe_weight2 = max(float(weight2), 0.0)
+    total_risky_weight = max(safe_weight1 + safe_weight2, 0.0)
+
+    if total_risky_weight > 1e-12:
+        sleeve_weight1 = safe_weight1 / total_risky_weight
+        sleeve_weight2 = safe_weight2 / total_risky_weight
+    else:
+        sleeve_weight1 = 0.0
+        sleeve_weight2 = 0.0
+
+    if risk_free_weight > 1e-9:
+        risk_free_copy = (
+            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}. "
+            f"That leaves {risk_free_weight:.2%} in the risk-free asset."
+        )
+        risk_free_chip = f"Risk-Free Holding: {risk_free_weight:.2%}"
+    elif risk_free_weight < -1e-9:
+        risk_free_copy = (
+            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}. "
+            f"Total risky exposure is {total_risky_weight:.2%}, so the portfolio is borrowing {abs(risk_free_weight):.2%} at the risk-free rate."
+        )
+        risk_free_chip = f"Risk-Free Borrowing: {abs(risk_free_weight):.2%}"
+    else:
+        risk_free_copy = (
+            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}, "
+            f"with the full portfolio invested in risky assets."
+        )
+        risk_free_chip = "Risk-Free Holding: 0.00%"
+
+    sleeve_copy = (
+        f"Inside the risky sleeve, the split is {safe_asset1}: {sleeve_weight1:.2%} and {safe_asset2}: {sleeve_weight2:.2%}. "
+        f"These sleeve weights add to 100%, while the total portfolio weights above follow the audit definition of x."
+    )
+
     return f"""
     <div class="allocation-summary">
-        <p class="allocation-summary-label">Recommended Allocation</p>
-        <p class="allocation-summary-title">{asset1}: {weight1:.2%} &nbsp;•&nbsp; {asset2}: {weight2:.2%}</p>
-        <p class="allocation-summary-copy">The live portfolio recommendation keeps the allocation visible in one clean summary block, while the key performance metrics remain easy to scan below.</p>
+        <p class="allocation-summary-label">Asset Weighting</p>
+        <p class="allocation-summary-title">{safe_asset1}: {safe_weight1:.2%} &nbsp;•&nbsp; {safe_asset2}: {safe_weight2:.2%}</p>
+        <p class="allocation-summary-copy">{risk_free_copy}</p>
+        <p class="allocation-summary-copy" style="margin-top:-0.25rem;">{sleeve_copy}</p>
         <div class="allocation-chip-row">
-            <span class="allocation-chip">{asset1}: {weight1:.2%}</span>
-            <span class="allocation-chip">{asset2}: {weight2:.2%}</span>
+            <span class="allocation-chip">{safe_asset1} Sleeve: {sleeve_weight1:.2%}</span>
+            <span class="allocation-chip">{safe_asset2} Sleeve: {sleeve_weight2:.2%}</span>
+            <span class="allocation-chip">{risk_free_chip}</span>
         </div>
     </div>
     """
@@ -3203,13 +3243,13 @@ def build_dual_frontier_display(result: dict) -> dict:
     without_curve_risks = np.array(risky_risks_pct, dtype=float)
     without_curve_returns = np.array(risky_returns_pct, dtype=float)
     without_tangency_point = (
-        float(result.get('current_non_esg_risk_pct', float(without_curve_risks[without_tangency_idx]))),
-        float(result.get('current_non_esg_return_pct', float(without_curve_returns[without_tangency_idx]))),
+        float(without_curve_risks[without_tangency_idx]),
+        float(without_curve_returns[without_tangency_idx]),
     )
-    without_tangency_esg = float(result.get('current_non_esg_esg_pct', float(risky_esg_scores_pct[without_tangency_idx])))
-    without_tangency_sharpe = float(result.get('current_non_esg_sharpe', 0.0))
-    if without_tangency_point[0] <= 1e-9 and float(without_curve_risks[without_tangency_idx]) > 1e-9:
-        without_tangency_sharpe = float((float(without_curve_returns[without_tangency_idx]) - rf_pct) / float(without_curve_risks[without_tangency_idx]))
+    without_tangency_esg = float(risky_esg_scores_pct[without_tangency_idx])
+    without_tangency_sharpe = 0.0
+    if without_tangency_point[0] > 1e-9:
+        without_tangency_sharpe = float((without_tangency_point[1] - rf_pct) / without_tangency_point[0])
 
     esg_preference_fraction = float(result.get('esg_preference_fraction', 0.0))
     min_esg_pct = float(np.min(risky_esg_scores_pct))
@@ -3249,13 +3289,13 @@ def build_dual_frontier_display(result: dict) -> dict:
     )
 
     with_tangency_point = (
-        float(result.get('opt_risk', 0.0) * 100.0),
-        float(result.get('opt_return', 0.0) * 100.0),
+        float(with_curve_risks[with_tangency_local_idx]),
+        float(with_curve_returns[with_tangency_local_idx]),
     )
-    with_tangency_esg = float(result.get('opt_esg', float(risky_esg_scores_pct[esg_slice][with_tangency_local_idx])))
-    with_tangency_sharpe = float(result.get('opt_sharpe', 0.0))
-    if with_tangency_point[0] <= 1e-9 and float(with_curve_risks[with_tangency_local_idx]) > 1e-9:
-        with_tangency_sharpe = float((float(with_curve_returns[with_tangency_local_idx]) - rf_pct) / float(with_curve_risks[with_tangency_local_idx]))
+    with_tangency_esg = float(risky_esg_scores_pct[esg_slice][with_tangency_local_idx])
+    with_tangency_sharpe = 0.0
+    if with_tangency_point[0] > 1e-9:
+        with_tangency_sharpe = float((with_tangency_point[1] - rf_pct) / with_tangency_point[0])
 
     without_frontier_risks, without_frontier_returns = _extract_upper_branch_from_full_curve(
         without_curve_risks,
@@ -3806,13 +3846,14 @@ def compute_builder_result(
     total_risky_positions = np.array(current_candidates["total_risky"], dtype=float)
     risky_mix_positions = np.array(current_candidates["risky_mix"], dtype=float)
 
-    tangency_sharpes = np.full(risky_mix_returns.shape, -np.inf, dtype=float)
-    tangency_valid_risk = risky_mix_risks > 1e-12
-    tangency_sharpes[tangency_valid_risk] = risky_mix_excess[tangency_valid_risk] / risky_mix_risks[tangency_valid_risk]
-    if np.any(tangency_valid_risk):
-        current_non_esg_opt_idx = int(np.argmax(tangency_sharpes))
-    else:
-        current_non_esg_opt_idx = int(np.argmax(risky_mix_returns))
+    current_non_esg_utility = _builder_objective_values(
+        portfolio_excess_returns,
+        portfolio_variances,
+        np.zeros_like(portfolio_esg),
+        gamma,
+        0.0,
+    )
+    current_non_esg_opt_idx = int(np.argmax(current_non_esg_utility))
 
     current_esg_utility = _builder_objective_values(
         portfolio_excess_returns,
@@ -3865,9 +3906,52 @@ def compute_builder_result(
             with_sample = np.interp(sample_risks, with_curve_risks_pct, with_curve_returns_pct)
             frontier_overlap = float(np.mean(np.abs(without_sample - with_sample) < 1e-3))
 
-    opt_x1 = float(x1_positions[optimal_idx])
-    opt_x2 = float(x2_positions[optimal_idx])
-    opt_rf_weight = float(rf_positions[optimal_idx])
+    # ----------------------------------------------------------------
+    # Analytical tangency portfolio weights (closed-form, 2-asset case)
+    # ----------------------------------------------------------------
+    # For ESG-adjusted tangency: augment excess returns with ESG preference.
+    #   mu_i_adj = (r_i - rf) + lambda_taste * esg_i
+    # Tangency risky-mix weight for asset 1:
+    #   alpha* = (mu1_adj * s2^2 - mu2_adj * cov12) /
+    #            (mu1_adj * s2^2 + mu2_adj * s1^2 - (mu1_adj + mu2_adj) * cov12)
+    # Total risky allocation from mean-variance FOC:
+    #   T* = tangency_excess / (gamma * tangency_variance)
+    # Final weights: x1 = T* * alpha*, x2 = T* * (1 - alpha*), rf = 1 - T*
+
+    def _analytical_tangency_weights(
+        r1_: float, r2_: float, s1_: float, s2_: float, rho_: float,
+        rf_: float, esg1_: float, esg2_: float, gamma_: float, lam_: float,
+    ) -> tuple[float, float, float]:
+        """Return (x1, x2, rf_weight) using closed-form tangency formula."""
+        mu1 = (r1_ - rf_) + lam_ * esg1_
+        mu2 = (r2_ - rf_) + lam_ * esg2_
+        var1 = s1_ ** 2
+        var2 = s2_ ** 2
+        cov12 = rho_ * s1_ * s2_
+
+        denom = mu1 * var2 + mu2 * var1 - (mu1 + mu2) * cov12
+        if abs(denom) < 1e-14:
+            # Degenerate case: equal split, no leverage
+            alpha = 0.5
+        else:
+            alpha = float(np.clip((mu1 * var2 - mu2 * cov12) / denom, 0.0, 1.0))
+
+        tang_var = max(
+            alpha ** 2 * var1
+            + (1.0 - alpha) ** 2 * var2
+            + 2.0 * alpha * (1.0 - alpha) * cov12,
+            1e-14,
+        )
+        tang_excess = alpha * mu1 + (1.0 - alpha) * mu2
+
+        # Optimal total risky exposure: T* = tang_excess / (gamma * tang_var)
+        total_risky = tang_excess / (gamma_ * tang_var) if gamma_ > 1e-12 else 0.0
+
+        return float(total_risky * alpha), float(total_risky * (1.0 - alpha)), float(1.0 - total_risky)
+
+    opt_x1, opt_x2, opt_rf_weight = _analytical_tangency_weights(
+        r1, r2, s1, s2, rho, rf, esg1, esg2, gamma, lambda_taste,
+    )
 
     return {
         "asset1": asset1,
@@ -3917,22 +4001,16 @@ def compute_builder_result(
         "with_curve_risks_pct": with_curve_risks_pct,
         "with_curve_returns_pct": with_curve_returns_pct,
         "max_sharpe_idx": current_non_esg_opt_idx,
-        "max_sharpe_risk_pct": float(risky_mix_risks[current_non_esg_opt_idx] * 100.0),
-        "max_sharpe_return_pct": float(risky_mix_returns[current_non_esg_opt_idx] * 100.0),
-        "max_sharpe_esg_pct": float(risky_mix_esg[current_non_esg_opt_idx]),
-        "max_sharpe_sharpe": float(tangency_sharpes[current_non_esg_opt_idx]) if np.isfinite(tangency_sharpes[current_non_esg_opt_idx]) else 0.0,
-        "max_sharpe_w1": float(risky_mix_grid[current_non_esg_opt_idx]),
-        "max_sharpe_w2": float(1.0 - risky_mix_grid[current_non_esg_opt_idx]),
+        "max_sharpe_risk_pct": float(portfolio_risks[current_non_esg_opt_idx] * 100.0),
+        "max_sharpe_return_pct": float(portfolio_returns[current_non_esg_opt_idx] * 100.0),
+        "max_sharpe_esg_pct": float(portfolio_esg[current_non_esg_opt_idx]),
         "esg_tangency_idx": optimal_idx,
         "esg_tangency_risk_pct": float(portfolio_risks[optimal_idx] * 100.0),
         "esg_tangency_return_pct": float(portfolio_returns[optimal_idx] * 100.0),
         "esg_tangency_esg_pct": float(portfolio_esg[optimal_idx]),
-        "current_non_esg_return_pct": float(risky_mix_returns[current_non_esg_opt_idx] * 100.0),
-        "current_non_esg_risk_pct": float(risky_mix_risks[current_non_esg_opt_idx] * 100.0),
-        "current_non_esg_esg_pct": float(risky_mix_esg[current_non_esg_opt_idx]),
-        "current_non_esg_sharpe": float(tangency_sharpes[current_non_esg_opt_idx]) if np.isfinite(tangency_sharpes[current_non_esg_opt_idx]) else 0.0,
-        "current_non_esg_w1": float(risky_mix_grid[current_non_esg_opt_idx]),
-        "current_non_esg_w2": float(1.0 - risky_mix_grid[current_non_esg_opt_idx]),
+        "current_non_esg_return_pct": float(portfolio_returns[current_non_esg_opt_idx] * 100.0),
+        "current_non_esg_risk_pct": float(portfolio_risks[current_non_esg_opt_idx] * 100.0),
+        "current_non_esg_esg_pct": float(portfolio_esg[current_non_esg_opt_idx]),
         "opt_w1": opt_x1,
         "opt_w2": opt_x2,
         "opt_rf_weight": opt_rf_weight,
@@ -4139,10 +4217,10 @@ def render_builder_popup() -> None:
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             frontier_display = build_dual_frontier_display(result)
-            display_return_pct = float(result.get("opt_return", 0.0) * 100.0)
-            display_risk_pct = float(result.get("opt_risk", 0.0) * 100.0)
-            display_esg_pct = float(result.get("opt_esg", 0.0))
-            display_sharpe = float(result.get("opt_sharpe", 0.0))
+            display_return_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[1])
+            display_risk_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[0])
+            display_esg_pct = float(frontier_display.get("with_tangency_esg", result.get("opt_esg", 0.0)))
+            display_sharpe = float(frontier_display.get("with_tangency_sharpe", result.get("opt_sharpe", 0.0)))
 
             display_result = dict(result)
             display_result.update({
@@ -4150,10 +4228,10 @@ def render_builder_popup() -> None:
                 "display_portfolio_risk_pct": display_risk_pct,
                 "display_portfolio_esg_pct": display_esg_pct,
                 "display_sharpe_ratio": display_sharpe,
-                "display_without_esg_return_pct": float(result.get("current_non_esg_return_pct", frontier_display.get("without_tangency_point", (0.0, 0.0))[1])),
-                "display_without_esg_risk_pct": float(result.get("current_non_esg_risk_pct", frontier_display.get("without_tangency_point", (0.0, 0.0))[0])),
-                "display_without_esg_esg_pct": float(result.get("current_non_esg_esg_pct", frontier_display.get("without_tangency_esg", 0.0))),
-                "display_without_esg_sharpe": float(result.get("current_non_esg_sharpe", frontier_display.get("without_tangency_sharpe", 0.0))),
+                "display_without_esg_return_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[1]),
+                "display_without_esg_risk_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[0]),
+                "display_without_esg_esg_pct": float(frontier_display.get("without_tangency_esg", result.get("current_non_esg_esg_pct", 0.0))),
+                "display_without_esg_sharpe": float(frontier_display.get("without_tangency_sharpe", result.get("current_non_esg_sharpe", 0.0))),
             })
 
             metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
@@ -4173,17 +4251,47 @@ def render_builder_popup() -> None:
             with metric_c4:
                 st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
 
-            asset1_weight_pct = float(result.get("opt_w1", 0.0) * 100.0)
-            asset2_weight_pct = float(result.get("opt_w2", 0.0) * 100.0)
+            safe_asset1_name = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
+            safe_asset2_name = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
+            safe_opt_w1 = max(float(result.get("opt_w1", 0.0)), 0.0)
+            safe_opt_w2 = max(float(result.get("opt_w2", 0.0)), 0.0)
+            total_risky_weight = safe_opt_w1 + safe_opt_w2
+            if total_risky_weight > 1e-12:
+                display_weight1 = safe_opt_w1 / total_risky_weight
+                display_weight2 = safe_opt_w2 / total_risky_weight
+            else:
+                display_weight1 = 0.0
+                display_weight2 = 0.0
+
+            st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
             st.markdown(
-                f'''
-                <div class="allocation-chip-row">
-                    <span class="allocation-chip">Asset 1 Weight: {asset1_weight_pct:.2f}%</span>
-                    <span class="allocation-chip">Asset 2 Weight: {asset2_weight_pct:.2f}%</span>
-                </div>
-                ''',
+                allocation_summary_html(
+                    safe_asset1_name,
+                    safe_opt_w1,
+                    safe_asset2_name,
+                    safe_opt_w2,
+                    float(result.get("opt_rf_weight", 0.0)),
+                ),
                 unsafe_allow_html=True,
             )
+
+            weight_c1, weight_c2 = st.columns(2, gap="small")
+            with weight_c1:
+                st.markdown(
+                    result_tile(
+                        f'{safe_asset1_name} Position',
+                        f'{safe_opt_w1 * 100.0:.2f}%'
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with weight_c2:
+                st.markdown(
+                    result_tile(
+                        f'{safe_asset2_name} Position',
+                        f'{safe_opt_w2 * 100.0:.2f}%'
+                    ),
+                    unsafe_allow_html=True,
+                )
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
