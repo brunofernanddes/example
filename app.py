@@ -2683,52 +2683,31 @@ def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
 def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float, risk_free_weight: float) -> str:
     safe_asset1 = str(asset1).strip() or "Asset 1"
     safe_asset2 = str(asset2).strip() or "Asset 2"
-
-    safe_weight1 = max(float(weight1), 0.0)
-    safe_weight2 = max(float(weight2), 0.0)
-    total_risky_weight = max(safe_weight1 + safe_weight2, 0.0)
+    total_risky_weight = max(weight1 + weight2, 0.0)
 
     if total_risky_weight > 1e-12:
-        sleeve_weight1 = safe_weight1 / total_risky_weight
-        sleeve_weight2 = safe_weight2 / total_risky_weight
+        display_weight1 = weight1 / total_risky_weight
+        display_weight2 = weight2 / total_risky_weight
     else:
-        sleeve_weight1 = 0.0
-        sleeve_weight2 = 0.0
+        display_weight1 = 0.0
+        display_weight2 = 0.0
 
+    risk_free_copy = ""
     if risk_free_weight > 1e-9:
-        risk_free_copy = (
-            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}. "
-            f"That leaves {risk_free_weight:.2%} in the risk-free asset."
-        )
-        risk_free_chip = f"Risk-Free Holding: {risk_free_weight:.2%}"
+        risk_free_copy = f"Total risky exposure is {total_risky_weight:.2%} of wealth, with the remaining {risk_free_weight:.2%} held in the risk-free asset."
     elif risk_free_weight < -1e-9:
-        risk_free_copy = (
-            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}. "
-            f"Total risky exposure is {total_risky_weight:.2%}, so the portfolio is borrowing {abs(risk_free_weight):.2%} at the risk-free rate."
-        )
-        risk_free_chip = f"Risk-Free Borrowing: {abs(risk_free_weight):.2%}"
+        risk_free_copy = f"Total risky exposure is {total_risky_weight:.2%} of wealth, which implies {abs(risk_free_weight):.2%} borrowing at the risk-free rate."
     else:
-        risk_free_copy = (
-            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}, "
-            f"with the full portfolio invested in risky assets."
-        )
-        risk_free_chip = "Risk-Free Holding: 0.00%"
-
-    sleeve_copy = (
-        f"Inside the risky sleeve, the split is {safe_asset1}: {sleeve_weight1:.2%} and {safe_asset2}: {sleeve_weight2:.2%}. "
-        f"These sleeve weights add to 100%, while the total portfolio weights above follow the audit definition of x."
-    )
+        risk_free_copy = f"The full portfolio is allocated to risky assets, with total risky exposure of {total_risky_weight:.2%}."
 
     return f"""
     <div class="allocation-summary">
         <p class="allocation-summary-label">Asset Weighting</p>
-        <p class="allocation-summary-title">{safe_asset1}: {safe_weight1:.2%} &nbsp;•&nbsp; {safe_asset2}: {safe_weight2:.2%}</p>
-        <p class="allocation-summary-copy">{risk_free_copy}</p>
-        <p class="allocation-summary-copy" style="margin-top:-0.25rem;">{sleeve_copy}</p>
+        <p class="allocation-summary-title">{safe_asset1}: {display_weight1:.2%} &nbsp;•&nbsp; {safe_asset2}: {display_weight2:.2%}</p>
+        <p class="allocation-summary-copy">These bubbles show the split inside the risky sleeve, so the two asset weights add to 100%. {risk_free_copy}</p>
         <div class="allocation-chip-row">
-            <span class="allocation-chip">{safe_asset1} Sleeve: {sleeve_weight1:.2%}</span>
-            <span class="allocation-chip">{safe_asset2} Sleeve: {sleeve_weight2:.2%}</span>
-            <span class="allocation-chip">{risk_free_chip}</span>
+            <span class="allocation-chip">{safe_asset1}: {display_weight1:.2%}</span>
+            <span class="allocation-chip">{safe_asset2}: {display_weight2:.2%}</span>
         </div>
     </div>
     """
@@ -4236,16 +4215,16 @@ def render_builder_popup() -> None:
             with weight_c1:
                 st.markdown(
                     result_tile(
-                        f'{safe_asset1_name} Position',
-                        f'{safe_opt_w1 * 100.0:.2f}%'
+                        f'{safe_asset1_name} Weight',
+                        f'{display_weight1 * 100.0:.2f}%'
                     ),
                     unsafe_allow_html=True,
                 )
             with weight_c2:
                 st.markdown(
                     result_tile(
-                        f'{safe_asset2_name} Position',
-                        f'{safe_opt_w2 * 100.0:.2f}%'
+                        f'{safe_asset2_name} Weight',
+                        f'{display_weight2 * 100.0:.2f}%'
                     ),
                     unsafe_allow_html=True,
                 )
