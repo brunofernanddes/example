@@ -2860,11 +2860,15 @@ def apply_frontier_visibility_lift(
 
 
 def _builder_max_total_risky_exposure() -> float:
-    return 2.0
+    return 20.0
 
 
 def _builder_min_nonzero_risky_exposure() -> float:
     return 0.05
+
+
+def _builder_esg_objective_scale() -> float:
+    return 25.0
 
 
 def _builder_mix_grid() -> np.ndarray:
@@ -3423,6 +3427,135 @@ def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect:
     }
 
 
+def _builder_risky_mix_statistics(
+    r1: float,
+    r2: float,
+    s1: float,
+    s2: float,
+    rho: float,
+    rf: float,
+    esg1: float,
+    esg2: float,
+) -> dict:
+    risky_mix_grid = _builder_mix_grid()
+    risky_mix_returns = risky_mix_grid * r1 + (1.0 - risky_mix_grid) * r2
+    risky_mix_excess = risky_mix_returns - rf
+    risky_mix_variances = (
+        (risky_mix_grid ** 2) * (s1 ** 2)
+        + ((1.0 - risky_mix_grid) ** 2) * (s2 ** 2)
+        + 2.0 * risky_mix_grid * (1.0 - risky_mix_grid) * s1 * s2 * rho
+    )
+    risky_mix_variances = np.maximum(risky_mix_variances, 0.0)
+    risky_mix_risks = np.sqrt(risky_mix_variances)
+    risky_mix_esg = risky_mix_grid * esg1 + (1.0 - risky_mix_grid) * esg2
+    risky_mix_sharpes = np.where(risky_mix_risks > 1e-12, risky_mix_excess / risky_mix_risks, 0.0)
+    return {
+        "risky_mix_grid": risky_mix_grid,
+        "risky_mix_returns": risky_mix_returns,
+        "risky_mix_excess": risky_mix_excess,
+        "risky_mix_variances": risky_mix_variances,
+        "risky_mix_risks": risky_mix_risks,
+        "risky_mix_esg": risky_mix_esg,
+        "risky_mix_sharpes": risky_mix_sharpes,
+    }
+
+
+
+def _builder_optimal_total_risky_for_mix(
+    risky_mix_excess: np.ndarray,
+    risky_mix_variances: np.ndarray,
+    gamma: float,
+) -> np.ndarray:
+    gamma = max(float(gamma), 1e-9)
+    total_risky = np.zeros_like(risky_mix_excess, dtype=float)
+
+    positive_variance = risky_mix_variances > 1e-12
+    total_risky[positive_variance] = np.maximum(risky_mix_excess[positive_variance], 0.0) / (
+        gamma * risky_mix_variances[positive_variance]
+    )
+
+    near_zero_variance = (~positive_variance) & (risky_mix_excess > 1e-12)
+    if np.any(near_zero_variance):
+        total_risky[near_zero_variance] = _builder_max_total_risky_exposure()
+
+    total_risky = np.clip(total_risky, 0.0, _builder_max_total_risky_exposure())
+    return total_risky
+
+
+
+def _builder_candidate_portfolios_for_gamma(
+    risky_mix_grid: np.ndarray,
+    risky_mix_returns: np.ndarray,
+    risky_mix_excess: np.ndarray,
+    risky_mix_variances: np.ndarray,
+    risky_mix_risks: np.ndarray,
+    risky_mix_esg: np.ndarray,
+    rf: float,
+    gamma: float,
+) -> dict:
+    total_risky = _builder_optimal_total_risky_for_mix(risky_mix_excess, risky_mix_variances, gamma)
+    x1 = total_risky * risky_mix_grid
+    x2 = total_risky * (1.0 - risky_mix_grid)
+    risk_free_weight = 1.0 - total_risky
+
+    portfolio_returns = rf + total_risky * risky_mix_excess
+    portfolio_variances = np.maximum((total_risky ** 2) * risky_mix_variances, 0.0)
+    portfolio_risks = np.sqrt(portfolio_variances)
+    portfolio_excess_returns = portfolio_returns - rf
+    portfolio_esg = np.where(total_risky > 1e-12, risky_mix_esg, 0.0)
+    portfolio_sharpes = np.where(portfolio_risks > 1e-12, portfolio_excess_returns / portfolio_risks, 0.0)
+
+    return {
+        "portfolio_returns": portfolio_returns,
+        "portfolio_variances": portfolio_variances,
+        "portfolio_risks": portfolio_risks,
+        "portfolio_excess_returns": portfolio_excess_returns,
+        "portfolio_esg": portfolio_esg,
+        "portfolio_sharpes": portfolio_sharpes,
+        "x1": x1,
+        "x2": x2,
+        "risk_free_weight": risk_free_weight,
+        "total_risky": total_risky,
+        "risky_mix": np.array(risky_mix_grid, dtype=float),
+    }
+
+
+
+def _builder_selected_mix_indices_by_gamma(
+    risky_mix_grid: np.ndarray,
+    risky_mix_returns: np.ndarray,
+    risky_mix_excess: np.ndarray,
+    risky_mix_variances: np.ndarray,
+    risky_mix_risks: np.ndarray,
+    risky_mix_esg: np.ndarray,
+    rf: float,
+    gamma_values: np.ndarray,
+    lambda_taste: float,
+) -> np.ndarray:
+    selected: list[int] = []
+    for gamma in gamma_values:
+        candidate = _builder_candidate_portfolios_for_gamma(
+            risky_mix_grid,
+            risky_mix_returns,
+            risky_mix_excess,
+            risky_mix_variances,
+            risky_mix_risks,
+            risky_mix_esg,
+            rf,
+            float(gamma),
+        )
+        utility = _builder_objective_values(
+            np.array(candidate["portfolio_excess_returns"], dtype=float),
+            np.array(candidate["portfolio_variances"], dtype=float),
+            np.array(candidate["portfolio_esg"], dtype=float) * _builder_esg_objective_scale(),
+            float(gamma),
+            float(lambda_taste),
+        )
+        selected.append(int(np.argmax(utility)))
+    return _unique_preserve_order(selected)
+
+
+
 def compute_builder_result(
     asset1: str,
     asset2: str,
@@ -3451,18 +3584,37 @@ def compute_builder_result(
     lambda_taste = float(esg_slider)
     esg_preference_fraction = float(np.clip(esg_slider / 0.10, 0.0, 1.0))
 
-    universe = _builder_portfolio_universe(r1, r2, s1, s2, rho, rf, esg1, esg2)
-    portfolio_returns = np.array(universe["portfolio_returns"], dtype=float)
-    portfolio_variances = np.array(universe["portfolio_variances"], dtype=float)
-    portfolio_risks = np.array(universe["portfolio_risks"], dtype=float)
-    portfolio_excess_returns = np.array(universe["portfolio_excess_returns"], dtype=float)
-    portfolio_esg = np.array(universe["portfolio_esg"], dtype=float)
-    portfolio_sharpes = np.array(universe["portfolio_sharpes"], dtype=float)
-    x1_positions = np.array(universe["x1"], dtype=float)
-    x2_positions = np.array(universe["x2"], dtype=float)
-    rf_positions = np.array(universe["risk_free_weight"], dtype=float)
-    total_risky_positions = np.array(universe["total_risky"], dtype=float)
-    risky_mix_positions = np.array(universe["risky_mix"], dtype=float)
+    mix_stats = _builder_risky_mix_statistics(r1, r2, s1, s2, rho, rf, esg1, esg2)
+    risky_mix_grid = np.array(mix_stats["risky_mix_grid"], dtype=float)
+    risky_mix_returns = np.array(mix_stats["risky_mix_returns"], dtype=float)
+    risky_mix_excess = np.array(mix_stats["risky_mix_excess"], dtype=float)
+    risky_mix_variances = np.array(mix_stats["risky_mix_variances"], dtype=float)
+    risky_mix_risks = np.array(mix_stats["risky_mix_risks"], dtype=float)
+    risky_mix_esg = np.array(mix_stats["risky_mix_esg"], dtype=float)
+    risky_mix_sharpes = np.array(mix_stats["risky_mix_sharpes"], dtype=float)
+
+    current_candidates = _builder_candidate_portfolios_for_gamma(
+        risky_mix_grid,
+        risky_mix_returns,
+        risky_mix_excess,
+        risky_mix_variances,
+        risky_mix_risks,
+        risky_mix_esg,
+        rf,
+        gamma,
+    )
+
+    portfolio_returns = np.array(current_candidates["portfolio_returns"], dtype=float)
+    portfolio_variances = np.array(current_candidates["portfolio_variances"], dtype=float)
+    portfolio_risks = np.array(current_candidates["portfolio_risks"], dtype=float)
+    portfolio_excess_returns = np.array(current_candidates["portfolio_excess_returns"], dtype=float)
+    portfolio_esg = np.array(current_candidates["portfolio_esg"], dtype=float)
+    portfolio_sharpes = np.array(current_candidates["portfolio_sharpes"], dtype=float)
+    x1_positions = np.array(current_candidates["x1"], dtype=float)
+    x2_positions = np.array(current_candidates["x2"], dtype=float)
+    rf_positions = np.array(current_candidates["risk_free_weight"], dtype=float)
+    total_risky_positions = np.array(current_candidates["total_risky"], dtype=float)
+    risky_mix_positions = np.array(current_candidates["risky_mix"], dtype=float)
 
     current_non_esg_utility = _builder_objective_values(
         portfolio_excess_returns,
@@ -3476,46 +3628,39 @@ def compute_builder_result(
     current_esg_utility = _builder_objective_values(
         portfolio_excess_returns,
         portfolio_variances,
-        portfolio_esg,
+        portfolio_esg * _builder_esg_objective_scale(),
         gamma,
         lambda_taste,
     )
     optimal_idx = int(np.argmax(current_esg_utility))
 
-    family_without_indices = _builder_selected_family_indices(
-        portfolio_excess_returns,
-        portfolio_variances,
-        np.zeros_like(portfolio_esg),
+    family_without_indices = _builder_selected_mix_indices_by_gamma(
+        risky_mix_grid,
+        risky_mix_returns,
+        risky_mix_excess,
+        risky_mix_variances,
+        risky_mix_risks,
+        risky_mix_esg,
+        rf,
         gamma_values,
         0.0,
     )
-    family_with_indices = _builder_selected_family_indices(
-        portfolio_excess_returns,
-        portfolio_variances,
-        portfolio_esg,
+    family_with_indices = _builder_selected_mix_indices_by_gamma(
+        risky_mix_grid,
+        risky_mix_returns,
+        risky_mix_excess,
+        risky_mix_variances,
+        risky_mix_risks,
+        risky_mix_esg,
+        rf,
         gamma_values,
         lambda_taste,
     )
-
-    risky_mix_grid = _builder_mix_grid()
-    risky_mix_returns = risky_mix_grid * r1 + (1.0 - risky_mix_grid) * r2
-    risky_mix_variances = (
-        (risky_mix_grid ** 2) * (s1 ** 2)
-        + ((1.0 - risky_mix_grid) ** 2) * (s2 ** 2)
-        + 2.0 * risky_mix_grid * (1.0 - risky_mix_grid) * s1 * s2 * rho
-    )
-    risky_mix_variances = np.maximum(risky_mix_variances, 0.0)
-    risky_mix_risks = np.sqrt(risky_mix_variances)
-    risky_mix_esg = risky_mix_grid * esg1 + (1.0 - risky_mix_grid) * esg2
-    risky_mix_sharpes = np.where(risky_mix_risks > 1e-12, (risky_mix_returns - rf) / risky_mix_risks, 0.0)
 
     frontier_without_idx = efficient_frontier_indices(risky_mix_risks, risky_mix_returns)
     frontier_without_risks_pct = np.array(risky_mix_risks[frontier_without_idx] * 100.0, dtype=float)
     frontier_without_returns_pct = np.array(risky_mix_returns[frontier_without_idx] * 100.0, dtype=float)
     blue_tangency_idx = int(np.argmax(risky_mix_sharpes))
-
-    family_with_nonzero_mask = total_risky_positions[family_with_indices] > 1e-12
-    family_with_nonzero_indices = np.array(family_with_indices[family_with_nonzero_mask], dtype=int)
 
     risky_mix_esg_min = float(np.min(risky_mix_esg))
     risky_mix_esg_max = float(np.max(risky_mix_esg))
@@ -3529,16 +3674,10 @@ def compute_builder_result(
 
     frontier_with_idx = efficient_frontier_indices(risky_mix_risks, risky_mix_returns, green_eligible_mask)
     if frontier_with_idx.size == 0:
-        if lambda_taste > 1e-12:
-            fallback_mix_idx = int(np.argmax(selected_mixes)) if esg1 >= esg2 else int(np.argmin(selected_mixes))
-            fallback_mix_value = float(np.max(selected_mixes)) if esg1 >= esg2 else float(np.min(selected_mixes))
-            fallback_pos = int(np.argmin(np.abs(risky_mix_grid - fallback_mix_value)))
-            frontier_with_idx = np.array([fallback_pos], dtype=int)
-            green_eligible_mask = np.zeros_like(risky_mix_grid, dtype=bool)
-            green_eligible_mask[fallback_pos] = True
-        else:
-            frontier_with_idx = frontier_without_idx.copy()
-            green_eligible_mask = np.ones_like(risky_mix_grid, dtype=bool)
+        fallback_idx = int(np.argmax(risky_mix_esg)) if esg1 >= esg2 else int(np.argmin(risky_mix_grid))
+        frontier_with_idx = np.array([fallback_idx], dtype=int)
+        green_eligible_mask = np.zeros_like(risky_mix_grid, dtype=bool)
+        green_eligible_mask[fallback_idx] = True
 
     frontier_with_risks_pct = np.array(risky_mix_risks[frontier_with_idx] * 100.0, dtype=float)
     frontier_with_returns_pct = np.array(risky_mix_returns[frontier_with_idx] * 100.0, dtype=float)
@@ -3546,6 +3685,7 @@ def compute_builder_result(
     without_curve_returns_pct = np.array(risky_mix_returns * 100.0, dtype=float)
     with_curve_risks_pct = np.array(risky_mix_risks[green_eligible_mask] * 100.0, dtype=float)
     with_curve_returns_pct = np.array(risky_mix_returns[green_eligible_mask] * 100.0, dtype=float)
+
     green_tangency_candidates = np.where(green_eligible_mask)[0]
     if green_tangency_candidates.size == 0:
         green_tangency_candidates = frontier_with_idx
@@ -3571,7 +3711,7 @@ def compute_builder_result(
         "gamma_input": float(gamma),
         "lambda_taste": float(lambda_taste),
         "esg_preference_fraction": esg_preference_fraction,
-        "weights": np.array(universe["total_risky_grid"], dtype=float),
+        "weights": np.array(total_risky_positions, dtype=float),
         "portfolio_returns": portfolio_returns,
         "portfolio_risks": portfolio_risks,
         "portfolio_variances": portfolio_variances,
