@@ -3006,7 +3006,7 @@ def _builder_objective_values(
     gamma: float,
     lambda_taste: float,
 ) -> np.ndarray:
-    return excess_returns - 0.5 * float(gamma) * variances + float(lambda_taste) * (risky_sleeve_esg / 100.0)
+    return excess_returns - 0.5 * float(gamma) * variances + float(lambda_taste) * risky_sleeve_esg
 
 
 def _builder_selected_family_indices(
@@ -3593,7 +3593,6 @@ def _builder_risky_mix_statistics(
     variance = max(float(variance), 1e-12)
     std_dev = np.sqrt(variance)
     esg_score = (mix_asset1 * float(esg_score1)) + (mix_asset2 * float(esg_score2))
-    esg_fraction = esg_score / 100.0
 
     return {
         'mix_asset1': mix_asset1,
@@ -3603,7 +3602,6 @@ def _builder_risky_mix_statistics(
         'variance': variance,
         'std_dev': std_dev,
         'esg': esg_score,
-        'esg_fraction': esg_fraction,
     }
 
 
@@ -3652,7 +3650,7 @@ def _builder_mix_objective_bundle(
         (total_risky * stats['excess_return'])
         - (0.5 * gamma * (total_risky ** 2) * stats['variance'])
     )
-    esg_component = float(esg_slider) * stats['esg_fraction'] if total_risky > 1e-12 else 0.0
+    esg_component = float(esg_slider) * stats['esg'] if total_risky > 1e-12 else 0.0
     objective_value = mean_variance_component + esg_component
 
     return {
@@ -4585,7 +4583,6 @@ def __v56_builder_risky_mix_statistics(
     variance = max(float(variance), 1e-12)
     std_dev = np.sqrt(variance)
     esg_score = (mix_asset1 * float(esg_score1)) + (mix_asset2 * float(esg_score2))
-    esg_fraction = esg_score / 100.0
     return {
         'mix_asset1': mix_asset1,
         'mix_asset2': mix_asset2,
@@ -4594,7 +4591,6 @@ def __v56_builder_risky_mix_statistics(
         'variance': variance,
         'std_dev': std_dev,
         'esg': esg_score,
-        'esg_fraction': esg_fraction,
     }
 
 
@@ -4641,7 +4637,7 @@ def __v56_builder_mix_objective_bundle(
         (total_risky * stats['excess_return'])
         - (0.5 * gamma * (total_risky ** 2) * stats['variance'])
     )
-    esg_component = float(esg_slider) * stats['esg_fraction'] if total_risky > 1e-12 else 0.0
+    esg_component = float(esg_slider) * stats['esg'] if total_risky > 1e-12 else 0.0
     return {
         'objective': float(mean_variance_component + esg_component),
         'total_risky': float(total_risky),
