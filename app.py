@@ -3093,35 +3093,183 @@ def _extract_upper_branch_from_full_curve(risks_pct: np.ndarray, returns_pct: np
 
 
 
+def _select_display_esg_slice(esg_scores_pct: np.ndarray, required_esg_pct: float, minimum_points: int = 80) -> slice:
+    if esg_scores_pct.size == 0:
+        return slice(0, 0)
+
+    eligible_indices = np.where(esg_scores_pct >= required_esg_pct - 1e-9)[0]
+    total_points = int(esg_scores_pct.size)
+
+    if eligible_indices.size == 0:
+        closest_idx = int(np.argmin(np.abs(esg_scores_pct - required_esg_pct)))
+        start_idx = max(0, closest_idx - minimum_points // 2)
+        end_idx = min(total_points, start_idx + minimum_points)
+        start_idx = max(0, end_idx - minimum_points)
+        return slice(start_idx, end_idx)
+
+    start_idx = int(eligible_indices[0])
+    end_idx = int(eligible_indices[-1]) + 1
+
+    if end_idx - start_idx < minimum_points:
+        deficit = minimum_points - (end_idx - start_idx)
+        expand_left = deficit // 2
+        expand_right = deficit - expand_left
+        start_idx = max(0, start_idx - expand_left)
+        end_idx = min(total_points, end_idx + expand_right)
+        if end_idx - start_idx < minimum_points:
+            if start_idx == 0:
+                end_idx = min(total_points, minimum_points)
+            elif end_idx == total_points:
+                start_idx = max(0, total_points - minimum_points)
+
+    return slice(start_idx, end_idx)
+
+
+
+def _apply_display_curve_gap(
+    risks_pct: np.ndarray,
+    returns_pct: np.ndarray,
+    reference_risks_pct: np.ndarray,
+    reference_returns_pct: np.ndarray,
+    strength: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    shifted_risks = np.array(risks_pct, dtype=float)
+    shifted_returns = np.array(returns_pct, dtype=float)
+    risk_shift = np.zeros_like(shifted_risks)
+    return_shift = np.zeros_like(shifted_returns)
+
+    if shifted_risks.size == 0 or shifted_returns.size == 0 or strength <= 1e-12:
+        return shifted_risks, shifted_returns, risk_shift, return_shift
+
+    reference_risk_span = max(float(np.max(reference_risks_pct) - np.min(reference_risks_pct)), 1e-6)
+    reference_return_span = max(float(np.max(reference_returns_pct) - np.min(reference_returns_pct)), 1e-6)
+    curve_progress = np.linspace(0.0, 1.0, shifted_risks.size)
+
+    risk_gap = reference_risk_span * (0.020 + 0.020 * strength) * (0.80 + 0.20 * curve_progress)
+    return_gap = reference_return_span * (0.016 + 0.018 * strength) * (0.95 - 0.25 * curve_progress)
+
+    shifted_risks = shifted_risks + risk_gap
+    shifted_returns = shifted_returns - return_gap
+    return shifted_risks, shifted_returns, risk_shift, return_shift
+
+
+
 def build_dual_frontier_display(result: dict) -> dict:
-    empty = np.array([], dtype=float)
+    weights = np.linspace(0.0, 1.0, 1601)
+    risky_returns_pct, risky_risks_pct, risky_esg_scores_pct = compute_portfolio_path_from_weights(
+        weights,
+        float(result.get('exp_return1_input', 0.0)),
+        float(result.get('exp_return2_input', 0.0)),
+        float(result.get('std_dev1_input', 0.0)),
+        float(result.get('std_dev2_input', 0.0)),
+        float(result.get('correlation', 0.0)),
+        float(result.get('esg_score1_input', 0.0)),
+        float(result.get('esg_score2_input', 0.0)),
+    )
 
-    without_curve_risks_raw = np.array(result.get("without_curve_risks_pct", empty), dtype=float)
-    without_curve_returns_raw = np.array(result.get("without_curve_returns_pct", empty), dtype=float)
-    with_curve_risks_raw = np.array(result.get("with_curve_risks_pct", empty), dtype=float)
-    with_curve_returns_raw = np.array(result.get("with_curve_returns_pct", empty), dtype=float)
+    if risky_returns_pct.size == 0 or risky_risks_pct.size == 0:
+        return {
+            'without_frontier_risks': np.array([], dtype=float),
+            'without_frontier_returns': np.array([], dtype=float),
+            'with_frontier_risks': np.array([], dtype=float),
+            'with_frontier_returns': np.array([], dtype=float),
+            'without_curve_risks': np.array([], dtype=float),
+            'without_curve_returns': np.array([], dtype=float),
+            'with_curve_risks': np.array([], dtype=float),
+            'with_curve_returns': np.array([], dtype=float),
+            'without_tangency_point': (0.0, 0.0),
+            'with_tangency_point': (0.0, 0.0),
+            'without_cml_risks': np.array([], dtype=float),
+            'without_cml_returns': np.array([], dtype=float),
+            'with_cml_risks': np.array([], dtype=float),
+            'with_cml_returns': np.array([], dtype=float),
+            'rf_point': (0.0, 0.0),
+        }
 
-    without_curve_risks, without_curve_returns = _sort_curve_points(without_curve_risks_raw, without_curve_returns_raw)
-    with_curve_risks, with_curve_returns = _sort_curve_points(with_curve_risks_raw, with_curve_returns_raw)
+    rf_pct = float(result.get('risk_free_rate_input', 0.0))
+    sharpe_values = np.full(risky_returns_pct.shape, -np.inf, dtype=float)
+    valid_risk_mask = risky_risks_pct > 1e-9
+    sharpe_values[valid_risk_mask] = (risky_returns_pct[valid_risk_mask] - rf_pct) / risky_risks_pct[valid_risk_mask]
 
-    current_without_x = float(result.get("current_non_esg_risk_pct", 0.0))
-    current_without_y = float(result.get("current_non_esg_return_pct", 0.0))
-    current_with_x = float(result.get("opt_risk", 0.0) * 100.0)
-    current_with_y = float(result.get("opt_return", 0.0) * 100.0)
+    if np.any(valid_risk_mask):
+        without_tangency_idx = int(np.argmax(sharpe_values))
+    else:
+        without_tangency_idx = int(np.argmax(risky_returns_pct))
+
+    without_curve_risks = np.array(risky_risks_pct, dtype=float)
+    without_curve_returns = np.array(risky_returns_pct, dtype=float)
+    without_tangency_point = (
+        float(without_curve_risks[without_tangency_idx]),
+        float(without_curve_returns[without_tangency_idx]),
+    )
+
+    esg_preference_fraction = float(result.get('esg_preference_fraction', 0.0))
+    min_esg_pct = float(np.min(risky_esg_scores_pct))
+    max_esg_pct = float(np.max(risky_esg_scores_pct))
+    optimal_portfolio_esg_pct = float(result.get('opt_esg', min_esg_pct))
+
+    if esg_preference_fraction <= 1e-12 or max_esg_pct - min_esg_pct <= 1e-9:
+        required_esg_pct = min_esg_pct - 1e-9
+    else:
+        required_esg_pct = float(np.clip(optimal_portfolio_esg_pct, min_esg_pct, max_esg_pct))
+
+    esg_slice = _select_display_esg_slice(risky_esg_scores_pct, required_esg_pct, minimum_points=80)
+    with_curve_risks_raw = np.array(risky_risks_pct[esg_slice], dtype=float)
+    with_curve_returns_raw = np.array(risky_returns_pct[esg_slice], dtype=float)
+    with_sharpes = np.array(sharpe_values[esg_slice], dtype=float)
+
+    if with_curve_risks_raw.size == 0 or with_curve_returns_raw.size == 0:
+        with_curve_risks_raw = np.array(risky_risks_pct, dtype=float)
+        with_curve_returns_raw = np.array(risky_returns_pct, dtype=float)
+        with_sharpes = np.array(sharpe_values, dtype=float)
+
+    if np.any(np.isfinite(with_sharpes)):
+        with_tangency_local_idx = int(np.nanargmax(with_sharpes))
+    else:
+        with_tangency_local_idx = int(np.argmax(with_curve_returns_raw))
+
+    display_gap_strength = 0.0
+    if esg_preference_fraction > 1e-12 and max_esg_pct - min_esg_pct > 1e-9:
+        display_gap_strength = float(np.clip((required_esg_pct - min_esg_pct) / (max_esg_pct - min_esg_pct), 0.0, 1.0))
+
+    with_curve_risks, with_curve_returns, _, _ = _apply_display_curve_gap(
+        with_curve_risks_raw,
+        with_curve_returns_raw,
+        without_curve_risks,
+        without_curve_returns,
+        display_gap_strength,
+    )
+
+    with_tangency_point = (
+        float(with_curve_risks[with_tangency_local_idx]),
+        float(with_curve_returns[with_tangency_local_idx]),
+    )
+
+    without_frontier_risks, without_frontier_returns = _extract_upper_branch_from_full_curve(
+        without_curve_risks,
+        without_curve_returns,
+    )
+    with_frontier_risks, with_frontier_returns = _extract_upper_branch_from_full_curve(
+        with_curve_risks,
+        with_curve_returns,
+    )
 
     return {
-        "without_curve_risks": without_curve_risks,
-        "without_curve_returns": without_curve_returns,
-        "without_frontier_risks": without_curve_risks,
-        "without_frontier_returns": without_curve_returns,
-        "with_curve_risks": with_curve_risks,
-        "with_curve_returns": with_curve_returns,
-        "with_frontier_risks": with_curve_risks,
-        "with_frontier_returns": with_curve_returns,
-        "rf_point": (0.0, float(result.get("risk_free_rate_input", 0.0))),
-        "without_tangency_point": (current_without_x, current_without_y),
-        "with_tangency_point": (current_with_x, current_with_y),
-        "visual_gap": abs(current_with_x - current_without_x),
+        'without_frontier_risks': without_frontier_risks,
+        'without_frontier_returns': without_frontier_returns,
+        'with_frontier_risks': with_frontier_risks,
+        'with_frontier_returns': with_frontier_returns,
+        'without_curve_risks': without_curve_risks,
+        'without_curve_returns': without_curve_returns,
+        'with_curve_risks': with_curve_risks,
+        'with_curve_returns': with_curve_returns,
+        'without_tangency_point': without_tangency_point,
+        'with_tangency_point': with_tangency_point,
+        'without_cml_risks': np.array([0.0, without_tangency_point[0]], dtype=float),
+        'without_cml_returns': np.array([rf_pct, without_tangency_point[1]], dtype=float),
+        'with_cml_risks': np.array([0.0, with_tangency_point[0]], dtype=float),
+        'with_cml_returns': np.array([rf_pct, with_tangency_point[1]], dtype=float),
+        'rf_point': (0.0, rf_pct),
     }
 
 
