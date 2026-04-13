@@ -3616,8 +3616,7 @@ def _builder_optimal_total_risky_for_mix(
     safe_variance = max(float(variance), 1e-12)
     safe_gamma = max(float(gamma), 1e-9)
     unconstrained_total = float(excess_return) / (safe_gamma * safe_variance)
-    clipped_total = max(0.0, min(float(max_total_risky), unconstrained_total))
-    return float(clipped_total)
+    return float(max(0.0, unconstrained_total))
 
 
 def _builder_mix_objective_bundle(
@@ -4608,7 +4607,7 @@ def __v56_builder_optimal_total_risky_for_mix(
     safe_variance = max(float(variance), 1e-12)
     safe_gamma = max(float(gamma), 1e-9)
     unconstrained_total = float(excess_return) / (safe_gamma * safe_variance)
-    return float(max(0.0, min(float(max_total_risky), unconstrained_total)))
+    return float(max(0.0, unconstrained_total))
 
 
 def __v56_builder_mix_objective_bundle(
@@ -5165,10 +5164,10 @@ def render_builder_popup() -> None:
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             frontier_display = build_dual_frontier_display(result)
-            display_return_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[1])
-            display_risk_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[0])
-            display_esg_pct = float(frontier_display.get("with_tangency_esg", result.get("opt_esg", 0.0)))
-            display_sharpe = float(frontier_display.get("with_tangency_sharpe", result.get("opt_sharpe", 0.0)))
+            display_return_pct = float(result.get("opt_return", 0.0))
+            display_risk_pct = float(result.get("opt_risk", 0.0))
+            display_esg_pct = float(result.get("opt_esg", 0.0))
+            display_sharpe = float(result.get("opt_sharpe", 0.0))
 
             display_result = dict(result)
             display_result.update({
@@ -5176,10 +5175,10 @@ def render_builder_popup() -> None:
                 "display_portfolio_risk_pct": display_risk_pct,
                 "display_portfolio_esg_pct": display_esg_pct,
                 "display_sharpe_ratio": display_sharpe,
-                "display_without_esg_return_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[1]),
-                "display_without_esg_risk_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[0]),
-                "display_without_esg_esg_pct": float(frontier_display.get("without_tangency_esg", result.get("current_non_esg_esg_pct", 0.0))),
-                "display_without_esg_sharpe": float(frontier_display.get("without_tangency_sharpe", result.get("current_non_esg_sharpe", 0.0))),
+                "display_without_esg_return_pct": float(result.get("current_non_esg_return_dec", 0.0) * 100.0),
+                "display_without_esg_risk_pct": float(result.get("current_non_esg_std_dec", 0.0) * 100.0),
+                "display_without_esg_esg_pct": float(result.get("current_non_esg_esg_pct", 0.0)),
+                "display_without_esg_sharpe": float(result.get("current_non_esg_sharpe", 0.0)),
             })
 
             metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
