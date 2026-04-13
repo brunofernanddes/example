@@ -4918,13 +4918,6 @@ def compute_builder_result(
         'std_dev2_dec': std_dev2_dec,
         'risk_free_rate': float(risk_free_rate),
         'risk_free_rate_dec': risk_free_rate_dec,
-        'exp_return1_input': float(exp_return1),
-        'exp_return2_input': float(exp_return2),
-        'std_dev1_input': float(std_dev1),
-        'std_dev2_input': float(std_dev2),
-        'esg_score1_input': float(esg_score1),
-        'esg_score2_input': float(esg_score2),
-        'risk_free_rate_input': float(risk_free_rate),
         'correlation': float(correlation),
         'gamma': gamma,
         'gamma_input': gamma_input,
@@ -5168,10 +5161,10 @@ def render_builder_popup() -> None:
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             frontier_display = build_dual_frontier_display(result)
-            display_return_pct = float(result.get("opt_return", 0.0))
-            display_risk_pct = float(result.get("opt_risk", 0.0))
-            display_esg_pct = float(result.get("opt_esg", 0.0))
-            display_sharpe = float(result.get("opt_sharpe", 0.0))
+            display_return_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[1])
+            display_risk_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[0])
+            display_esg_pct = float(frontier_display.get("with_tangency_esg", result.get("opt_esg", 0.0)))
+            display_sharpe = float(frontier_display.get("with_tangency_sharpe", result.get("opt_sharpe", 0.0)))
 
             display_result = dict(result)
             display_result.update({
@@ -5179,10 +5172,10 @@ def render_builder_popup() -> None:
                 "display_portfolio_risk_pct": display_risk_pct,
                 "display_portfolio_esg_pct": display_esg_pct,
                 "display_sharpe_ratio": display_sharpe,
-                "display_without_esg_return_pct": float(result.get("current_non_esg_return_dec", 0.0) * 100.0),
-                "display_without_esg_risk_pct": float(result.get("current_non_esg_std_dec", 0.0) * 100.0),
-                "display_without_esg_esg_pct": float(result.get("current_non_esg_esg_pct", 0.0)),
-                "display_without_esg_sharpe": float(result.get("current_non_esg_sharpe", 0.0)),
+                "display_without_esg_return_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[1]),
+                "display_without_esg_risk_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[0]),
+                "display_without_esg_esg_pct": float(frontier_display.get("without_tangency_esg", result.get("current_non_esg_esg_pct", 0.0))),
+                "display_without_esg_sharpe": float(frontier_display.get("without_tangency_sharpe", result.get("current_non_esg_sharpe", 0.0))),
             })
 
             metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
