@@ -2869,8 +2869,17 @@ def _builder_max_total_risky_exposure() -> float:
     return 2.0
 
 
-def _builder_position_grid() -> np.ndarray:
-    return np.linspace(0.0, _builder_max_total_risky_exposure(), 401)
+def _builder_min_nonzero_risky_exposure() -> float:
+    return 0.05
+
+
+def _builder_mix_grid() -> np.ndarray:
+    return np.linspace(0.0, 1.0, 401)
+
+
+def _builder_total_risky_grid() -> np.ndarray:
+    positive = np.linspace(_builder_min_nonzero_risky_exposure(), _builder_max_total_risky_exposure(), 320)
+    return np.concatenate((np.array([0.0]), positive))
 
 
 def _builder_gamma_from_risk_tolerance(risk_tolerance: int) -> float:
@@ -2878,7 +2887,7 @@ def _builder_gamma_from_risk_tolerance(risk_tolerance: int) -> float:
 
 
 def _builder_gamma_sweep(current_gamma: float) -> np.ndarray:
-    sweep = np.linspace(0.80, 14.00, 260)
+    sweep = np.linspace(0.80, 14.00, 220)
     sweep = np.concatenate((sweep, np.array([float(current_gamma)])))
     sweep = np.unique(np.round(sweep, 8))
     return np.sort(sweep)
@@ -2905,62 +2914,58 @@ def _builder_portfolio_universe(
     esg1: float,
     esg2: float,
 ) -> dict:
-    position_grid = _builder_position_grid()
+    position_grid = np.linspace(0.0, _builder_max_total_risky_exposure(), 361)
     x1_mesh, x2_mesh = np.meshgrid(position_grid, position_grid, indexing="ij")
-    feasible_mask = (x1_mesh + x2_mesh) <= (_builder_max_total_risky_exposure() + 1e-12)
 
-    x1 = x1_mesh[feasible_mask].astype(float)
-    x2 = x2_mesh[feasible_mask].astype(float)
+    x1 = x1_mesh.ravel()
+    x2 = x2_mesh.ravel()
     total_risky = x1 + x2
     risk_free_weight = 1.0 - total_risky
 
-    total_portfolio_return = rf + x1 * (r1 - rf) + x2 * (r2 - rf)
-    total_portfolio_excess = total_portfolio_return - rf
-
-    total_portfolio_variance = (
+    portfolio_returns = rf + x1 * (r1 - rf) + x2 * (r2 - rf)
+    portfolio_variances = (
         (x1 ** 2) * (s1 ** 2)
         + (x2 ** 2) * (s2 ** 2)
         + 2.0 * x1 * x2 * s1 * s2 * rho
     )
-    total_portfolio_variance = np.maximum(total_portfolio_variance, 0.0)
-    total_portfolio_risk = np.sqrt(total_portfolio_variance)
+    portfolio_variances = np.maximum(portfolio_variances, 0.0)
+    portfolio_risks = np.sqrt(portfolio_variances)
+    portfolio_excess_returns = portfolio_returns - rf
 
-    risky_sleeve_esg_numerator = x1 * esg1 + x2 * esg2
-    risky_sleeve_esg = np.divide(
-        risky_sleeve_esg_numerator,
+    risky_mix = np.divide(x1, total_risky, out=np.zeros_like(total_risky), where=total_risky > 1e-12)
+    portfolio_esg = np.divide(
+        x1 * esg1 + x2 * esg2,
         total_risky,
-        out=np.zeros_like(total_risky, dtype=float),
+        out=np.zeros_like(total_risky),
         where=total_risky > 1e-12,
     )
-
-    risky_mix = np.divide(
-        x1,
-        total_risky,
-        out=np.zeros_like(total_risky, dtype=float),
-        where=total_risky > 1e-12,
-    )
-
-    total_portfolio_sharpe = np.divide(
-        total_portfolio_excess,
-        total_portfolio_risk,
-        out=np.zeros_like(total_portfolio_excess, dtype=float),
-        where=total_portfolio_risk > 1e-12,
+    portfolio_sharpes = np.divide(
+        portfolio_excess_returns,
+        portfolio_risks,
+        out=np.zeros_like(portfolio_risks),
+        where=portfolio_risks > 1e-12,
     )
 
     return {
+        "position_grid": position_grid,
         "x1": x1,
         "x2": x2,
         "risk_free_weight": risk_free_weight,
         "total_risky": total_risky,
         "risky_mix": risky_mix,
-        "portfolio_returns": total_portfolio_return,
-        "portfolio_variances": total_portfolio_variance,
-        "portfolio_risks": total_portfolio_risk,
-        "portfolio_excess_returns": total_portfolio_excess,
-        "portfolio_esg": risky_sleeve_esg,
-        "portfolio_sharpes": total_portfolio_sharpe,
+        "portfolio_returns": portfolio_returns,
+        "portfolio_variances": portfolio_variances,
+        "portfolio_risks": portfolio_risks,
+        "portfolio_excess_returns": portfolio_excess_returns,
+        "portfolio_esg": portfolio_esg,
+        "portfolio_sharpes": portfolio_sharpes,
     }
 
+
+def _builder_mix_index_lookup(risky_mix_grid: np.ndarray, risky_mix_values: np.ndarray) -> np.ndarray:
+    clipped = np.clip(np.array(risky_mix_values, dtype=float), 0.0, 1.0)
+    scaled = clipped * (len(risky_mix_grid) - 1)
+    return np.clip(np.rint(scaled).astype(int), 0, len(risky_mix_grid) - 1)
 
 def _builder_objective_values(
     excess_returns: np.ndarray,
@@ -3096,12 +3101,12 @@ def build_frontier_interpretation(result: dict) -> str:
         )
     elif opt_esg >= required_esg:
         esg_sentence = (
-            f"The risky-sleeve ESG score is <strong>{opt_esg:.2f}/100</strong>, which meets the implied ESG target of "
+            f"The risky-sleeve ESG score is <strong>{opt_esg:.2f}/100</strong>, which is meeting the implied ESG target of "
             f"<strong>{required_esg:.2f}/100</strong>."
         )
     else:
         esg_sentence = (
-            f"The risky-sleeve ESG score is <strong>{opt_esg:.2f}/100</strong>, which is below the implied ESG target of "
+            f"The risky-sleeve ESG score is <strong>{opt_esg:.2f}/100</strong>, which is still below the implied ESG target of "
             f"<strong>{required_esg:.2f}/100</strong>."
         )
 
@@ -3110,35 +3115,202 @@ def build_frontier_interpretation(result: dict) -> str:
     esg_lift = opt_esg - base_esg
 
     if abs(return_gap) < 0.15 and abs(risk_gap) < 0.15:
-        tradeoff_sentence = "Compared with the non-ESG optimum at the same risk-aversion setting, the ESG-aware choice is financially very similar, so sustainability is being improved without a major performance sacrifice."
-    elif return_gap >= 0.15 and risk_gap <= 0.15:
-        tradeoff_sentence = "Compared with the non-ESG optimum at the same risk-aversion setting, the ESG-aware choice is achieving slightly stronger return without meaningfully increasing risk."
-    elif return_gap >= -0.15 and risk_gap > 0.15:
-        tradeoff_sentence = "Compared with the non-ESG optimum at the same risk-aversion setting, the ESG-aware choice keeps return fairly close, but it accepts more total portfolio risk."
+        tradeoff_sentence = "Compared with the non-ESG recommendation at the same risk-tolerance setting, the ESG-aware portfolio is financially very close, so the sustainability preference is not forcing a big sacrifice."
     elif return_gap < -0.15 and risk_gap <= 0.15:
-        tradeoff_sentence = f"Compared with the non-ESG optimum at the same risk-aversion setting, the ESG-aware choice gives up some expected return, but keeps risk close while improving the risky-sleeve ESG score by <strong>{max(esg_lift, 0.0):.2f}</strong> points."
+        tradeoff_sentence = f"Compared with the non-ESG recommendation, the ESG-aware portfolio gives up some expected return, but it keeps risk broadly similar while improving ESG by <strong>{max(esg_lift, 0.0):.2f}</strong> points."
+    elif return_gap <= 0.15 and risk_gap > 0.15:
+        tradeoff_sentence = "Compared with the non-ESG recommendation, the ESG-aware portfolio is carrying more risk in order to keep a greener risky sleeve."
     else:
-        tradeoff_sentence = "Compared with the non-ESG optimum at the same risk-aversion setting, the ESG-aware choice is making a clearer trade-off, prioritising sustainability while accepting lower return and higher risk."
+        tradeoff_sentence = "Compared with the non-ESG recommendation, the ESG-aware portfolio is making a clearer risk-return trade-off in exchange for a greener risky sleeve."
 
     if correlation <= -0.20:
-        diversification_sentence = "The two risky assets are moving differently enough that diversification is helping reduce total portfolio risk in a meaningful way."
+        diversification_sentence = "The two risky assets are moving differently enough that diversification is helping reduce risk in a meaningful way."
     elif correlation <= 0.35:
-        diversification_sentence = "The two risky assets still provide useful diversification, which helps smooth total portfolio risk."
+        diversification_sentence = "The two risky assets still provide some diversification, which helps smooth the portfolio's overall risk."
     else:
-        diversification_sentence = "The two risky assets are moving quite similarly, so diversification is limited and the portfolio can be less cushioned against swings."
+        diversification_sentence = "The two risky assets are moving quite similarly, so diversification is more limited under the current assumptions."
 
     return f"""
-    <div class="interpretation-card">
+    <div class="interpretation-card"> 
         <p class="interpretation-title">Portfolio Analysis</p>
         <p class="interpretation-subtitle">This summary updates live as your portfolio inputs change.</p>
         <div class="interpretation-divider"></div>
-        <p class="interpretation-copy">{capital_sentence}</p>
-        <p class="interpretation-copy">{allocation_sentence}</p>
+        <p class="interpretation-copy">{allocation_sentence} {capital_sentence}</p>
         <p class="interpretation-copy">{performance_sentence}</p>
         <p class="interpretation-copy">{esg_sentence} {tradeoff_sentence}</p>
         <p class="interpretation-copy">{diversification_sentence}</p>
     </div>
     """
+
+
+# -------------------------------------------------
+# Company search helpers
+
+# -------------------------------------------------
+# Company search helpers
+# -------------------------------------------------
+def company_option_label(company_tuple) -> str:
+    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+    return f"{name} ({ticker.upper()})"
+
+
+def company_search_score(query: str, company_tuple) -> int:
+    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+    q = query.strip().lower()
+    if not q:
+        return -1
+
+    ticker_l = str(ticker).lower()
+    name_l = str(name).lower()
+    industry_l = str(industry).lower()
+    exchange_l = str(exchange).lower()
+    combined = f"{name_l} {ticker_l} {industry_l} {exchange_l}"
+
+    if q == ticker_l:
+        return 5000
+    if q == name_l:
+        return 4900
+    if ticker_l.startswith(q):
+        return 4000 - len(name_l)
+    if name_l.startswith(q):
+        return 3500 - len(name_l)
+    if q in name_l:
+        return 2500 - name_l.find(q)
+    if q in ticker_l:
+        return 2200 - ticker_l.find(q)
+    if q in industry_l:
+        return 1500 - industry_l.find(q)
+    if q in exchange_l:
+        return 1200 - exchange_l.find(q)
+
+    parts = [p for p in q.split() if p]
+    if parts and all(p in combined for p in parts):
+        return 1000 - len(name_l)
+
+    return -1
+
+
+def get_company_matches(query: str, limit: int = 30):
+    q = query.strip()
+    if not q:
+        return []
+
+    scored = []
+    for company in COMPANY_DATA:
+        score = company_search_score(q, company)
+        if score >= 0:
+            scored.append((score, company_option_label(company), company))
+
+    scored.sort(key=lambda item: (-item[0], item[1].lower()))
+    return [item[2] for item in scored[:limit]]
+
+
+def get_company_by_option_label(label: str):
+    if not label:
+        return None
+    for company in COMPANY_DATA:
+        if company_option_label(company) == label:
+            return company
+    return None
+
+
+def render_company_profile(company_tuple) -> None:
+    if company_tuple is None:
+        return
+
+    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="mini-header">Company ESG Profile</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        f"""
+        <div class="asset-card">
+            <div class="asset-card-title">{name} ({ticker.upper()})</div>
+            <p class="asset-card-copy">
+                Industry: {industry}<br>
+                Exchange: {exchange}<br>
+                Overall ESG Grade: <strong>{total_grade}</strong> · {total_level}
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+
+    m1, m2, m3, m4 = st.columns(4, gap="small")
+    with m1:
+        st.markdown(result_tile("Environmental", f"{e_grade} · {e_level}"), unsafe_allow_html=True)
+    with m2:
+        st.markdown(result_tile("Social", f"{s_grade} · {s_level}"), unsafe_allow_html=True)
+    with m3:
+        st.markdown(result_tile("Governance", f"{g_grade} · {g_level}"), unsafe_allow_html=True)
+    with m4:
+        st.markdown(result_tile("Total ESG", f"{total_grade} · {total_level}"), unsafe_allow_html=True)
+
+
+# -------------------------------------------------
+# Portfolio computations
+# -------------------------------------------------
+def risk_level_from_score(risk_tolerance: int) -> str:
+    if 1 <= risk_tolerance <= 4:
+        return "Low"
+    if 5 <= risk_tolerance <= 7:
+        return "Medium"
+    return "High"
+
+
+def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect: str) -> dict:
+    investment_priority_map = {
+        "Balanced return and sustainability": "1",
+        "Prioritise financial growth": "2",
+        "Prioritise sustainability": "3",
+    }
+
+    investment_priority_key = investment_priority_map[priority_label]
+    risk_level = risk_level_from_score(risk_tolerance)
+
+    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
+    def lookup(asset_label: str):
+        ticker = asset_label.split("(")[-1].replace(")", "").strip().lower()
+        for row in COMPANY_DATA:
+            if row[0] == ticker:
+                return row
+        return None
+
+    row1 = lookup(asset1)
+    row2 = lookup(asset2)
+    exp_return1 = ASSET_DATA_LOOKUP.get(asset1, {"expected_return": 0.0, "std_dev": 0.0})["expected_return"]
+    std_dev1 = ASSET_DATA_LOOKUP.get(asset1, {"expected_return": 0.0, "std_dev": 0.0})["std_dev"]
+    exp_return2 = ASSET_DATA_LOOKUP.get(asset2, {"expected_return": 0.0, "std_dev": 0.0})["expected_return"]
+    std_dev2 = ASSET_DATA_LOOKUP.get(asset2, {"expected_return": 0.0, "std_dev": 0.0})["std_dev"]
+
+    rho = 0.30
+    w1 = 0.5
+    w2 = 0.5
+    s1 = std_dev1 / 100
+    s2 = std_dev2 / 100
+    portfolio_return = w1 * exp_return1 + w2 * exp_return2
+    portfolio_std_dev = (
+        np.sqrt((w1 ** 2) * (s1 ** 2) + (w2 ** 2) * (s2 ** 2) + 2 * w1 * w2 * s1 * s2 * rho) * 100
+    )
+
+    return {
+        "investment_priority_label": priority_label,
+        "risk_level": risk_level,
+        "esg_aspect": esg_aspect,
+        "asset1": asset1,
+        "asset2": asset2,
+        "exp_return1": exp_return1,
+        "std_dev1": std_dev1,
+        "exp_return2": exp_return2,
+        "std_dev2": std_dev2,
+        "portfolio_return": portfolio_return,
+        "portfolio_std_dev": portfolio_std_dev,
+        "company_row1": row1,
+        "company_row2": row2,
+    }
 
 
 def compute_builder_result(
@@ -3175,11 +3347,11 @@ def compute_builder_result(
     portfolio_excess_returns = np.array(universe["portfolio_excess_returns"], dtype=float)
     portfolio_esg = np.array(universe["portfolio_esg"], dtype=float)
     portfolio_sharpes = np.array(universe["portfolio_sharpes"], dtype=float)
-    x1_positions = np.array(universe["x1"], dtype=float)
-    x2_positions = np.array(universe["x2"], dtype=float)
-    rf_positions = np.array(universe["risk_free_weight"], dtype=float)
-    total_risky_positions = np.array(universe["total_risky"], dtype=float)
-    risky_mix_positions = np.array(universe["risky_mix"], dtype=float)
+    portfolio_x1 = np.array(universe["x1"], dtype=float)
+    portfolio_x2 = np.array(universe["x2"], dtype=float)
+    portfolio_rf_weight = np.array(universe["risk_free_weight"], dtype=float)
+    total_risky = np.array(universe["total_risky"], dtype=float)
+    risky_mix = np.array(universe["risky_mix"], dtype=float)
 
     current_non_esg_utility = _builder_objective_values(
         portfolio_excess_returns,
@@ -3199,40 +3371,62 @@ def compute_builder_result(
     )
     optimal_idx = int(np.argmax(current_esg_utility))
 
-    gamma_sweep = _builder_gamma_sweep(gamma)
+    risky_mix_grid = _builder_mix_grid()
+    risky_mix_returns = risky_mix_grid * r1 + (1.0 - risky_mix_grid) * r2
+    risky_mix_variances = (
+        (risky_mix_grid ** 2) * (s1 ** 2)
+        + ((1.0 - risky_mix_grid) ** 2) * (s2 ** 2)
+        + 2.0 * risky_mix_grid * (1.0 - risky_mix_grid) * s1 * s2 * rho
+    )
+    risky_mix_variances = np.maximum(risky_mix_variances, 0.0)
+    risky_mix_risks = np.sqrt(risky_mix_variances)
+    risky_mix_esg = risky_mix_grid * esg1 + (1.0 - risky_mix_grid) * esg2
+    risky_mix_sharpes = np.divide(
+        risky_mix_returns - rf,
+        risky_mix_risks,
+        out=np.zeros_like(risky_mix_risks),
+        where=risky_mix_risks > 1e-12,
+    )
 
-    frontier_without_idx = efficient_frontier_indices(portfolio_risks, portfolio_returns)
-    frontier_without_risks_pct = np.array(portfolio_risks[frontier_without_idx] * 100.0, dtype=float)
-    frontier_without_returns_pct = np.array(portfolio_returns[frontier_without_idx] * 100.0, dtype=float)
-    blue_tangency_idx = int(np.argmax(portfolio_sharpes))
+    frontier_without_idx = efficient_frontier_indices(risky_mix_risks, risky_mix_returns)
+    frontier_without_risks_pct = np.array(risky_mix_risks[frontier_without_idx] * 100.0, dtype=float)
+    frontier_without_returns_pct = np.array(risky_mix_returns[frontier_without_idx] * 100.0, dtype=float)
+    blue_tangency_idx = int(np.argmax(risky_mix_sharpes))
 
-    selected_with_esg_idx = _builder_selected_family_indices(
+    gamma_values = _builder_gamma_sweep(gamma)
+    green_family_portfolio_idx = _builder_selected_family_indices(
         portfolio_excess_returns,
         portfolio_variances,
         portfolio_esg,
-        gamma_sweep,
+        gamma_values,
         lambda_taste,
     )
 
-    if selected_with_esg_idx.size == 0:
-        selected_with_esg_idx = np.array([optimal_idx], dtype=int)
+    green_family_total_risky = total_risky[green_family_portfolio_idx]
+    positive_green_mask = green_family_total_risky > 1e-12
+    green_family_mixes = risky_mix[green_family_portfolio_idx][positive_green_mask]
+    if green_family_mixes.size == 0:
+        fallback_mix_idx = int(np.argmax(risky_mix_esg))
+        green_mix_indices = np.array([fallback_mix_idx], dtype=int)
+    else:
+        green_mix_indices = _unique_preserve_order(_builder_mix_index_lookup(risky_mix_grid, green_family_mixes).tolist())
 
-    with_family_risks = np.array(portfolio_risks[selected_with_esg_idx], dtype=float)
-    with_family_returns = np.array(portfolio_returns[selected_with_esg_idx], dtype=float)
-    _, _, frontier_with_local_idx = _builder_frontier_arrays_from_points(with_family_risks, with_family_returns)
-    if frontier_with_local_idx.size == 0:
-        frontier_with_local_idx = np.array([int(np.argmax(with_family_returns))], dtype=int)
-    frontier_with_idx = np.array(selected_with_esg_idx[frontier_with_local_idx], dtype=int)
-    frontier_with_risks_pct = np.array(portfolio_risks[frontier_with_idx] * 100.0, dtype=float)
-    frontier_with_returns_pct = np.array(portfolio_returns[frontier_with_idx] * 100.0, dtype=float)
-    green_tangency_idx = int(frontier_with_idx[np.argmax(portfolio_sharpes[frontier_with_idx])])
+    green_eligible_mask = np.zeros_like(risky_mix_grid, dtype=bool)
+    green_eligible_mask[green_mix_indices] = True
+    frontier_with_idx = efficient_frontier_indices(risky_mix_risks, risky_mix_returns, green_eligible_mask)
+    if frontier_with_idx.size == 0:
+        frontier_with_idx = np.array([int(green_mix_indices[0])], dtype=int)
+    frontier_with_risks_pct = np.array(risky_mix_risks[frontier_with_idx] * 100.0, dtype=float)
+    frontier_with_returns_pct = np.array(risky_mix_returns[frontier_with_idx] * 100.0, dtype=float)
+    green_tangency_local_idx = int(np.argmax(risky_mix_sharpes[frontier_with_idx]))
+    green_tangency_idx = int(frontier_with_idx[green_tangency_local_idx])
 
     frontier_overlap = frontier_overlap_ratio(frontier_without_idx, frontier_with_idx)
-    required_esg = float(np.min(portfolio_esg[selected_with_esg_idx])) if selected_with_esg_idx.size > 0 else float(portfolio_esg[optimal_idx])
+    required_esg = float(np.min(risky_mix_esg[frontier_with_idx]) if frontier_with_idx.size > 0 else np.max(risky_mix_esg))
 
-    opt_x1 = float(x1_positions[optimal_idx])
-    opt_x2 = float(x2_positions[optimal_idx])
-    opt_rf_weight = float(rf_positions[optimal_idx])
+    opt_x1 = float(portfolio_x1[optimal_idx])
+    opt_x2 = float(portfolio_x2[optimal_idx])
+    opt_rf_weight = float(portfolio_rf_weight[optimal_idx])
 
     return {
         "asset1": asset1,
@@ -3248,18 +3442,18 @@ def compute_builder_result(
         "gamma_input": float(gamma),
         "lambda_taste": float(lambda_taste),
         "esg_preference_fraction": esg_preference_fraction,
-        "weights": total_risky_positions,
+        "weights": np.array(universe["position_grid"], dtype=float),
         "portfolio_returns": portfolio_returns,
         "portfolio_risks": portfolio_risks,
         "portfolio_variances": portfolio_variances,
         "portfolio_excess_returns": portfolio_excess_returns,
         "portfolio_esg": portfolio_esg,
         "portfolio_sharpes": portfolio_sharpes,
-        "portfolio_x1": x1_positions,
-        "portfolio_x2": x2_positions,
-        "portfolio_rf_weight": rf_positions,
-        "portfolio_total_risky": total_risky_positions,
-        "portfolio_risky_mix": risky_mix_positions,
+        "portfolio_x1": portfolio_x1,
+        "portfolio_x2": portfolio_x2,
+        "portfolio_rf_weight": portfolio_rf_weight,
+        "portfolio_total_risky": total_risky,
+        "portfolio_risky_mix": risky_mix,
         "current_non_esg_opt_idx": current_non_esg_opt_idx,
         "optimal_idx": optimal_idx,
         "efficient_idx_without_esg_full": frontier_without_idx,
@@ -3274,13 +3468,13 @@ def compute_builder_result(
         "frontier_with_risks_pct": frontier_with_risks_pct,
         "frontier_with_returns_pct": frontier_with_returns_pct,
         "max_sharpe_idx": blue_tangency_idx,
-        "max_sharpe_risk_pct": float(portfolio_risks[blue_tangency_idx] * 100.0),
-        "max_sharpe_return_pct": float(portfolio_returns[blue_tangency_idx] * 100.0),
-        "max_sharpe_esg_pct": float(portfolio_esg[blue_tangency_idx] * 100.0),
+        "max_sharpe_risk_pct": float(risky_mix_risks[blue_tangency_idx] * 100.0),
+        "max_sharpe_return_pct": float(risky_mix_returns[blue_tangency_idx] * 100.0),
+        "max_sharpe_esg_pct": float(risky_mix_esg[blue_tangency_idx] * 100.0),
         "esg_tangency_idx": green_tangency_idx,
-        "esg_tangency_risk_pct": float(portfolio_risks[green_tangency_idx] * 100.0),
-        "esg_tangency_return_pct": float(portfolio_returns[green_tangency_idx] * 100.0),
-        "esg_tangency_esg_pct": float(portfolio_esg[green_tangency_idx] * 100.0),
+        "esg_tangency_risk_pct": float(risky_mix_risks[green_tangency_idx] * 100.0),
+        "esg_tangency_return_pct": float(risky_mix_returns[green_tangency_idx] * 100.0),
+        "esg_tangency_esg_pct": float(risky_mix_esg[green_tangency_idx] * 100.0),
         "current_non_esg_return_pct": float(portfolio_returns[current_non_esg_opt_idx] * 100.0),
         "current_non_esg_risk_pct": float(portfolio_risks[current_non_esg_opt_idx] * 100.0),
         "current_non_esg_esg_pct": float(portfolio_esg[current_non_esg_opt_idx] * 100.0),
