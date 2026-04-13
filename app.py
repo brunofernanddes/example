@@ -4772,951 +4772,282 @@ def __v56_builder_best_risky_mix(
     return refined_bundle if refined_bundle['objective'] >= best_bundle['objective'] else best_bundle
 
 
-def compute_builder_result(
-    asset1: str,
-    asset2: str,
-    exp_return1: float,
-    exp_return2: float,
-    std_dev1: float,
-    std_dev2: float,
-    esg_score1: float,
-    esg_score2: float,
-    correlation: float,
-    risk_free_rate: float,
-    risk_tolerance: int,
-    esg_slider: float,
-) -> dict[str, float]:
-    exp_return1_dec = float(exp_return1) / 100.0
-    exp_return2_dec = float(exp_return2) / 100.0
-    std_dev1_dec = max(float(std_dev1), 0.01) / 100.0
-    std_dev2_dec = max(float(std_dev2), 0.01) / 100.0
-    risk_free_rate_dec = float(risk_free_rate) / 100.0
-    gamma = _builder_gamma_from_risk_tolerance(int(risk_tolerance))
-    gamma_input = gamma
-    esg_preference_fraction = float(esg_slider)
 
-    sigma12 = float(correlation) * std_dev1_dec * std_dev2_dec
-    covariance_matrix = np.array(
+
+def compute_builder_result(
+    asset1_name: str,
+    asset2_name: str,
+    mu1_pct: float,
+    mu2_pct: float,
+    sigma1_pct: float,
+    sigma2_pct: float,
+    correlation: float,
+    rf_pct: float,
+    esg1: float,
+    esg2: float,
+    risk_tolerance: float,
+    preferred_lambda: float,
+) -> dict:
+    """Compute portfolio weights x that solve the builder problem.
+
+    Audit-consistent setup:
+      maximise  x' (mu - rf*1) - (gamma/2) x' Σ x + lambda * s_bar
+      subject to x >= 0
+
+    where s_bar is the ESG score of the risky sleeve only.
+    The risky weights x are fractions of wealth and therefore do not need to sum to 1.
+    The residual 1 - sum(x) is the position in the risk-free asset.
+    """
+
+    mu = np.array([float(mu1_pct), float(mu2_pct)], dtype=float) / 100.0
+    rf = float(rf_pct) / 100.0
+    excess_mu = mu - rf
+
+    sigma = np.array([float(sigma1_pct), float(sigma2_pct)], dtype=float) / 100.0
+    rho = float(np.clip(correlation, -0.999999, 0.999999))
+    covariance = np.array(
         [
-            [std_dev1_dec ** 2, sigma12],
-            [sigma12, std_dev2_dec ** 2],
+            [sigma[0] ** 2, rho * sigma[0] * sigma[1]],
+            [rho * sigma[0] * sigma[1], sigma[1] ** 2],
         ],
         dtype=float,
     )
-    max_total_risky = _builder_max_total_risky_exposure()
 
-    current_bundle = __v56_builder_best_risky_mix(
-        exp_return1_dec=exp_return1_dec,
-        exp_return2_dec=exp_return2_dec,
-        esg_score1=float(esg_score1),
-        esg_score2=float(esg_score2),
-        covariance_matrix=covariance_matrix,
-        risk_free_rate_dec=risk_free_rate_dec,
-        gamma=gamma,
-        esg_slider=esg_preference_fraction,
-        max_total_risky=max_total_risky,
-    )
+    esg_scores = np.array([float(esg1), float(esg2)], dtype=float)
+    gamma = float(max(1e-8, _builder_gamma_from_risk_tolerance(risk_tolerance)))
+    total_risky_cap = float(max(0.0, _builder_max_total_risky_exposure()))
+    min_nonzero_risky = float(max(0.0, _builder_min_nonzero_risky_exposure()))
+    eps = 1e-12
 
-    current_mix_asset1 = float(current_bundle['mix_asset1'])
-    current_mix_asset2 = float(current_bundle['mix_asset2'])
-    total_risky_position = float(current_bundle['total_risky'])
-    opt_weight_asset_1 = float(total_risky_position * current_mix_asset1)
-    opt_weight_asset_2 = float(total_risky_position * current_mix_asset2)
-    opt_rf_weight = float(1.0 - total_risky_position)
+    def _evaluate_candidate(total_risky: float, sleeve_weight_1: float, esg_lambda: float) -> dict:
+        p = float(np.clip(sleeve_weight_1, 0.0, 1.0))
+        risky_total = float(max(0.0, min(total_risky, total_risky_cap)))
+        sleeve = np.array([p, 1.0 - p], dtype=float)
+        risky_mean = float(np.dot(excess_mu, sleeve))
+        risky_variance = float(sleeve @ covariance @ sleeve)
+        risky_variance = max(risky_variance, 0.0)
+        risky_esg = float(np.dot(esg_scores, sleeve))
 
-    portfolio_variance = float(
-        np.array([opt_weight_asset_1, opt_weight_asset_2], dtype=float)
-        @ covariance_matrix
-        @ np.array([opt_weight_asset_1, opt_weight_asset_2], dtype=float)
-    )
-    portfolio_std_dev_dec = math.sqrt(max(portfolio_variance, 0.0))
-    portfolio_return_dec = float(
-        risk_free_rate_dec
-        + opt_weight_asset_1 * (exp_return1_dec - risk_free_rate_dec)
-        + opt_weight_asset_2 * (exp_return2_dec - risk_free_rate_dec)
-    )
-    portfolio_esg_score = (
-        float(current_mix_asset1 * float(esg_score1) + current_mix_asset2 * float(esg_score2))
-        if total_risky_position > 1e-12 else 0.0
-    )
-    portfolio_sharpe = (
-        (portfolio_return_dec - risk_free_rate_dec) / max(portfolio_std_dev_dec, 1e-12)
-        if portfolio_std_dev_dec > 1e-12 else 0.0
-    )
+        if risky_total <= eps:
+            objective = 0.0
+            x = np.array([0.0, 0.0], dtype=float)
+            portfolio_return = rf
+            portfolio_risk = 0.0
+            portfolio_esg = 0.0
+        else:
+            x = risky_total * sleeve
+            objective = (
+                risky_total * risky_mean
+                - 0.5 * gamma * (risky_total ** 2) * risky_variance
+                + float(esg_lambda) * risky_esg
+            )
+            portfolio_return = rf + float(np.dot(x, excess_mu))
+            portfolio_risk = math.sqrt(max(0.0, float(x @ covariance @ x)))
+            portfolio_esg = risky_esg
 
-    non_esg_bundle = __v56_builder_best_risky_mix(
-        exp_return1_dec=exp_return1_dec,
-        exp_return2_dec=exp_return2_dec,
-        esg_score1=float(esg_score1),
-        esg_score2=float(esg_score2),
-        covariance_matrix=covariance_matrix,
-        risk_free_rate_dec=risk_free_rate_dec,
-        gamma=gamma,
-        esg_slider=0.0,
-        max_total_risky=max_total_risky,
-    )
-    current_non_esg_mix = float(non_esg_bundle['mix_asset1'])
-    current_non_esg_total_risky = float(non_esg_bundle['total_risky'])
-    current_non_esg_w1 = float(current_non_esg_total_risky * current_non_esg_mix)
-    current_non_esg_w2 = float(current_non_esg_total_risky * (1.0 - current_non_esg_mix))
-    current_non_esg_return_dec = float(
-        risk_free_rate_dec
-        + current_non_esg_w1 * (exp_return1_dec - risk_free_rate_dec)
-        + current_non_esg_w2 * (exp_return2_dec - risk_free_rate_dec)
-    )
-    current_non_esg_variance = float(
-        np.array([current_non_esg_w1, current_non_esg_w2], dtype=float)
-        @ covariance_matrix
-        @ np.array([current_non_esg_w1, current_non_esg_w2], dtype=float)
-    )
-    current_non_esg_std_dec = math.sqrt(max(current_non_esg_variance, 0.0))
-    current_non_esg_sharpe = (
-        (current_non_esg_return_dec - risk_free_rate_dec) / max(current_non_esg_std_dec, 1e-12)
-        if current_non_esg_std_dec > 1e-12 else 0.0
-    )
-    current_non_esg_esg_pct = (
-        float(current_non_esg_mix * float(esg_score1) + (1.0 - current_non_esg_mix) * float(esg_score2))
-        if current_non_esg_total_risky > 1e-12 else 0.0
-    )
+        sharpe = (
+            (portfolio_return - rf) / portfolio_risk
+            if portfolio_risk > eps
+            else 0.0
+        )
 
-    frontier_display = build_dual_frontier_display(
-        {
-            'asset1': asset1,
-            'asset2': asset2,
-            'exp_return1': float(exp_return1),
-            'exp_return2': float(exp_return2),
-            'std_dev1': float(std_dev1),
-            'std_dev2': float(std_dev2),
-            'correlation': float(correlation),
-            'risk_free_rate': float(risk_free_rate),
-            'gamma_input': gamma_input,
-            'esg_score1': float(esg_score1),
-            'esg_score2': float(esg_score2),
-            'esg_preference_fraction': esg_preference_fraction,
-            'current_non_esg_mix': current_non_esg_mix,
-            'current_non_esg_total_risky': current_non_esg_total_risky,
-            'current_non_esg_esg_pct': current_non_esg_esg_pct,
-            'opt_return_dec': portfolio_return_dec,
-            'opt_std_dec': portfolio_std_dev_dec,
-            'opt_sharpe': portfolio_sharpe,
-            'opt_esg': portfolio_esg_score,
+        return {
+            "objective": float(objective),
+            "sleeve_weight_1": p,
+            "sleeve_weight_2": 1.0 - p,
+            "risky_total": risky_total,
+            "x": x,
+            "portfolio_return": float(portfolio_return),
+            "portfolio_risk": float(portfolio_risk),
+            "portfolio_esg": float(portfolio_esg),
+            "portfolio_sharpe": float(sharpe),
+            "risky_mean": float(risky_mean),
+            "risky_variance": float(risky_variance),
         }
+
+    def _best_total_for_sleeve(sleeve_weight_1: float, esg_lambda: float) -> dict:
+        p = float(np.clip(sleeve_weight_1, 0.0, 1.0))
+        sleeve = np.array([p, 1.0 - p], dtype=float)
+        risky_mean = float(np.dot(excess_mu, sleeve))
+        risky_variance = float(sleeve @ covariance @ sleeve)
+        risky_variance = max(risky_variance, 0.0)
+
+        candidate_totals = [0.0, total_risky_cap]
+        if esg_lambda > eps and min_nonzero_risky > eps:
+            candidate_totals.append(min_nonzero_risky)
+
+        if risky_variance > eps:
+            interior_total = risky_mean / (gamma * risky_variance)
+            candidate_totals.append(float(np.clip(interior_total, 0.0, total_risky_cap)))
+
+        best_candidate = None
+        seen = set()
+        for candidate_total in candidate_totals:
+            total_key = round(float(candidate_total), 12)
+            if total_key in seen:
+                continue
+            seen.add(total_key)
+            candidate = _evaluate_candidate(float(candidate_total), p, esg_lambda)
+            if (
+                best_candidate is None
+                or candidate["objective"] > best_candidate["objective"] + 1e-12
+                or (
+                    abs(candidate["objective"] - best_candidate["objective"]) <= 1e-12
+                    and candidate["risky_total"] < best_candidate["risky_total"]
+                )
+            ):
+                best_candidate = candidate
+
+        return best_candidate
+
+    def _solve_for_lambda(esg_lambda: float) -> dict:
+        symmetric_case = (
+            abs(mu1_pct - mu2_pct) <= 1e-12
+            and abs(sigma1_pct - sigma2_pct) <= 1e-12
+            and abs(esg1 - esg2) <= 1e-12
+        )
+
+        if symmetric_case:
+            best = _best_total_for_sleeve(0.5, esg_lambda)
+            best["sleeve_weight_1"] = 0.5
+            best["sleeve_weight_2"] = 0.5
+            best["x"] = np.array(
+                [0.5 * best["risky_total"], 0.5 * best["risky_total"]],
+                dtype=float,
+            )
+            best["portfolio_return"] = rf + float(np.dot(best["x"], excess_mu))
+            best["portfolio_risk"] = math.sqrt(max(0.0, float(best["x"] @ covariance @ best["x"])))
+            best["portfolio_sharpe"] = (
+                (best["portfolio_return"] - rf) / best["portfolio_risk"]
+                if best["portfolio_risk"] > eps
+                else 0.0
+            )
+            best["portfolio_esg"] = float(np.dot(esg_scores, np.array([0.5, 0.5], dtype=float))) if best["risky_total"] > eps else 0.0
+            return best
+
+        coarse_grid = np.linspace(0.0, 1.0, 4001)
+        best = None
+
+        def _update_best(candidate: dict, current_best: dict | None) -> dict:
+            if current_best is None:
+                return candidate
+            if candidate["objective"] > current_best["objective"] + 1e-12:
+                return candidate
+            if abs(candidate["objective"] - current_best["objective"]) <= 1e-12:
+                if candidate["portfolio_risk"] < current_best["portfolio_risk"] - 1e-12:
+                    return candidate
+                if abs(candidate["portfolio_risk"] - current_best["portfolio_risk"]) <= 1e-12 and candidate["risky_total"] < current_best["risky_total"]:
+                    return candidate
+            return current_best
+
+        for p in coarse_grid:
+            best = _update_best(_best_total_for_sleeve(float(p), esg_lambda), best)
+
+        centre = float(best["sleeve_weight_1"])
+        for half_window, points in ((0.05, 1201), (0.01, 1201), (0.002, 1201), (0.0005, 1201)):
+            left = max(0.0, centre - half_window)
+            right = min(1.0, centre + half_window)
+            local_grid = np.linspace(left, right, points)
+            for p in local_grid:
+                best = _update_best(_best_total_for_sleeve(float(p), esg_lambda), best)
+            centre = float(best["sleeve_weight_1"])
+
+        x = np.array(best["x"], dtype=float)
+        total_risky = float(max(0.0, np.sum(x)))
+        if total_risky > eps:
+            best["sleeve_weight_1"] = float(x[0] / total_risky)
+            best["sleeve_weight_2"] = float(x[1] / total_risky)
+        else:
+            best["sleeve_weight_1"] = 0.0
+            best["sleeve_weight_2"] = 0.0
+
+        return best
+
+    benchmark = _solve_for_lambda(0.0)
+    adjusted = _solve_for_lambda(float(preferred_lambda))
+
+    opt_w1 = float(adjusted["x"][0])
+    opt_w2 = float(adjusted["x"][1])
+    risky_weight_sum = float(opt_w1 + opt_w2)
+    opt_rf_weight = float(1.0 - risky_weight_sum)
+
+    if risky_weight_sum > eps:
+        optimal_weights = np.array([opt_w1, opt_w2], dtype=float) / risky_weight_sum
+        sleeve_weight_asset1 = float(optimal_weights[0])
+        sleeve_weight_asset2 = float(optimal_weights[1])
+    else:
+        optimal_weights = np.array([0.0, 0.0], dtype=float)
+        sleeve_weight_asset1 = 0.0
+        sleeve_weight_asset2 = 0.0
+
+    tangency_no_esg_weights = (
+        np.array([benchmark["x"][0], benchmark["x"][1]], dtype=float) / benchmark["risky_total"]
+        if benchmark["risky_total"] > eps
+        else np.array([0.5, 0.5], dtype=float)
+    )
+    tangency_with_esg_weights = (
+        np.array([adjusted["x"][0], adjusted["x"][1]], dtype=float) / adjusted["risky_total"]
+        if adjusted["risky_total"] > eps
+        else np.array([0.5, 0.5], dtype=float)
+    )
+
+    frontier_scale_end = max(
+        1.6,
+        1.35 * max(1.0, benchmark["risky_total"], adjusted["risky_total"]),
     )
 
     return {
-        'asset1': asset1,
-        'asset2': asset2,
-        'exp_return1': float(exp_return1),
-        'exp_return2': float(exp_return2),
-        'std_dev1': float(std_dev1),
-        'std_dev2': float(std_dev2),
-        'esg_score1': float(esg_score1),
-        'esg_score2': float(esg_score2),
-        'exp_return1_dec': exp_return1_dec,
-        'exp_return2_dec': exp_return2_dec,
-        'std_dev1_dec': std_dev1_dec,
-        'std_dev2_dec': std_dev2_dec,
-        'risk_free_rate': float(risk_free_rate),
-        'risk_free_rate_dec': risk_free_rate_dec,
-        'correlation': float(correlation),
-        'gamma': gamma,
-        'gamma_input': gamma_input,
-        'esg_slider': esg_preference_fraction,
-        'esg_preference_fraction': esg_preference_fraction,
-        'covariance_matrix': covariance_matrix,
-        'max_total_risky': max_total_risky,
-        'optimal_risky_mix': current_mix_asset1,
-        'optimal_total_risky': total_risky_position,
-        'total_risky_position': total_risky_position,
-        'portfolio_total_risky': total_risky_position,
-        'weight_asset_1': opt_weight_asset_1,
-        'weight_asset_2': opt_weight_asset_2,
-        'opt_weight_asset_1': opt_weight_asset_1,
-        'opt_weight_asset_2': opt_weight_asset_2,
-        'opt_weight_asset1': opt_weight_asset_1,
-        'opt_weight_asset2': opt_weight_asset_2,
-        'opt_w1': opt_weight_asset_1,
-        'opt_w2': opt_weight_asset_2,
-        'opt_rf_weight': opt_rf_weight,
-        'risk_free_weight': opt_rf_weight,
-        'portfolio_return_dec': portfolio_return_dec,
-        'portfolio_std_dev_dec': portfolio_std_dev_dec,
-        'portfolio_esg_score': portfolio_esg_score,
-        'portfolio_variance': portfolio_variance,
-        'current_non_esg_mix': current_non_esg_mix,
-        'current_non_esg_total_risky': current_non_esg_total_risky,
-        'current_non_esg_w1': current_non_esg_w1,
-        'current_non_esg_w2': current_non_esg_w2,
-        'current_non_esg_return_dec': current_non_esg_return_dec,
-        'current_non_esg_std_dec': current_non_esg_std_dec,
-        'current_non_esg_sharpe': current_non_esg_sharpe,
-        'current_non_esg_esg_pct': current_non_esg_esg_pct,
-        'sleeve_weight_asset1': current_mix_asset1 * 100.0 if total_risky_position > 1e-12 else 0.0,
-        'sleeve_weight_asset2': current_mix_asset2 * 100.0 if total_risky_position > 1e-12 else 0.0,
-        'sleeve_weight_asset_1': current_mix_asset1 * 100.0 if total_risky_position > 1e-12 else 0.0,
-        'sleeve_weight_asset_2': current_mix_asset2 * 100.0 if total_risky_position > 1e-12 else 0.0,
-        'risky_sleeve_weight_asset1': current_mix_asset1 * 100.0 if total_risky_position > 1e-12 else 0.0,
-        'risky_sleeve_weight_asset2': current_mix_asset2 * 100.0 if total_risky_position > 1e-12 else 0.0,
-        'total_risky_exposure': total_risky_position * 100.0,
-        'risk_free_borrowing': max((total_risky_position - 1.0) * 100.0, 0.0),
-        'risk_free_weight_pct': opt_rf_weight * 100.0,
-        'opt_return_dec': portfolio_return_dec,
-        'opt_std_dec': portfolio_std_dev_dec,
-        'opt_return': portfolio_return_dec * 100.0,
-        'opt_risk': portfolio_std_dev_dec * 100.0,
-        'opt_esg': portfolio_esg_score,
-        'opt_sharpe': portfolio_sharpe,
-        'current_frontier_display': frontier_display,
-        'current_analysis': {},
+        "asset1_name": asset1_name,
+        "asset2_name": asset2_name,
+        "weight_asset_1": opt_w1,
+        "weight_asset_2": opt_w2,
+        "opt_w1": opt_w1,
+        "opt_w2": opt_w2,
+        "opt_risk_weight": risky_weight_sum,
+        "opt_rf_weight": opt_rf_weight,
+        "risky_exposure": risky_weight_sum,
+        "risky_weight_sum": risky_weight_sum,
+        "sleeve_weight_asset1": sleeve_weight_asset1,
+        "sleeve_weight_asset2": sleeve_weight_asset2,
+        "risky_sleeve_total": risky_weight_sum,
+        "optimal_weights": optimal_weights,
+        "opt_return": float(adjusted["portfolio_return"] * 100.0),
+        "opt_risk": float(adjusted["portfolio_risk"] * 100.0),
+        "opt_sharpe": float(adjusted["portfolio_sharpe"]),
+        "expected_return": float(adjusted["portfolio_return"] * 100.0),
+        "portfolio_risk": float(adjusted["portfolio_risk"] * 100.0),
+        "portfolio_esg_score": float(adjusted["portfolio_esg"]),
+        "gamma_used": gamma,
+        "lambda_used": float(preferred_lambda),
+        "tangency_no_esg_risk": float(benchmark["portfolio_risk"] * 100.0),
+        "tangency_no_esg_return": float(benchmark["portfolio_return"] * 100.0),
+        "tangency_no_esg_weights": tangency_no_esg_weights,
+        "tangency_with_esg_risk": float(adjusted["portfolio_risk"] * 100.0),
+        "tangency_with_esg_return": float(adjusted["portfolio_return"] * 100.0),
+        "tangency_with_esg_weights": tangency_with_esg_weights,
+        "plot_x_pct": float(adjusted["portfolio_risk"] * 100.0),
+        "plot_y_pct": float(adjusted["portfolio_return"] * 100.0),
+        "frontier_reference": {
+            "means": mu,
+            "volatilities": sigma,
+            "covariance": covariance,
+            "rf": rf,
+            "esg_scores": esg_scores,
+            "preferred_lambda": float(preferred_lambda),
+            "gamma": gamma,
+            "benchmark_weights": tangency_no_esg_weights,
+            "benchmark_return": float(benchmark["portfolio_return"] * 100.0),
+            "benchmark_risk": float(benchmark["portfolio_risk"] * 100.0),
+            "benchmark_sharpe": float(benchmark["portfolio_sharpe"]),
+            "benchmark_esg": float(benchmark["portfolio_esg"]),
+            "adjusted_weights": tangency_with_esg_weights,
+            "adjusted_return": float(adjusted["portfolio_return"] * 100.0),
+            "adjusted_risk": float(adjusted["portfolio_risk"] * 100.0),
+            "adjusted_sharpe": float(adjusted["portfolio_sharpe"]),
+            "adjusted_esg": float(adjusted["portfolio_esg"]),
+            "frontier_scale_end": float(frontier_scale_end),
+        },
     }
-
-
-# -------------------------------------------------
-# Recommendation asset stats lookup
-# -------------------------------------------------
-ASSET_DATA_LOOKUP = {
-    "PepsiCo (PEP)": {"expected_return": 7.33, "std_dev": 5.19},
-    "Consolidated Edison (ED)": {"expected_return": 7.53, "std_dev": 5.22},
-    "Edison International (EIX)": {"expected_return": 4.26, "std_dev": 8.20},
-    "Procter & Gamble (PG)": {"expected_return": 8.61, "std_dev": 6.92},
-    "Microsoft (MSFT)": {"expected_return": 23.16, "std_dev": 6.81},
-    "Air Products and Chemicals (APD)": {"expected_return": 10.06, "std_dev": 6.64},
-    "Regency Centers (REG)": {"expected_return": 4.14, "std_dev": 4.09},
-    "Trane Technologies (TT)": {"expected_return": 23.15, "std_dev": 8.35},
-    "Airbnb (ABNB)": {"expected_return": -5.81, "std_dev": 10.67},
-    "Amazon (AMZN)": {"expected_return": 21.84, "std_dev": 7.90},
-    "General Mills (GIS)": {"expected_return": -1.33, "std_dev": 7.33},
-    "ConocoPhillips (COP)": {"expected_return": 15.21, "std_dev": 8.08},
-    "Exelon (EXC)": {"expected_return": 10.72, "std_dev": 5.84},
-    "Pinnacle West Capital (PNW)": {"expected_return": 7.01, "std_dev": 4.96},
-    "Raytheon Technologies (RTX)": {"expected_return": 16.65, "std_dev": 8.73},
-}
-
-
-# -------------------------------------------------
-# Live popup renderers
-# -------------------------------------------------
-def render_recommendation_popup() -> None:
-    result = compute_recommendation(
-        st.session_state.rec_investment_priority,
-        int(st.session_state.rec_risk_tolerance),
-        st.session_state.rec_esg_aspect,
-    )
-
-    outer_left, outer_mid, outer_right = st.columns([0.08, 0.84, 0.08])
-    with outer_mid:
-        popup = st.container(border=True)
-        with popup:
-            header_left, header_right = st.columns([0.82, 0.18], gap="small")
-            with header_left:
-                st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="popup-subtitle">This recommendation updates live as you change the inputs below.</div>',
-                    unsafe_allow_html=True,
-                )
-            with header_right:
-                st.button("Close", key="close_rec_popup_btn", use_container_width=True, on_click=hide_recommendation_popup)
-
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            left, right = st.columns([0.9, 1.1], gap="large")
-            with left:
-                st.markdown(result_tile("Investment Priority", result["investment_priority_label"]), unsafe_allow_html=True)
-                st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
-                g1c1, g1c2 = st.columns(2, gap="small")
-                with g1c1:
-                    st.markdown(result_tile("Risk Level", result["risk_level"]), unsafe_allow_html=True)
-                with g1c2:
-                    st.markdown(result_tile("Preferred ESG Aspect", result["esg_aspect"]), unsafe_allow_html=True)
-
-                st.markdown("<div style='height:0.45rem;'></div>", unsafe_allow_html=True)
-
-                g2c1, g2c2 = st.columns(2, gap="small")
-                with g2c1:
-                    st.markdown(result_tile("Expected Returns", f'{result["portfolio_return"]:.2f}%'), unsafe_allow_html=True)
-                with g2c2:
-                    st.markdown(
-                        result_tile(
-                            "Portfolio Risk",
-                            f'{result["portfolio_std_dev"]:.2f}%',
-                            tooltip="Portfolio risk is characterised by standard deviation.",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-
-            with right:
-                st.markdown('<div class="mini-header">Recommended Assets</div>', unsafe_allow_html=True)
-                for row, asset_label, exp_return, std_dev in [
-                    (result["company_row1"], result["asset1"], result["exp_return1"], result["std_dev1"]),
-                    (result["company_row2"], result["asset2"], result["exp_return2"], result["std_dev2"]),
-                ]:
-                    if row is None:
-                        st.markdown(
-                            f"""
-                            <div class="asset-card">
-                                <div class="asset-card-title">{asset_label}</div>
-                                <p class="asset-card-copy">
-                                    Expected return: {exp_return:.2f}%<br>
-                                    Standard deviation: {std_dev:.2f}%
-                                </p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    else:
-                        ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = row
-                        st.markdown(
-                            f"""
-                            <div class="asset-card">
-                                <div class="asset-card-title">{name} ({ticker.upper()})</div>
-                                <p class="asset-card-copy">
-                                    Industry: {industry}<br>
-                                    ESG Grade: <strong>{total_grade}</strong> · {total_level}<br>
-                                    Expected return: {exp_return:.2f}% · Standard deviation: {std_dev:.2f}%
-                                </p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    st.markdown("<div style='height:0.65rem;'></div>", unsafe_allow_html=True)
-
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="mini-header">Asset Comparison</div>', unsafe_allow_html=True)
-
-            fig, ax = plt.subplots(figsize=(9, 4.2), dpi=180, constrained_layout=True)
-            fig.patch.set_facecolor("white")
-            labels = [result["asset1"], result["asset2"]]
-            returns = [result["exp_return1"], result["exp_return2"]]
-            risks = [result["std_dev1"], result["std_dev2"]]
-            x = np.arange(len(labels))
-            width = 0.34
-
-            ax.bar(x - width / 2, returns, width, label="Expected Return (%)", color="#16a34a", edgecolor="#166534")
-            ax.bar(x + width / 2, risks, width, label="Standard Deviation (%)", color="#86efac", edgecolor="#15803d")
-            ax.set_xticks(x)
-            ax.set_xticklabels(labels)
-            ax.set_ylabel("Percentage (%)")
-            ax.set_title("Asset Metrics")
-            style_modern_axes(ax)
-            ax.legend(frameon=False)
-            st.pyplot(fig)
-            plt.close(fig)
-
-
-def render_builder_popup() -> None:
-    if st.session_state.builder_asset_choice != "Input my own assets":
-        outer_left, outer_mid, outer_right = st.columns([0.08, 0.84, 0.08])
-        with outer_mid:
-            popup = st.container(border=True)
-            with popup:
-                header_left, header_right = st.columns([0.82, 0.18], gap="small")
-                with header_left:
-                    st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                    st.markdown(
-                        '<div class="popup-subtitle">The popup remains open while you refine the inputs on the page.</div>',
-                        unsafe_allow_html=True,
-                    )
-                with header_right:
-                    st.button("Close", key="close_builder_popup_btn_info", use_container_width=True, on_click=hide_builder_popup)
-                st.info("Recommended public companies mode is ready for your curated ESG universe integration.")
-        return
-
-    try:
-        result = compute_builder_result(
-            asset1=st.session_state.builder_asset1,
-            asset2=st.session_state.builder_asset2,
-            exp_return1=float(st.session_state.builder_exp_return1),
-            exp_return2=float(st.session_state.builder_exp_return2),
-            std_dev1=float(st.session_state.builder_std_dev1),
-            std_dev2=float(st.session_state.builder_std_dev2),
-            esg_score1=float(st.session_state.builder_esg_score1),
-            esg_score2=float(st.session_state.builder_esg_score2),
-            correlation=float(st.session_state.builder_correlation),
-            risk_free_rate=float(st.session_state.builder_risk_free_rate),
-            risk_tolerance=int(st.session_state.builder_risk_tolerance),
-            esg_slider=float(st.session_state.builder_esg_slider),
-        )
-    except Exception:
-        outer_left, outer_mid, outer_right = st.columns([0.08, 0.84, 0.08])
-        with outer_mid:
-            popup = st.container(border=True)
-            with popup:
-                header_left, header_right = st.columns([0.82, 0.18], gap="small")
-                with header_left:
-                    st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                with header_right:
-                    st.button("Close", key="close_builder_popup_btn_error", use_container_width=True, on_click=hide_builder_popup)
-                st.error("Please check your inputs and try again.")
-        return
-
-    outer_left, outer_mid, outer_right = st.columns([0.05, 0.90, 0.05])
-    with outer_mid:
-        popup = st.container(border=True)
-        with popup:
-            header_left, header_right = st.columns([0.82, 0.18], gap="small")
-            with header_left:
-                st.markdown('<div class="popup-title">Live Portfolio Recommendation</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="popup-subtitle">This output updates live while you keep editing the inputs behind it.</div>',
-                    unsafe_allow_html=True,
-                )
-            with header_right:
-                st.button("Close", key="close_builder_popup_btn", use_container_width=True, on_click=hide_builder_popup)
-
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            frontier_display = build_dual_frontier_display(result)
-            display_return_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[1])
-            display_risk_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[0])
-            display_esg_pct = float(frontier_display.get("with_tangency_esg", result.get("opt_esg", 0.0)))
-            display_sharpe = float(frontier_display.get("with_tangency_sharpe", result.get("opt_sharpe", 0.0)))
-
-            display_result = dict(result)
-            display_result.update({
-                "display_expected_return_pct": display_return_pct,
-                "display_portfolio_risk_pct": display_risk_pct,
-                "display_portfolio_esg_pct": display_esg_pct,
-                "display_sharpe_ratio": display_sharpe,
-                "display_without_esg_return_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[1]),
-                "display_without_esg_risk_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[0]),
-                "display_without_esg_esg_pct": float(frontier_display.get("without_tangency_esg", result.get("current_non_esg_esg_pct", 0.0))),
-                "display_without_esg_sharpe": float(frontier_display.get("without_tangency_sharpe", result.get("current_non_esg_sharpe", 0.0))),
-            })
-
-            metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
-            with metric_c1:
-                st.markdown(result_tile("Expected Return", f'{display_return_pct:.2f}%'), unsafe_allow_html=True)
-            with metric_c2:
-                st.markdown(
-                    result_tile(
-                        "Portfolio Risk",
-                        f'{display_risk_pct:.2f}%',
-                        tooltip="Portfolio risk is characterised by standard deviation.",
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with metric_c3:
-                st.markdown(result_tile("Portfolio ESG Score", f'{display_esg_pct:.2f}/100'), unsafe_allow_html=True)
-            with metric_c4:
-                st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
-
-            safe_asset1_name = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
-            safe_asset2_name = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
-            safe_opt_w1 = max(float(result.get("opt_w1", 0.0)), 0.0)
-            safe_opt_w2 = max(float(result.get("opt_w2", 0.0)), 0.0)
-            total_risky_weight = safe_opt_w1 + safe_opt_w2
-            if total_risky_weight > 1e-12:
-                display_weight1 = safe_opt_w1 / total_risky_weight
-                display_weight2 = safe_opt_w2 / total_risky_weight
-            else:
-                display_weight1 = 0.0
-                display_weight2 = 0.0
-
-            st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-            st.markdown(
-                allocation_summary_html(
-                    safe_asset1_name,
-                    safe_opt_w1,
-                    safe_asset2_name,
-                    safe_opt_w2,
-                    float(result.get("opt_rf_weight", 0.0)),
-                ),
-                unsafe_allow_html=True,
-            )
-
-            weight_c1, weight_c2 = st.columns(2, gap="small")
-            with weight_c1:
-                st.markdown(
-                    result_tile(
-                        f'{safe_asset1_name} Position',
-                        f'{safe_opt_w1 * 100.0:.2f}%'
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with weight_c2:
-                st.markdown(
-                    result_tile(
-                        f'{safe_asset2_name} Position',
-                        f'{safe_opt_w2 * 100.0:.2f}%'
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
-
-            fig, ax = plt.subplots(figsize=(9.6, 5.6), dpi=180, constrained_layout=True)
-            fig.patch.set_facecolor("white")
-
-            without_curve_risks = frontier_display["without_curve_risks"]
-            without_curve_returns = frontier_display["without_curve_returns"]
-            without_frontier_risks = frontier_display["without_frontier_risks"]
-            without_frontier_returns = frontier_display["without_frontier_returns"]
-            with_curve_risks = frontier_display["with_curve_risks"]
-            with_curve_returns = frontier_display["with_curve_returns"]
-            with_frontier_risks = frontier_display["with_frontier_risks"]
-            with_frontier_returns = frontier_display["with_frontier_returns"]
-            rf_x, rf_y = frontier_display["rf_point"]
-            without_tangency_x, without_tangency_y = frontier_display["without_tangency_point"]
-            with_tangency_x, with_tangency_y = frontier_display["with_tangency_point"]
-
-            if len(without_curve_risks) > 0:
-                ax.plot(
-                    without_curve_risks,
-                    without_curve_returns,
-                    linewidth=5.4,
-                    color="white",
-                    alpha=0.98,
-                    zorder=1,
-                )
-                ax.plot(
-                    without_curve_risks,
-                    without_curve_returns,
-                    linewidth=2.8,
-                    color="#2563eb",
-                    alpha=0.96,
-                    zorder=2,
-                )
-
-            if len(with_curve_risks) > 0:
-                ax.plot(
-                    with_curve_risks,
-                    with_curve_returns,
-                    linewidth=5.6,
-                    color="white",
-                    alpha=0.98,
-                    zorder=2,
-                )
-                ax.plot(
-                    with_curve_risks,
-                    with_curve_returns,
-                    linewidth=2.9,
-                    color="#16a34a",
-                    alpha=0.96,
-                    zorder=3,
-                )
-
-            if len(without_frontier_risks) > 0:
-                ax.plot(
-                    without_frontier_risks,
-                    without_frontier_returns,
-                    linewidth=3.2,
-                    color="#2563eb",
-                    zorder=4,
-                )
-
-            if len(with_frontier_risks) > 0:
-                ax.plot(
-                    with_frontier_risks,
-                    with_frontier_returns,
-                    linewidth=3.4,
-                    color="#16a34a",
-                    linestyle=(0, (8, 4)),
-                    zorder=5,
-                )
-
-            ax.plot(
-                [rf_x, without_tangency_x],
-                [rf_y, without_tangency_y],
-                linestyle=(0, (3, 3)),
-                linewidth=1.8,
-                color="#2563eb",
-                alpha=0.9,
-                zorder=2,
-            )
-            ax.plot(
-                [rf_x, with_tangency_x],
-                [rf_y, with_tangency_y],
-                linestyle=(0, (3, 3)),
-                linewidth=1.8,
-                color="#14b8a6",
-                alpha=0.9,
-                zorder=2,
-            )
-
-            ax.scatter(rf_x, rf_y, s=38, color="#94a3b8", edgecolors="white", linewidths=0.8, zorder=5)
-            ax.scatter(
-                without_tangency_x,
-                without_tangency_y,
-                s=84,
-                color="#2563eb",
-                edgecolors="white",
-                linewidths=1.0,
-                zorder=6,
-            )
-            ax.scatter(
-                with_tangency_x,
-                with_tangency_y,
-                s=84,
-                color="#16a34a",
-                edgecolors="white",
-                linewidths=1.0,
-                zorder=6,
-            )
-
-            if len(without_frontier_risks) > 0:
-                without_label_idx = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.58)))
-                ax.annotate(
-                    "Mean-Variance Frontier\n(Without ESG)",
-                    (without_frontier_risks[without_label_idx], without_frontier_returns[without_label_idx]),
-                    xytext=(26, 18),
-                    textcoords="offset points",
-                    fontsize=8.6,
-                    color="#1d4ed8",
-                    weight="bold",
-                    bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bfdbfe", alpha=0.98),
-                    arrowprops=dict(arrowstyle="-", color="#2563eb", lw=1.05, alpha=0.95),
-                )
-
-            if len(with_frontier_risks) > 0:
-                with_label_idx = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.68)))
-                ax.annotate(
-                    "Mean-Variance Frontier\n(With Given ESG)",
-                    (with_frontier_risks[with_label_idx], with_frontier_returns[with_label_idx]),
-                    xytext=(20, -34),
-                    textcoords="offset points",
-                    fontsize=8.6,
-                    color="#15803d",
-                    weight="bold",
-                    bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bbf7d0", alpha=0.98),
-                    arrowprops=dict(arrowstyle="-", color="#16a34a", lw=1.05, alpha=0.95),
-                )
-
-            ax.annotate(
-                "Tangency Portfolio\n(Without ESG)",
-                (without_tangency_x, without_tangency_y),
-                xytext=(-118, 12),
-                textcoords="offset points",
-                fontsize=8.5,
-                color="#1d4ed8",
-                weight="bold",
-                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bfdbfe", alpha=0.98),
-                arrowprops=dict(arrowstyle="->", color="#2563eb", lw=1.0, alpha=0.9),
-            )
-            ax.annotate(
-                "Tangency Portfolio\n(With Given ESG)",
-                (with_tangency_x, with_tangency_y),
-                xytext=(12, -34),
-                textcoords="offset points",
-                fontsize=8.5,
-                color="#15803d",
-                weight="bold",
-                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
-                arrowprops=dict(arrowstyle="->", color="#16a34a", lw=1.0, alpha=0.9),
-            )
-
-            all_x = np.concatenate([without_curve_risks, with_curve_risks, np.array([rf_x])]) if len(without_curve_risks) + len(with_curve_risks) > 0 else np.array([0.0])
-            all_y = np.concatenate([without_curve_returns, with_curve_returns, np.array([rf_y])]) if len(without_curve_returns) + len(with_curve_returns) > 0 else np.array([0.0])
-            x_span = max(float(np.max(all_x) - np.min(all_x)), 1.0)
-            y_span = max(float(np.max(all_y) - np.min(all_y)), 1.0)
-            ax.set_xlim(left=0.0, right=float(np.max(all_x) + 0.07 * x_span))
-            ax.set_ylim(bottom=float(min(rf_y, np.min(all_y)) - 0.08 * y_span), top=float(np.max(all_y) + 0.08 * y_span))
-            ax.set_xlabel("Portfolio Risk (%)")
-            ax.set_ylabel("Expected Return (%)")
-            ax.set_title("Efficient Frontiers")
-            style_modern_axes(ax)
-            st.pyplot(fig)
-            plt.close(fig)
-            st.markdown(build_frontier_interpretation(display_result), unsafe_allow_html=True)
-
-
-
-# -------------------------------------------------
-# Screens
-# -------------------------------------------------
-def render_home() -> None:
-    st.markdown(
-        """
-        <style>
-            div[data-testid="stButton"] > button[kind="primary"],
-            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
-                min-height: 16.3rem !important;
-                border-radius: 36px !important;
-                padding: 2.9rem 1.7rem !important;
-                border: 1px solid rgba(91,33,182,0.54) !important;
-                background: linear-gradient(135deg, #5b21b6, #6d28d9) !important;
-                background-color: #5b21b6 !important;
-                box-shadow: 0 24px 46px rgba(91,33,182,0.26) !important;
-                color: #ffffff !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-            }
-
-            div[data-testid="stButton"] > button[kind="secondary"],
-            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] {
-                min-height: 16.3rem !important;
-                border-radius: 36px !important;
-                padding: 2.9rem 1.7rem !important;
-                border: 1px solid rgba(185,28,28,0.46) !important;
-                background: linear-gradient(135deg, #991b1b, #dc2626) !important;
-                background-color: #991b1b !important;
-                box-shadow: 0 24px 46px rgba(185,28,28,0.24) !important;
-                color: #ffffff !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-            }
-
-            div[data-testid="stButton"] > button[kind="primary"]:hover,
-            div[data-testid="stButton"] > button[kind="primary"]:focus,
-            div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover,
-            div[data-testid="stButton"] > button[data-testid="baseButton-primary"]:focus {
-                background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
-                background-color: #4c1d95 !important;
-                box-shadow: 0 28px 50px rgba(76,29,149,0.30) !important;
-                transform: translateY(-2px) !important;
-            }
-
-            div[data-testid="stButton"] > button[kind="secondary"]:hover,
-            div[data-testid="stButton"] > button[kind="secondary"]:focus,
-            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:hover,
-            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"]:focus {
-                background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
-                background-color: #7f1d1d !important;
-                box-shadow: 0 28px 50px rgba(127,29,29,0.28) !important;
-                transform: translateY(-2px) !important;
-            }
-
-            div[data-testid="stButton"] > button[kind="primary"] p,
-            div[data-testid="stButton"] > button[kind="primary"] span,
-            div[data-testid="stButton"] > button[kind="primary"] div,
-            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] p,
-            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] span,
-            div[data-testid="stButton"] > button[data-testid="baseButton-primary"] div,
-            div[data-testid="stButton"] > button[kind="secondary"] p,
-            div[data-testid="stButton"] > button[kind="secondary"] span,
-            div[data-testid="stButton"] > button[kind="secondary"] div,
-            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] p,
-            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] span,
-            div[data-testid="stButton"] > button[data-testid="baseButton-secondary"] div {
-                color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-                font-size: 1.34rem !important;
-                font-weight: 760 !important;
-                line-height: 1.18 !important;
-                text-align: center !important;
-                white-space: normal !important;
-                word-break: keep-all !important;
-                overflow-wrap: normal !important;
-                hyphens: none !important;
-            }
-
-            .brand-row {
-                gap: 0.75rem !important;
-                margin-bottom: 1.1rem !important;
-            }
-
-            .brand-row-logo-only {
-                justify-content: flex-start !important;
-                align-items: flex-start !important;
-                margin-bottom: -2.35rem !important;
-                width: 100% !important;
-                overflow: visible !important;
-            }
-
-            .logo-box {
-                width: clamp(248px, 27vw, 356px) !important;
-                height: auto !important;
-                min-width: 248px !important;
-                min-height: 0 !important;
-                max-width: 100% !important;
-                max-height: none !important;
-                border-radius: 0 !important;
-                overflow: visible !important;
-                display: block !important;
-                line-height: 0 !important;
-                padding: 0 !important;
-            }
-
-            .brand-row-logo-only .logo-box img {
-                width: 100% !important;
-                height: auto !important;
-                max-width: 100% !important;
-                object-fit: contain !important;
-                display: block !important;
-            }
-
-            .brand-title {
-                font-size: 1.18rem !important;
-            }
-
-            .brand-subtitle {
-                font-size: 0.98rem !important;
-            }
-
-            .home-cta-shell {
-                max-width: 980px !important;
-                margin: 0 auto 0.55rem auto !important;
-            }
-
-            .home-main-row {
-                margin-top: -4.15rem !important;
-            }
-
-            .home-cta-note {
-                font-size: 1.06rem !important;
-            }
-
-            .home-button-spacer {
-                height: 1.35rem !important;
-            }
-
-            .home-overview-panel {
-                padding: 1.65rem 1.55rem !important;
-                border-radius: 30px !important;
-                min-height: 29.4rem !important;
-                height: 100% !important;
-                width: 100% !important;
-                box-sizing: border-box !important;
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: flex-start !important;
-            }
-
-            .home-overview-title {
-                font-size: 1.42rem !important;
-                line-height: 1.28 !important;
-            }
-
-            .home-overview-copy {
-                font-size: 1.12rem !important;
-                line-height: 1.92 !important;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
-        <div class="brand-row brand-row-logo-only">
-            <div class="logo-box"><img src="data:image/png;base64,{LEAF_LOGO_BASE64}" alt="Leaf It To Us logo"></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<div class="home-main-row">', unsafe_allow_html=True)
-    left, right = st.columns([1.34, 0.96], gap="medium")
-    with left:
-        hero_panel = st.container(border=True)
-        with hero_panel:
-            st.markdown(
-                """
-                <div class="home-cta-shell">
-                    <div class="section-label">Get Started</div>
-                    <div class="section-title">Choose how you want to build your portfolio</div>
-                    <div class="home-cta-note">
-                        Start with a guided recommendation or move straight into a fully customised portfolio build.
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown('<div class="home-button-spacer"></div>', unsafe_allow_html=True)
-            btn1, btn2 = st.columns(2, gap="large")
-            with btn1:
-                st.button(
-                    "Give Me a Portfolio Recommendation",
-                    key="home_recommendation_button",
-                    type="primary",
-                    use_container_width=True,
-                    on_click=open_recommendation,
-                )
-            with btn2:
-                st.button(
-                    "Build Your Customised Portfolio",
-                    key="home_builder_button",
-                    type="secondary",
-                    use_container_width=True,
-                    on_click=open_builder,
-                )
-    with right:
-        st.markdown(
-            """
-            <div class="home-overview-panel">
-                <div class="home-overview-eyebrow">App Overview</div>
-                <div class="home-overview-title">Build ESG-aware portfolios with a simple, guided workflow.</div>
-                <p class="home-overview-copy">
-                    This app helps investors compare financial return, portfolio risk, and sustainability priorities in one place.
-                    You can either receive a guided recommendation or build a fully customised portfolio using your own assumptions,
-                    then explore how the efficient frontiers and portfolio analysis change live as you adjust the inputs.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("<div style='height:1.8rem;'></div>", unsafe_allow_html=True)
-    st.markdown('<div class="section-label">Why this app?</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">An investment app that prioritises ESG preferences</div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="section-copy">
-            This app is designed for investors who want their portfolios to reflect more than financial return alone.
-            It prioritises ESG preferences by allowing sustainability considerations to play a central role in portfolio
-            construction, helping users align their investments with environmental values, social impact priorities,
-            and expectations around strong governance.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    c1, c2, c3 = st.columns(3, gap="large")
-    with c1:
-        render_card("Environmental (E)", "Environmental factors consider climate risk, carbon emissions, resource use, pollution, and broader ecological sustainability.")
-    with c2:
-        render_card("Social (S)", "Social factors focus on how organisations treat people, including labour standards, diversity, community impact, health, safety, and human rights.")
-    with c3:
-        render_card("Governance (G)", "Governance factors examine how organisations are led, including board quality, executive accountability, transparency, ethics, and shareholder rights.")
-
-
-def render_recommendation_screen() -> None:
-    inject_tool_text_css()
-    st.button("← Back", on_click=open_home, use_container_width=False)
-    render_page_header(
-        "Portfolio Recommendation",
-        "Set your preferences below. When you generate a recommendation, a live popup-style panel appears on the same screen and updates as you refine the inputs.",
-    )
-
-    if st.session_state.show_recommendation_popup:
-        render_recommendation_popup()
-        st.markdown("<div style='height:1.05rem;'></div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-label">Step 1</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Set Your Preferences</div>', unsafe_allow_html=True)
-
-    left, right = st.columns(2, gap="large")
-    with left:
-        render_custom_label("Investment Priority")
-        st.radio(
-            "Investment Priority",
-            ["Prioritise sustainability", "Prioritise financial growth", "Balanced return and sustainability"],
-            key="rec_investment_priority",
-            horizontal=False,
-            label_visibility="collapsed",
-        )
-        render_custom_label("Risk Tolerance")
-        st.slider("Risk Tolerance", min_value=1, max_value=10, key="rec_risk_tolerance", label_visibility="collapsed")
-        render_risk_tolerance_helper()
-    with right:
-        render_custom_label("Which ESG aspect matters most?")
-        st.radio(
-            "Which ESG aspect matters most?",
-            ["All Equal", "Governance", "Environmental", "Social"],
-            key="rec_esg_aspect",
-            horizontal=False,
-            label_visibility="collapsed",
-        )
-
-    st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
-    st.button("Generate Portfolio Recommendation", type="primary", use_container_width=True, on_click=show_recommendation_popup)
 
 
 def render_builder_screen() -> None:
