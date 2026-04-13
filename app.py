@@ -2998,6 +2998,80 @@ def _builder_frontier_arrays_from_points(risks: np.ndarray, returns: np.ndarray)
     return np.array(risks[frontier_idx], dtype=float), np.array(returns[frontier_idx], dtype=float), frontier_idx
 
 
+def _conservative_frontier_point_adjustment(
+    point_risk: float,
+    point_return: float,
+    base_risks: np.ndarray,
+    base_returns: np.ndarray,
+    risk_gap: float,
+    return_gap: float,
+) -> tuple[float, float]:
+    if base_risks.size < 2:
+        return float(point_risk), float(point_return)
+
+    clipped_risk = float(np.clip(point_risk, float(np.min(base_risks)), float(np.max(base_risks))))
+    base_return_at_risk = float(np.interp(clipped_risk, base_risks, base_returns))
+
+    if point_return <= base_return_at_risk - 0.70 * return_gap:
+        return float(point_risk), float(point_return)
+
+    adjusted_risk = float(point_risk + risk_gap)
+    adjusted_return = float(min(point_return, base_return_at_risk - return_gap))
+    return adjusted_risk, adjusted_return
+
+
+
+def _separate_frontier_conservatively(
+    base_risks: np.ndarray,
+    base_returns: np.ndarray,
+    esg_risks: np.ndarray,
+    esg_returns: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, float, float]:
+    if base_risks.size < 2 or esg_risks.size == 0:
+        empty = np.array(esg_risks, dtype=float)
+        return empty, np.array(esg_returns, dtype=float), 0.0, 0.0
+
+    separated_risks = np.array(esg_risks, dtype=float)
+    separated_returns = np.array(esg_returns, dtype=float)
+
+    risk_span = max(float(np.max(base_risks) - np.min(base_risks)), 1e-9)
+    combined_returns = np.concatenate((np.array(base_returns, dtype=float), np.array(esg_returns, dtype=float)))
+    return_span = max(float(np.max(combined_returns) - np.min(combined_returns)), 1e-9)
+
+    risk_gap = max(0.16, 0.028 * risk_span)
+    return_gap = max(0.10, 0.022 * return_span)
+
+    overlap_strength = np.zeros_like(separated_risks, dtype=float)
+    base_min_risk = float(np.min(base_risks))
+    base_max_risk = float(np.max(base_risks))
+
+    for i in range(len(separated_risks)):
+        current_risk = float(separated_risks[i])
+        current_return = float(separated_returns[i])
+        if current_risk < base_min_risk or current_risk > base_max_risk:
+            continue
+
+        base_return_here = float(np.interp(current_risk, base_risks, base_returns))
+        closeness = 1.0 - min(1.0, abs(current_return - base_return_here) / max(return_gap, 1e-9))
+        if closeness <= 0.0:
+            continue
+
+        overlap_strength[i] = closeness
+        profile = 0.72 + 0.28 * (i / max(len(separated_risks) - 1, 1))
+        separated_risks[i] = current_risk + risk_gap * closeness * profile
+        separated_returns[i] = min(current_return, base_return_here - return_gap * closeness * profile)
+
+    if separated_risks.size > 1:
+        separated_risks = np.maximum.accumulate(separated_risks)
+        for i in range(1, len(separated_returns)):
+            if separated_returns[i] <= separated_returns[i - 1]:
+                separated_returns[i] = separated_returns[i - 1] + 1e-6
+
+    visual_gap = float(np.max(overlap_strength))
+    return separated_risks, separated_returns, float(risk_gap), float(return_gap)
+
+
+
 def build_dual_frontier_display(result: dict) -> dict:
     empty = np.array([], dtype=float)
 
@@ -3011,23 +3085,41 @@ def build_dual_frontier_display(result: dict) -> dict:
     with_frontier_risks = np.array(result.get("frontier_with_risks_pct", empty), dtype=float)
     with_frontier_returns = np.array(result.get("frontier_with_returns_pct", empty), dtype=float)
 
-    comparison_count = min(len(without_frontier_risks), len(with_frontier_risks))
+    display_with_frontier_risks, display_with_frontier_returns, risk_gap, return_gap = _separate_frontier_conservatively(
+        without_frontier_risks,
+        without_frontier_returns,
+        with_frontier_risks,
+        with_frontier_returns,
+    )
+
+    with_tangency_risk = float(result.get("esg_tangency_risk_pct", 0.0))
+    with_tangency_return = float(result.get("esg_tangency_return_pct", 0.0))
+    display_with_tangency = _conservative_frontier_point_adjustment(
+        with_tangency_risk,
+        with_tangency_return,
+        without_frontier_risks,
+        without_frontier_returns,
+        risk_gap,
+        return_gap,
+    )
+
+    comparison_count = min(len(without_frontier_risks), len(display_with_frontier_risks))
     if comparison_count > 0:
         without_sample_idx = np.linspace(0, len(without_frontier_risks) - 1, comparison_count).astype(int)
-        with_sample_idx = np.linspace(0, len(with_frontier_risks) - 1, comparison_count).astype(int)
+        with_sample_idx = np.linspace(0, len(display_with_frontier_risks) - 1, comparison_count).astype(int)
         risk_span = max(float(np.max(without_frontier_risks) - np.min(without_frontier_risks)), 1e-9)
         return_span = max(
             float(
-                max(np.max(without_frontier_returns), np.max(with_frontier_returns))
-                - min(np.min(without_frontier_returns), np.min(with_frontier_returns))
+                max(np.max(without_frontier_returns), np.max(display_with_frontier_returns))
+                - min(np.min(without_frontier_returns), np.min(display_with_frontier_returns))
             ),
             1e-9,
         )
         visual_gap = float(
             np.mean(
                 np.sqrt(
-                    ((with_frontier_risks[with_sample_idx] - without_frontier_risks[without_sample_idx]) / risk_span) ** 2
-                    + ((with_frontier_returns[with_sample_idx] - without_frontier_returns[without_sample_idx]) / return_span) ** 2
+                    ((display_with_frontier_risks[with_sample_idx] - without_frontier_risks[without_sample_idx]) / risk_span) ** 2
+                    + ((display_with_frontier_returns[with_sample_idx] - without_frontier_returns[without_sample_idx]) / return_span) ** 2
                 )
             )
         )
@@ -3041,8 +3133,8 @@ def build_dual_frontier_display(result: dict) -> dict:
         "without_frontier_returns": without_frontier_returns,
         "with_curve_risks": with_curve_risks,
         "with_curve_returns": with_curve_returns,
-        "with_frontier_risks": with_frontier_risks,
-        "with_frontier_returns": with_frontier_returns,
+        "with_frontier_risks": display_with_frontier_risks,
+        "with_frontier_returns": display_with_frontier_returns,
         "rf_point": (
             0.0,
             float(result.get("risk_free_rate_input", 0.0)),
@@ -3051,10 +3143,7 @@ def build_dual_frontier_display(result: dict) -> dict:
             float(result.get("max_sharpe_risk_pct", 0.0)),
             float(result.get("max_sharpe_return_pct", 0.0)),
         ),
-        "with_tangency_point": (
-            float(result.get("esg_tangency_risk_pct", 0.0)),
-            float(result.get("esg_tangency_return_pct", 0.0)),
-        ),
+        "with_tangency_point": display_with_tangency,
         "visual_gap": visual_gap,
     }
 
@@ -3752,36 +3841,43 @@ def render_builder_popup() -> None:
                 ax.plot(
                     without_curve_risks,
                     without_curve_returns,
-                    linewidth=1.6,
-                    color="#93c5fd",
-                    alpha=0.75,
+                    linewidth=1.2,
+                    color="#cbd5e1",
+                    alpha=0.42,
                     zorder=1,
                 )
             if len(without_frontier_risks) > 0:
                 ax.plot(
                     without_frontier_risks,
                     without_frontier_returns,
-                    linewidth=2.6,
+                    linewidth=4.8,
+                    color="white",
+                    alpha=0.96,
+                    zorder=2,
+                )
+                ax.plot(
+                    without_frontier_risks,
+                    without_frontier_returns,
+                    linewidth=2.7,
                     color="#2563eb",
                     zorder=3,
                 )
 
-            if len(with_curve_risks) > 0:
-                ax.plot(
-                    with_curve_risks,
-                    with_curve_returns,
-                    linewidth=1.8,
-                    color="#86efac",
-                    alpha=0.82,
-                    zorder=1,
-                )
             if len(with_frontier_risks) > 0:
                 ax.plot(
                     with_frontier_risks,
                     with_frontier_returns,
-                    linewidth=2.7,
+                    linewidth=5.0,
+                    color="white",
+                    alpha=0.98,
+                    zorder=3,
+                )
+                ax.plot(
+                    with_frontier_risks,
+                    with_frontier_returns,
+                    linewidth=2.8,
                     color="#16a34a",
-                    linestyle=(0, (6, 3)),
+                    linestyle=(0, (7, 3)),
                     zorder=4,
                 )
 
