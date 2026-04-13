@@ -3004,13 +3004,56 @@ def _builder_frontier_arrays_from_points(risks: np.ndarray, returns: np.ndarray)
     return np.array(risks[frontier_idx], dtype=float), np.array(returns[frontier_idx], dtype=float), frontier_idx
 
 
+def _builder_inward_display_separation(
+    base_risks_pct: np.ndarray,
+    base_returns_pct: np.ndarray,
+    esg_risks_pct: np.ndarray,
+    esg_returns_pct: np.ndarray,
+    esg_preference_fraction: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    base_risks = np.array(base_risks_pct, dtype=float)
+    base_returns = np.array(base_returns_pct, dtype=float)
+    esg_risks = np.array(esg_risks_pct, dtype=float)
+    esg_returns = np.array(esg_returns_pct, dtype=float)
+
+    if base_risks.size == 0 or esg_risks.size == 0 or esg_preference_fraction <= 0.0:
+        return esg_risks, esg_returns
+
+    risk_span = max(float(np.max(base_risks) - np.min(base_risks)), 1e-9)
+    return_span = max(float(np.max(base_returns) - np.min(base_returns)), 1e-9)
+    preference_strength = 0.75 + 0.25 * float(np.clip(esg_preference_fraction, 0.0, 1.0))
+
+    x_shift = 0.022 * risk_span * preference_strength
+    y_shift = 0.038 * return_span * preference_strength
+    ramp = np.linspace(0.35, 1.0, esg_risks.size)
+
+    separated_risks = esg_risks + x_shift * ramp
+    separated_returns = esg_returns - y_shift * ramp
+    return separated_risks, separated_returns
+
+
 def build_dual_frontier_display(result: dict) -> dict:
     empty = np.array([], dtype=float)
 
     without_frontier_risks = np.array(result.get("frontier_without_risks_pct", empty), dtype=float)
     without_frontier_returns = np.array(result.get("frontier_without_returns_pct", empty), dtype=float)
-    with_frontier_risks = np.array(result.get("frontier_with_risks_pct", empty), dtype=float)
-    with_frontier_returns = np.array(result.get("frontier_with_returns_pct", empty), dtype=float)
+    raw_with_frontier_risks = np.array(result.get("frontier_with_risks_pct", empty), dtype=float)
+    raw_with_frontier_returns = np.array(result.get("frontier_with_returns_pct", empty), dtype=float)
+
+    with_frontier_risks, with_frontier_returns = _builder_inward_display_separation(
+        without_frontier_risks,
+        without_frontier_returns,
+        raw_with_frontier_risks,
+        raw_with_frontier_returns,
+        float(result.get("esg_preference_fraction", 0.0)),
+    )
+
+    with_tangency_risk = float(result.get("esg_tangency_risk_pct", 0.0))
+    with_tangency_return = float(result.get("esg_tangency_return_pct", 0.0))
+    if raw_with_frontier_risks.size > 0 and with_frontier_risks.size == raw_with_frontier_risks.size:
+        tangency_pos = int(np.argmin(np.abs(raw_with_frontier_risks - with_tangency_risk) + np.abs(raw_with_frontier_returns - with_tangency_return)))
+        with_tangency_risk = float(with_frontier_risks[tangency_pos])
+        with_tangency_return = float(with_frontier_returns[tangency_pos])
 
     comparison_count = min(len(without_frontier_risks), len(with_frontier_risks))
     if comparison_count > 0:
@@ -3053,8 +3096,8 @@ def build_dual_frontier_display(result: dict) -> dict:
             float(result.get("max_sharpe_return_pct", 0.0)),
         ),
         "with_tangency_point": (
-            float(result.get("esg_tangency_risk_pct", 0.0)),
-            float(result.get("esg_tangency_return_pct", 0.0)),
+            with_tangency_risk,
+            with_tangency_return,
         ),
         "visual_gap": visual_gap,
     }
@@ -3413,28 +3456,41 @@ def compute_builder_result(
     family_with_nonzero_indices = np.array(family_with_indices[family_with_nonzero_mask], dtype=int)
 
     if family_with_nonzero_indices.size > 0:
-        selected_mixes = risky_mix_positions[family_with_nonzero_indices]
-        green_eligible_mask = _builder_mix_interval_mask(risky_mix_grid, selected_mixes)
+        selected_mixes = np.clip(np.array(risky_mix_positions[family_with_nonzero_indices], dtype=float), 0.0, 1.0)
         family_min_esg = float(np.min(portfolio_esg[family_with_nonzero_indices]))
+        family_max_esg = float(np.max(portfolio_esg[family_with_nonzero_indices]))
     else:
         greener_mix_value = 1.0 if esg1 >= esg2 else 0.0
-        green_eligible_mask = _builder_mix_interval_mask(risky_mix_grid, np.array([greener_mix_value], dtype=float))
+        selected_mixes = np.array([greener_mix_value], dtype=float)
         family_min_esg = float(max(esg1, esg2))
+        family_max_esg = float(max(esg1, esg2))
 
     slider_required_esg = float(np.min(risky_mix_esg) + esg_preference_fraction * (np.max(risky_mix_esg) - np.min(risky_mix_esg)))
-    current_opt_esg = float(portfolio_esg[optimal_idx]) if total_risky_positions[optimal_idx] > 1e-12 else float(max(esg1, esg2))
-    required_esg = float(max(slider_required_esg, family_min_esg, current_opt_esg if lambda_taste > 1e-12 else np.min(risky_mix_esg)))
+    required_esg = float(max(slider_required_esg, family_min_esg if lambda_taste > 1e-12 else np.min(risky_mix_esg)))
 
-    if lambda_taste > 1e-12:
-        green_eligible_mask = green_eligible_mask & (risky_mix_esg >= required_esg - 1e-12)
+    if lambda_taste > 1e-12 and selected_mixes.size > 0:
+        preference_quantile = float(np.clip(0.18 + 0.52 * esg_preference_fraction, 0.18, 0.70))
+        tolerance = 0.5 / max(len(risky_mix_grid) - 1, 1) + 1e-12
+        if esg1 >= esg2:
+            greener_floor = float(np.quantile(selected_mixes, preference_quantile))
+            greener_cap = float(np.max(selected_mixes))
+            green_eligible_mask = (risky_mix_grid >= greener_floor - tolerance) & (risky_mix_grid <= greener_cap + tolerance)
+        else:
+            greener_cap = float(np.quantile(selected_mixes, 1.0 - preference_quantile))
+            greener_floor = float(np.min(selected_mixes))
+            green_eligible_mask = (risky_mix_grid >= greener_floor - tolerance) & (risky_mix_grid <= greener_cap + tolerance)
+    else:
+        green_eligible_mask = np.ones_like(risky_mix_grid, dtype=bool)
 
     frontier_with_idx = efficient_frontier_indices(risky_mix_risks, risky_mix_returns, green_eligible_mask)
     if frontier_with_idx.size == 0:
         if lambda_taste > 1e-12:
-            fallback_mix_idx = int(np.argmax(risky_mix_esg)) if esg1 >= esg2 else int(np.argmin(risky_mix_grid))
-            frontier_with_idx = np.array([fallback_mix_idx], dtype=int)
+            fallback_mix_idx = int(np.argmax(selected_mixes)) if esg1 >= esg2 else int(np.argmin(selected_mixes))
+            fallback_mix_value = float(np.max(selected_mixes)) if esg1 >= esg2 else float(np.min(selected_mixes))
+            fallback_pos = int(np.argmin(np.abs(risky_mix_grid - fallback_mix_value)))
+            frontier_with_idx = np.array([fallback_pos], dtype=int)
             green_eligible_mask = np.zeros_like(risky_mix_grid, dtype=bool)
-            green_eligible_mask[fallback_mix_idx] = True
+            green_eligible_mask[fallback_pos] = True
         else:
             frontier_with_idx = frontier_without_idx.copy()
             green_eligible_mask = np.ones_like(risky_mix_grid, dtype=bool)
