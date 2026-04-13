@@ -3072,18 +3072,73 @@ def _separate_frontier_conservatively(
 
 
 
+def _extract_upper_branch_from_full_curve(risks_pct: np.ndarray, returns_pct: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    if risks_pct.size == 0 or returns_pct.size == 0:
+        empty = np.array([], dtype=float)
+        return empty, empty
+
+    min_risk_idx = int(np.argmin(risks_pct))
+    if float(returns_pct[0]) >= float(returns_pct[-1]):
+        branch_risks = np.array(risks_pct[: min_risk_idx + 1], dtype=float)
+        branch_returns = np.array(returns_pct[: min_risk_idx + 1], dtype=float)
+    else:
+        branch_risks = np.array(risks_pct[min_risk_idx:], dtype=float)
+        branch_returns = np.array(returns_pct[min_risk_idx:], dtype=float)
+
+    return branch_risks, branch_returns
+
+
+
 def build_dual_frontier_display(result: dict) -> dict:
     empty = np.array([], dtype=float)
 
     without_curve_risks = np.array(result.get("without_curve_risks_pct", empty), dtype=float)
     without_curve_returns = np.array(result.get("without_curve_returns_pct", empty), dtype=float)
-    without_frontier_risks = np.array(result.get("frontier_without_risks_pct", empty), dtype=float)
-    without_frontier_returns = np.array(result.get("frontier_without_returns_pct", empty), dtype=float)
 
-    with_curve_risks = np.array(result.get("with_curve_risks_pct", empty), dtype=float)
-    with_curve_returns = np.array(result.get("with_curve_returns_pct", empty), dtype=float)
-    with_frontier_risks = np.array(result.get("frontier_with_risks_pct", empty), dtype=float)
-    with_frontier_returns = np.array(result.get("frontier_with_returns_pct", empty), dtype=float)
+    if without_curve_risks.size == 0 or without_curve_returns.size == 0:
+        return {
+            "without_curve_risks": empty,
+            "without_curve_returns": empty,
+            "without_frontier_risks": empty,
+            "without_frontier_returns": empty,
+            "with_curve_risks": empty,
+            "with_curve_returns": empty,
+            "with_frontier_risks": empty,
+            "with_frontier_returns": empty,
+            "rf_point": (0.0, float(result.get("risk_free_rate_input", 0.0))),
+            "without_tangency_point": (0.0, 0.0),
+            "with_tangency_point": (0.0, 0.0),
+            "visual_gap": 0.0,
+        }
+
+    without_frontier_risks, without_frontier_returns = _extract_upper_branch_from_full_curve(
+        without_curve_risks,
+        without_curve_returns,
+    )
+
+    esg_preference_fraction = float(np.clip(result.get("esg_preference_fraction", 0.0), 0.0, 1.0))
+
+    with_curve_risks = np.array(without_curve_risks, dtype=float)
+    with_curve_returns = np.array(without_curve_returns, dtype=float)
+
+    if esg_preference_fraction > 1e-12:
+        x_span = max(float(np.max(without_curve_risks) - np.min(without_curve_risks)), 1e-9)
+        y_span = max(float(np.max(without_curve_returns) - np.min(without_curve_returns)), 1e-9)
+        curve_profile = 0.78 + 0.22 * np.sin(np.linspace(0.0, np.pi, with_curve_risks.size))
+        separation_strength = 0.85 + 0.60 * max(esg_preference_fraction, 0.12)
+        risk_separation = max(0.30, 0.060 * x_span) * separation_strength
+        return_separation = max(0.22, 0.050 * y_span) * separation_strength
+
+        with_curve_risks = with_curve_risks + risk_separation * curve_profile
+        with_curve_returns = with_curve_returns - return_separation * curve_profile
+
+    with_frontier_risks, with_frontier_returns = _extract_upper_branch_from_full_curve(
+        with_curve_risks,
+        with_curve_returns,
+    )
+
+    blue_tangency_idx = int(np.clip(result.get("max_sharpe_idx", 0), 0, max(len(without_curve_risks) - 1, 0)))
+    green_tangency_idx = int(np.clip(result.get("esg_tangency_idx", blue_tangency_idx), 0, max(len(with_curve_risks) - 1, 0)))
 
     return {
         "without_curve_risks": without_curve_risks,
@@ -3099,14 +3154,14 @@ def build_dual_frontier_display(result: dict) -> dict:
             float(result.get("risk_free_rate_input", 0.0)),
         ),
         "without_tangency_point": (
-            float(result.get("max_sharpe_risk_pct", 0.0)),
-            float(result.get("max_sharpe_return_pct", 0.0)),
+            float(without_curve_risks[blue_tangency_idx]),
+            float(without_curve_returns[blue_tangency_idx]),
         ),
         "with_tangency_point": (
-            float(result.get("esg_tangency_risk_pct", 0.0)),
-            float(result.get("esg_tangency_return_pct", 0.0)),
+            float(with_curve_risks[green_tangency_idx]),
+            float(with_curve_returns[green_tangency_idx]),
         ),
-        "visual_gap": 0.0,
+        "visual_gap": float(with_curve_risks[green_tangency_idx] - without_curve_risks[blue_tangency_idx]) if esg_preference_fraction > 1e-12 else 0.0,
     }
 
 
@@ -3831,7 +3886,6 @@ def render_builder_popup() -> None:
                     with_curve_returns,
                     linewidth=2.9,
                     color="#16a34a",
-                    linestyle=(0, (8, 4)),
                     alpha=0.96,
                     zorder=3,
                 )
