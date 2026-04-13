@@ -4173,6 +4173,18 @@ def render_builder_popup() -> None:
             with metric_c4:
                 st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
 
+            asset1_weight_pct = float(result.get("opt_w1", 0.0) * 100.0)
+            asset2_weight_pct = float(result.get("opt_w2", 0.0) * 100.0)
+            st.markdown(
+                f'''
+                <div class="allocation-chip-row">
+                    <span class="allocation-chip">Asset 1 Weight: {asset1_weight_pct:.2f}%</span>
+                    <span class="allocation-chip">Asset 2 Weight: {asset2_weight_pct:.2f}%</span>
+                </div>
+                ''',
+                unsafe_allow_html=True,
+            )
+
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
 
