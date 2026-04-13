@@ -2410,14 +2410,14 @@ def inject_css() -> None:
 
             .splash-card {
                 text-align: center;
-                padding: 2.5rem 2rem;
-                width: min(720px, 92vw);
+                padding: 1.1rem;
+                width: min(820px, 96vw);
             }
 
             .splash-logo {
-                width: 128px;
-                height: 128px;
-                margin: 0 auto 1.05rem auto;
+                width: 300px;
+                height: 300px;
+                margin: 0 auto;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -2425,12 +2425,7 @@ def inject_css() -> None:
             }
 
             .splash-title {
-                color: var(--text);
-                font-size: 2.7rem;
-                font-weight: 900;
-                letter-spacing: -0.05em;
-                margin: 0;
-                animation: brandFadeOut 0.8s ease 2s forwards;
+                display: none;
             }
 
             .splash-copy {
@@ -2598,7 +2593,6 @@ def render_splash_overlay() -> None:
         <div class="splash-overlay">
             <div class="splash-card">
                 <div class="splash-logo"><img src="data:image/png;base64,{LEAF_LOGO_BASE64}" alt="Leaf It To Us logo"></div>
-                <div class="splash-title">{APP_NAME}</div>
             </div>
         </div>
         """,
@@ -3004,56 +2998,18 @@ def _builder_frontier_arrays_from_points(risks: np.ndarray, returns: np.ndarray)
     return np.array(risks[frontier_idx], dtype=float), np.array(returns[frontier_idx], dtype=float), frontier_idx
 
 
-def _builder_inward_display_separation(
-    base_risks_pct: np.ndarray,
-    base_returns_pct: np.ndarray,
-    esg_risks_pct: np.ndarray,
-    esg_returns_pct: np.ndarray,
-    esg_preference_fraction: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    base_risks = np.array(base_risks_pct, dtype=float)
-    base_returns = np.array(base_returns_pct, dtype=float)
-    esg_risks = np.array(esg_risks_pct, dtype=float)
-    esg_returns = np.array(esg_returns_pct, dtype=float)
-
-    if base_risks.size == 0 or esg_risks.size == 0 or esg_preference_fraction <= 0.0:
-        return esg_risks, esg_returns
-
-    risk_span = max(float(np.max(base_risks) - np.min(base_risks)), 1e-9)
-    return_span = max(float(np.max(base_returns) - np.min(base_returns)), 1e-9)
-    preference_strength = 0.75 + 0.25 * float(np.clip(esg_preference_fraction, 0.0, 1.0))
-
-    x_shift = 0.022 * risk_span * preference_strength
-    y_shift = 0.038 * return_span * preference_strength
-    ramp = np.linspace(0.35, 1.0, esg_risks.size)
-
-    separated_risks = esg_risks + x_shift * ramp
-    separated_returns = esg_returns - y_shift * ramp
-    return separated_risks, separated_returns
-
-
 def build_dual_frontier_display(result: dict) -> dict:
     empty = np.array([], dtype=float)
 
+    without_curve_risks = np.array(result.get("without_curve_risks_pct", empty), dtype=float)
+    without_curve_returns = np.array(result.get("without_curve_returns_pct", empty), dtype=float)
     without_frontier_risks = np.array(result.get("frontier_without_risks_pct", empty), dtype=float)
     without_frontier_returns = np.array(result.get("frontier_without_returns_pct", empty), dtype=float)
-    raw_with_frontier_risks = np.array(result.get("frontier_with_risks_pct", empty), dtype=float)
-    raw_with_frontier_returns = np.array(result.get("frontier_with_returns_pct", empty), dtype=float)
 
-    with_frontier_risks, with_frontier_returns = _builder_inward_display_separation(
-        without_frontier_risks,
-        without_frontier_returns,
-        raw_with_frontier_risks,
-        raw_with_frontier_returns,
-        float(result.get("esg_preference_fraction", 0.0)),
-    )
-
-    with_tangency_risk = float(result.get("esg_tangency_risk_pct", 0.0))
-    with_tangency_return = float(result.get("esg_tangency_return_pct", 0.0))
-    if raw_with_frontier_risks.size > 0 and with_frontier_risks.size == raw_with_frontier_risks.size:
-        tangency_pos = int(np.argmin(np.abs(raw_with_frontier_risks - with_tangency_risk) + np.abs(raw_with_frontier_returns - with_tangency_return)))
-        with_tangency_risk = float(with_frontier_risks[tangency_pos])
-        with_tangency_return = float(with_frontier_returns[tangency_pos])
+    with_curve_risks = np.array(result.get("with_curve_risks_pct", empty), dtype=float)
+    with_curve_returns = np.array(result.get("with_curve_returns_pct", empty), dtype=float)
+    with_frontier_risks = np.array(result.get("frontier_with_risks_pct", empty), dtype=float)
+    with_frontier_returns = np.array(result.get("frontier_with_returns_pct", empty), dtype=float)
 
     comparison_count = min(len(without_frontier_risks), len(with_frontier_risks))
     if comparison_count > 0:
@@ -3079,12 +3035,12 @@ def build_dual_frontier_display(result: dict) -> dict:
         visual_gap = 0.0
 
     return {
-        "without_curve_risks": without_frontier_risks,
-        "without_curve_returns": without_frontier_returns,
+        "without_curve_risks": without_curve_risks,
+        "without_curve_returns": without_curve_returns,
         "without_frontier_risks": without_frontier_risks,
         "without_frontier_returns": without_frontier_returns,
-        "with_curve_risks": with_frontier_risks,
-        "with_curve_returns": with_frontier_returns,
+        "with_curve_risks": with_curve_risks,
+        "with_curve_returns": with_curve_returns,
         "with_frontier_risks": with_frontier_risks,
         "with_frontier_returns": with_frontier_returns,
         "rf_point": (
@@ -3096,8 +3052,8 @@ def build_dual_frontier_display(result: dict) -> dict:
             float(result.get("max_sharpe_return_pct", 0.0)),
         ),
         "with_tangency_point": (
-            with_tangency_risk,
-            with_tangency_return,
+            float(result.get("esg_tangency_risk_pct", 0.0)),
+            float(result.get("esg_tangency_return_pct", 0.0)),
         ),
         "visual_gap": visual_gap,
     }
@@ -3455,30 +3411,13 @@ def compute_builder_result(
     family_with_nonzero_mask = total_risky_positions[family_with_indices] > 1e-12
     family_with_nonzero_indices = np.array(family_with_indices[family_with_nonzero_mask], dtype=int)
 
-    if family_with_nonzero_indices.size > 0:
-        selected_mixes = np.clip(np.array(risky_mix_positions[family_with_nonzero_indices], dtype=float), 0.0, 1.0)
-        family_min_esg = float(np.min(portfolio_esg[family_with_nonzero_indices]))
-        family_max_esg = float(np.max(portfolio_esg[family_with_nonzero_indices]))
-    else:
-        greener_mix_value = 1.0 if esg1 >= esg2 else 0.0
-        selected_mixes = np.array([greener_mix_value], dtype=float)
-        family_min_esg = float(max(esg1, esg2))
-        family_max_esg = float(max(esg1, esg2))
+    risky_mix_esg_min = float(np.min(risky_mix_esg))
+    risky_mix_esg_max = float(np.max(risky_mix_esg))
+    slider_required_esg = float(risky_mix_esg_min + esg_preference_fraction * (risky_mix_esg_max - risky_mix_esg_min))
+    required_esg = float(slider_required_esg if lambda_taste > 1e-12 else risky_mix_esg_min)
 
-    slider_required_esg = float(np.min(risky_mix_esg) + esg_preference_fraction * (np.max(risky_mix_esg) - np.min(risky_mix_esg)))
-    required_esg = float(max(slider_required_esg, family_min_esg if lambda_taste > 1e-12 else np.min(risky_mix_esg)))
-
-    if lambda_taste > 1e-12 and selected_mixes.size > 0:
-        preference_quantile = float(np.clip(0.18 + 0.52 * esg_preference_fraction, 0.18, 0.70))
-        tolerance = 0.5 / max(len(risky_mix_grid) - 1, 1) + 1e-12
-        if esg1 >= esg2:
-            greener_floor = float(np.quantile(selected_mixes, preference_quantile))
-            greener_cap = float(np.max(selected_mixes))
-            green_eligible_mask = (risky_mix_grid >= greener_floor - tolerance) & (risky_mix_grid <= greener_cap + tolerance)
-        else:
-            greener_cap = float(np.quantile(selected_mixes, 1.0 - preference_quantile))
-            greener_floor = float(np.min(selected_mixes))
-            green_eligible_mask = (risky_mix_grid >= greener_floor - tolerance) & (risky_mix_grid <= greener_cap + tolerance)
+    if lambda_taste > 1e-12 and (risky_mix_esg_max - risky_mix_esg_min) > 1e-12:
+        green_eligible_mask = risky_mix_esg >= required_esg - 1e-12
     else:
         green_eligible_mask = np.ones_like(risky_mix_grid, dtype=bool)
 
@@ -3497,6 +3436,10 @@ def compute_builder_result(
 
     frontier_with_risks_pct = np.array(risky_mix_risks[frontier_with_idx] * 100.0, dtype=float)
     frontier_with_returns_pct = np.array(risky_mix_returns[frontier_with_idx] * 100.0, dtype=float)
+    without_curve_risks_pct = np.array(risky_mix_risks * 100.0, dtype=float)
+    without_curve_returns_pct = np.array(risky_mix_returns * 100.0, dtype=float)
+    with_curve_risks_pct = np.array(risky_mix_risks[green_eligible_mask] * 100.0, dtype=float)
+    with_curve_returns_pct = np.array(risky_mix_returns[green_eligible_mask] * 100.0, dtype=float)
     green_tangency_candidates = np.where(green_eligible_mask)[0]
     if green_tangency_candidates.size == 0:
         green_tangency_candidates = frontier_with_idx
@@ -3549,6 +3492,10 @@ def compute_builder_result(
         "frontier_without_returns_pct": frontier_without_returns_pct,
         "frontier_with_risks_pct": frontier_with_risks_pct,
         "frontier_with_returns_pct": frontier_with_returns_pct,
+        "without_curve_risks_pct": without_curve_risks_pct,
+        "without_curve_returns_pct": without_curve_returns_pct,
+        "with_curve_risks_pct": with_curve_risks_pct,
+        "with_curve_returns_pct": with_curve_returns_pct,
         "max_sharpe_idx": blue_tangency_idx,
         "max_sharpe_risk_pct": float(risky_mix_risks[blue_tangency_idx] * 100.0),
         "max_sharpe_return_pct": float(risky_mix_returns[blue_tangency_idx] * 100.0),
@@ -3805,9 +3752,9 @@ def render_builder_popup() -> None:
                 ax.plot(
                     without_curve_risks,
                     without_curve_returns,
-                    linewidth=1.8,
-                    color="#60a5fa",
-                    alpha=0.55,
+                    linewidth=1.6,
+                    color="#93c5fd",
+                    alpha=0.75,
                     zorder=1,
                 )
             if len(without_frontier_risks) > 0:
@@ -3825,7 +3772,7 @@ def render_builder_popup() -> None:
                     with_curve_returns,
                     linewidth=1.8,
                     color="#86efac",
-                    alpha=0.58,
+                    alpha=0.82,
                     zorder=1,
                 )
             if len(with_frontier_risks) > 0:
@@ -3834,6 +3781,7 @@ def render_builder_popup() -> None:
                     with_frontier_returns,
                     linewidth=2.7,
                     color="#16a34a",
+                    linestyle=(0, (6, 3)),
                     zorder=4,
                 )
 
