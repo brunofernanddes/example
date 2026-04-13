@@ -3883,6 +3883,23 @@ def compute_builder_result(
     opt_x1 = float(x1_positions[optimal_idx])
     opt_x2 = float(x2_positions[optimal_idx])
     opt_rf_weight = float(rf_positions[optimal_idx])
+    opt_total_risky = float(opt_x1 + opt_x2)
+
+    if opt_total_risky > 1e-12:
+        asset1_display_weight_pct = float((opt_x1 / opt_total_risky) * 100.0)
+        asset2_display_weight_pct = float((opt_x2 / opt_total_risky) * 100.0)
+    else:
+        fallback_mix = float(risky_mix_grid[optimal_idx])
+        asset1_display_weight_pct = float(fallback_mix * 100.0)
+        asset2_display_weight_pct = float((1.0 - fallback_mix) * 100.0)
+
+    display_weight_total = asset1_display_weight_pct + asset2_display_weight_pct
+    if display_weight_total > 1e-12:
+        asset1_display_weight_pct = float((asset1_display_weight_pct / display_weight_total) * 100.0)
+        asset2_display_weight_pct = float(100.0 - asset1_display_weight_pct)
+    else:
+        asset1_display_weight_pct = 50.0
+        asset2_display_weight_pct = 50.0
 
     return {
         "asset1": asset1,
@@ -3948,6 +3965,8 @@ def compute_builder_result(
         "current_non_esg_sharpe": float(tangency_sharpes[current_non_esg_opt_idx]) if np.isfinite(tangency_sharpes[current_non_esg_opt_idx]) else 0.0,
         "current_non_esg_w1": float(risky_mix_grid[current_non_esg_opt_idx]),
         "current_non_esg_w2": float(1.0 - risky_mix_grid[current_non_esg_opt_idx]),
+        "display_weight_asset1_pct": asset1_display_weight_pct,
+        "display_weight_asset2_pct": asset2_display_weight_pct,
         "opt_w1": opt_x1,
         "opt_w2": opt_x2,
         "opt_rf_weight": opt_rf_weight,
@@ -4188,8 +4207,8 @@ def render_builder_popup() -> None:
             with metric_c4:
                 st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
 
-            asset1_weight_pct = float(result.get("opt_w1", 0.0) * 100.0)
-            asset2_weight_pct = float(result.get("opt_w2", 0.0) * 100.0)
+            asset1_weight_pct = float(result.get("display_weight_asset1_pct", 50.0))
+            asset2_weight_pct = float(result.get("display_weight_asset2_pct", 50.0))
             st.markdown(
                 f'''
                 <div class="allocation-chip-row">
