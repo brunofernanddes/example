@@ -2410,14 +2410,14 @@ def inject_css() -> None:
 
             .splash-card {
                 text-align: center;
-                padding: 2.5rem 2rem;
-                width: min(720px, 92vw);
+                padding: 2.9rem 2rem;
+                width: min(860px, 94vw);
             }
 
             .splash-logo {
-                width: 128px;
-                height: 128px;
-                margin: 0 auto 1.05rem auto;
+                width: 218px;
+                height: 218px;
+                margin: 0 auto 1.2rem auto;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -2426,7 +2426,7 @@ def inject_css() -> None:
 
             .splash-title {
                 color: var(--text);
-                font-size: 2.7rem;
+                font-size: 3.0rem;
                 font-weight: 900;
                 letter-spacing: -0.05em;
                 margin: 0;
@@ -2889,63 +2889,96 @@ def build_dual_frontier_display(result: dict) -> dict:
             "visual_gap": 0.0,
         }
 
-    def upper_branch_indices(risks_arr: np.ndarray, performance_arr: np.ndarray) -> np.ndarray:
-        min_risk_idx = int(np.argmin(risks_arr))
-        left_branch = np.arange(0, min_risk_idx + 1, dtype=int)
-        right_branch = np.arange(min_risk_idx, len(risks_arr), dtype=int)
+    base_risks_pct = np.array(portfolio_risks * 100.0, dtype=float)
+    base_returns_pct = np.array(portfolio_returns * 100.0, dtype=float)
 
-        left_best = float(np.max(performance_arr[left_branch])) if left_branch.size > 0 else -np.inf
-        right_best = float(np.max(performance_arr[right_branch])) if right_branch.size > 0 else -np.inf
+    efficient_idx_without_esg = np.array(result.get("efficient_idx_without_esg_full", []), dtype=int)
+    if efficient_idx_without_esg.size == 0:
+        efficient_idx_without_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns)
 
-        if right_best >= left_best:
-            return right_branch
-        return left_branch[::-1]
+    esg_constrained_mask = np.array(result.get("esg_constrained_mask", np.ones_like(portfolio_returns, dtype=bool)), dtype=bool)
+    efficient_idx_with_esg = np.array(result.get("efficient_idx_with_esg", []), dtype=int)
+    if efficient_idx_with_esg.size == 0:
+        efficient_idx_with_esg = efficient_frontier_indices(portfolio_risks, portfolio_returns, esg_constrained_mask)
+    if efficient_idx_with_esg.size == 0:
+        efficient_idx_with_esg = efficient_idx_without_esg.copy()
+        esg_constrained_mask = np.ones_like(portfolio_returns, dtype=bool)
 
-    without_curve_risks = np.array(portfolio_risks * 100.0, dtype=float)
-    without_curve_returns = np.array(portfolio_returns * 100.0, dtype=float)
-    without_indices = upper_branch_indices(portfolio_risks, portfolio_returns)
-    without_frontier_risks = np.array(without_curve_risks[without_indices], dtype=float)
-    without_frontier_returns = np.array(without_curve_returns[without_indices], dtype=float)
+    eligible_curve_indices = np.where(esg_constrained_mask)[0]
+    if eligible_curve_indices.size == 0:
+        eligible_curve_indices = np.arange(portfolio_returns.size, dtype=int)
 
     rf = float(result.get("risk_free_rate_input", 0.0)) / 100.0
     esg_preference_fraction = float(np.clip(result.get("esg_preference_fraction", 0.0), 0.0, 1.0))
-    required_esg = float(result.get("required_esg", float(np.mean(portfolio_esg))))
 
-    esg_gap_fraction = abs(float(result.get("esg_score1_input", 0.0)) - float(result.get("esg_score2_input", 0.0))) / 100.0
-    return_gap_fraction = abs(float(result.get("exp_return1_input", 0.0)) - float(result.get("exp_return2_input", 0.0))) / 100.0
-    adjustment_scale = 0.18 + 0.72 * esg_gap_fraction + 0.48 * return_gap_fraction
-    with_performance_full = portfolio_returns + esg_preference_fraction * adjustment_scale * (portfolio_esg - required_esg)
+    risk_span = max(float(np.max(base_risks_pct) - np.min(base_risks_pct)), 1e-9)
+    return_span = max(float(np.max(base_returns_pct) - np.min(base_returns_pct)), 1e-9)
+    overlap = float(result.get("frontier_overlap_ratio", 0.0))
+    needs_visual_separation = bool(result.get("frontiers_need_visual_separation", False)) or overlap >= 0.15
 
-    with_curve_risks = np.array(portfolio_risks * 100.0, dtype=float)
-    with_curve_returns = np.array(with_performance_full * 100.0, dtype=float)
-    with_indices = upper_branch_indices(portfolio_risks, with_performance_full)
-    with_frontier_risks = np.array(with_curve_risks[with_indices], dtype=float)
-    with_frontier_returns = np.array(with_curve_returns[with_indices], dtype=float)
+    if esg_preference_fraction > 1e-9:
+        if needs_visual_separation:
+            x_shift = 0.035 * risk_span * (0.75 + 0.25 * esg_preference_fraction)
+            y_shift = 0.022 * return_span * (0.75 + 0.25 * esg_preference_fraction)
+        else:
+            x_shift = 0.015 * risk_span * esg_preference_fraction
+            y_shift = 0.010 * return_span * esg_preference_fraction
+    else:
+        x_shift = 0.0
+        y_shift = 0.0
 
-    with_sharpes = np.where(portfolio_risks > 1e-12, (with_performance_full - rf) / portfolio_risks, -np.inf)
-    with_tangency_idx = int(np.argmax(with_sharpes))
-
-    without_tangency_point = (
-        float(without_curve_risks[result["max_sharpe_idx"]]),
-        float(without_curve_returns[result["max_sharpe_idx"]]),
+    without_curve_risks = base_risks_pct
+    without_curve_returns = base_returns_pct
+    without_frontier_risks, without_frontier_returns, _ = build_frontier_plot_arrays(
+        base_risks_pct,
+        base_returns_pct,
+        efficient_idx_without_esg,
     )
-    with_tangency_point = (
-        float(with_curve_risks[with_tangency_idx]),
-        float(with_curve_returns[with_tangency_idx]),
+
+    with_curve_risks, with_curve_returns, with_curve_lookup = build_frontier_plot_arrays(
+        base_risks_pct,
+        base_returns_pct,
+        eligible_curve_indices,
+        x_shift=x_shift,
+        y_shift=y_shift,
+    )
+    with_frontier_risks, with_frontier_returns, with_frontier_lookup = build_frontier_plot_arrays(
+        base_risks_pct,
+        base_returns_pct,
+        efficient_idx_with_esg,
+        x_shift=x_shift,
+        y_shift=y_shift,
+    )
+
+    without_tangency_idx = int(result.get("max_sharpe_idx", 0))
+    without_tangency_point = (
+        float(base_risks_pct[without_tangency_idx]),
+        float(base_returns_pct[without_tangency_idx]),
+    )
+
+    with_sharpes = np.divide(
+        portfolio_returns - rf,
+        portfolio_risks,
+        out=np.full_like(portfolio_returns, -np.inf),
+        where=esg_constrained_mask & (portfolio_risks > 1e-12),
+    )
+    if np.all(~np.isfinite(with_sharpes)):
+        with_tangency_idx = without_tangency_idx
+    else:
+        with_tangency_idx = int(np.argmax(with_sharpes))
+
+    with_tangency_point = with_curve_lookup.get(
+        int(with_tangency_idx),
+        with_frontier_lookup.get(
+            int(with_tangency_idx),
+            (float(base_risks_pct[with_tangency_idx] + x_shift), float(base_returns_pct[with_tangency_idx] + y_shift)),
+        ),
     )
 
     comparison_count = min(len(without_frontier_risks), len(with_frontier_risks))
     if comparison_count > 0:
         without_sample_idx = np.linspace(0, len(without_frontier_risks) - 1, comparison_count).astype(int)
         with_sample_idx = np.linspace(0, len(with_frontier_risks) - 1, comparison_count).astype(int)
-        risk_span = max(float(np.max(without_frontier_risks) - np.min(without_frontier_risks)), 1e-9)
-        return_span = max(
-            float(
-                max(np.max(without_frontier_returns), np.max(with_frontier_returns))
-                - min(np.min(without_frontier_returns), np.min(with_frontier_returns))
-            ),
-            1e-9,
-        )
         visual_gap = float(
             np.mean(
                 np.sqrt(
@@ -2966,93 +2999,126 @@ def build_dual_frontier_display(result: dict) -> dict:
         "with_curve_returns": with_curve_returns,
         "with_frontier_risks": with_frontier_risks,
         "with_frontier_returns": with_frontier_returns,
-        "with_performance": np.array(with_performance_full * 100.0, dtype=float),
+        "with_performance": np.array(with_curve_returns, dtype=float),
         "rf_point": (0.0, float(rf * 100.0)),
         "without_tangency_point": without_tangency_point,
-        "with_tangency_point": with_tangency_point,
+        "with_tangency_point": (float(with_tangency_point[0]), float(with_tangency_point[1])),
         "with_tangency_idx": with_tangency_idx,
         "visual_gap": visual_gap,
     }
+
 
 
 def build_frontier_interpretation(result: dict) -> str:
     asset1 = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
     asset2 = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
 
+    opt_x1 = float(result.get("opt_x1", 0.0))
+    opt_x2 = float(result.get("opt_x2", 0.0))
     opt_w1 = float(result.get("opt_w1", 0.0))
     opt_w2 = float(result.get("opt_w2", 0.0))
+    opt_risky_share = float(result.get("opt_risky_share", 0.0))
+    opt_rf_weight = float(result.get("opt_rf_weight", 0.0))
     opt_return = float(result.get("opt_return", 0.0) * 100.0)
     opt_risk = float(result.get("opt_risk", 0.0) * 100.0)
     opt_esg = float(result.get("opt_esg", 0.0) * 100.0)
     opt_sharpe = float(result.get("opt_sharpe", 0.0))
-
     required_esg = float(result.get("required_esg", 0.0) * 100.0)
     correlation = float(result.get("correlation", 0.0))
 
-    max_sharpe_idx = int(result.get("max_sharpe_idx", 0))
     portfolio_returns = np.array(result.get("portfolio_returns", []), dtype=float)
     portfolio_risks = np.array(result.get("portfolio_risks", []), dtype=float)
     portfolio_esg = np.array(result.get("portfolio_esg", []), dtype=float)
+    max_sharpe_idx = int(result.get("max_sharpe_idx", 0))
 
     if portfolio_returns.size > 0 and 0 <= max_sharpe_idx < portfolio_returns.size:
-        base_return = float(portfolio_returns[max_sharpe_idx] * 100.0)
-        base_risk = float(portfolio_risks[max_sharpe_idx] * 100.0)
-        base_esg = float(portfolio_esg[max_sharpe_idx] * 100.0)
+        tangency_return = float(portfolio_returns[max_sharpe_idx] * 100.0)
+        tangency_risk = float(portfolio_risks[max_sharpe_idx] * 100.0)
+        tangency_esg = float(portfolio_esg[max_sharpe_idx] * 100.0)
     else:
-        base_return = opt_return
-        base_risk = opt_risk
-        base_esg = opt_esg
+        tangency_return = opt_return
+        tangency_risk = opt_risk
+        tangency_esg = opt_esg
 
-    if opt_w1 >= 0.70:
-        allocation_sentence = f"Your portfolio is mainly invested in <strong>{asset1}</strong> ({opt_w1 * 100.0:.1f}%), with {opt_w2 * 100.0:.1f}% in <strong>{asset2}</strong>."
-    elif opt_w2 >= 0.70:
-        allocation_sentence = f"Your portfolio is mainly invested in <strong>{asset2}</strong> ({opt_w2 * 100.0:.1f}%), with {opt_w1 * 100.0:.1f}% in <strong>{asset1}</strong>."
+    if opt_risky_share <= 0.03:
+        allocation_sentence = (
+            "Based on your current inputs, the model keeps almost all of the portfolio in the risk-free asset. "
+            "That usually means the risky assets do not look attractive enough relative to their risk."
+        )
+    elif opt_rf_weight >= 0.10:
+        dominant_asset = asset1 if opt_w1 >= opt_w2 else asset2
+        allocation_sentence = (
+            f"The model invests <strong>{opt_risky_share * 100.0:.1f}%</strong> in risky assets and keeps "
+            f"<strong>{max(opt_rf_weight, 0.0) * 100.0:.1f}%</strong> in the risk-free asset. "
+            f"Within the risky part, it leans more toward <strong>{dominant_asset}</strong>."
+        )
+    elif opt_rf_weight >= -0.05:
+        if opt_w1 >= 0.65:
+            mix_phrase = f"most of the risky allocation sits in <strong>{asset1}</strong>"
+        elif opt_w2 >= 0.65:
+            mix_phrase = f"most of the risky allocation sits in <strong>{asset2}</strong>"
+        else:
+            mix_phrase = f"the risky allocation is split between <strong>{asset1}</strong> and <strong>{asset2}</strong>"
+        allocation_sentence = (
+            f"The model places nearly all wealth in risky assets, and {mix_phrase}. "
+            f"That is a more return-seeking position."
+        )
     else:
-        allocation_sentence = f"Your portfolio is spread across both assets, with {opt_w1 * 100.0:.1f}% in <strong>{asset1}</strong> and {opt_w2 * 100.0:.1f}% in <strong>{asset2}</strong>."
+        allocation_sentence = (
+            f"The model puts more than 100% into risky assets and effectively borrows <strong>{abs(opt_rf_weight) * 100.0:.1f}%</strong> "
+            "at the risk-free rate. This is an aggressive result driven by the current return, risk, and ESG inputs."
+        )
 
     performance_sentence = (
-        f"Based on your current inputs, the portfolio is targeting <strong>{opt_return:.2f}% expected return</strong> "
-        f"with <strong>{opt_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{opt_sharpe:.2f}</strong>, "
-        f"which means the return is being judged against the amount of risk taken."
+        f"At these settings, the portfolio targets <strong>{opt_return:.2f}% expected return</strong> with "
+        f"<strong>{opt_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{opt_sharpe:.2f}</strong>, "
+        "which is a simple way of judging how much return you are getting for each unit of risk."
     )
 
-    if opt_esg >= required_esg + 5.0:
+    if opt_risky_share <= 1e-12:
+        esg_sentence = "Because no money is currently placed in risky assets, the ESG score of the risky sleeve is effectively zero."
+    elif opt_esg >= required_esg + 5.0:
         esg_sentence = (
-            f"The ESG score is <strong>{opt_esg:.2f}/100</strong>, which is comfortably above your current ESG target of "
-            f"<strong>{required_esg:.2f}/100</strong>."
+            f"The risky part of the portfolio has an ESG score of <strong>{opt_esg:.2f}/100</strong>, "
+            f"which is comfortably above your current ESG target of <strong>{required_esg:.2f}/100</strong>."
         )
     elif opt_esg >= required_esg:
         esg_sentence = (
-            f"The ESG score is <strong>{opt_esg:.2f}/100</strong>, which meets your current ESG target of "
-            f"<strong>{required_esg:.2f}/100</strong>."
+            f"The risky part of the portfolio has an ESG score of <strong>{opt_esg:.2f}/100</strong>, "
+            f"which meets your current ESG target of <strong>{required_esg:.2f}/100</strong>."
         )
     else:
         esg_sentence = (
-            f"The ESG score is <strong>{opt_esg:.2f}/100</strong>, which is below your current ESG target of "
-            f"<strong>{required_esg:.2f}/100</strong>."
+            f"The risky part of the portfolio has an ESG score of <strong>{opt_esg:.2f}/100</strong>, "
+            f"which is below your current ESG target of <strong>{required_esg:.2f}/100</strong>."
         )
 
-    return_gap = opt_return - base_return
-    risk_gap = opt_risk - base_risk
-    esg_lift = opt_esg - base_esg
+    return_gap = opt_return - tangency_return
+    risk_gap = opt_risk - tangency_risk
+    esg_gap = opt_esg - tangency_esg
 
-    if abs(return_gap) < 0.15 and abs(risk_gap) < 0.15:
-        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio is very similar financially, so you are not giving up much to reflect your sustainability preference."
-    elif return_gap >= 0.15 and risk_gap <= 0.15:
-        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio is offering slightly stronger return without meaningfully increasing risk."
-    elif return_gap >= -0.15 and risk_gap > 0.15:
-        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio keeps return fairly close, but it does take on more risk."
-    elif return_gap < -0.15 and risk_gap <= 0.15:
-        tradeoff_sentence = f"Compared with the highest Sharpe portfolio, your ESG-focused portfolio gives up a little expected return, but keeps risk close while improving ESG by <strong>{max(esg_lift, 0.0):.2f}</strong> points."
+    if abs(return_gap) <= 0.20 and abs(risk_gap) <= 0.20:
+        tradeoff_sentence = "Compared with the best risk-adjusted risky mix, your current settings lead to a very similar financial outcome."
+    elif return_gap < -0.20 and esg_gap > 0.0:
+        tradeoff_sentence = "Your settings are trading some expected return for a greener risky allocation."
+    elif return_gap > 0.20 and risk_gap > 0.20:
+        tradeoff_sentence = "Your settings are pushing toward higher return, but they are also taking on more risk to get there."
+    elif return_gap > 0.20 and risk_gap <= 0.20:
+        tradeoff_sentence = "Your settings improve expected return without adding much extra risk."
     else:
-        tradeoff_sentence = "Compared with the highest Sharpe portfolio, your ESG-focused portfolio is making a clearer trade-off: it is prioritising sustainability, but with lower expected return and higher risk."
+        tradeoff_sentence = "Your settings are balancing risk, return, and ESG rather than maximising only one of them."
 
-    if correlation <= -0.20:
-        diversification_sentence = "The two assets are moving differently enough that diversification is helping reduce risk in a meaningful way."
-    elif correlation <= 0.35:
-        diversification_sentence = "The two assets still provide some diversification, which helps smooth overall portfolio risk."
+    if opt_risky_share > 0.03:
+        if correlation <= -0.20 and 0.20 <= opt_w1 <= 0.80 and 0.20 <= opt_w2 <= 0.80:
+            diversification_sentence = "Because the two assets do not move together closely, using both of them is helping to smooth the ride."
+        elif correlation >= 0.50:
+            diversification_sentence = "The two assets move quite similarly, so diversification is limited and one asset may dominate the decision."
+        elif opt_w1 >= 0.85 or opt_w2 >= 0.85:
+            diversification_sentence = "The risky allocation is concentrated in one asset, so most of the result is being driven by that single investment."
+        else:
+            diversification_sentence = "The risky allocation is shared across both assets, which gives some diversification benefit without making the portfolio too complex."
     else:
-        diversification_sentence = "The two assets are moving quite similarly, so diversification is limited and the portfolio may be less cushioned against swings."
+        diversification_sentence = "With very little invested in risky assets, diversification is currently less important than capital preservation."
 
     return f"""
     <div class="interpretation-card">
@@ -3065,6 +3131,7 @@ def build_frontier_interpretation(result: dict) -> str:
         <p class="interpretation-copy">{diversification_sentence}</p>
     </div>
     """
+
 
 
 # -------------------------------------------------
@@ -3248,53 +3315,53 @@ def compute_builder_result(
     risk_tolerance: int,
     esg_slider: float,
 ) -> dict:
-    r1 = exp_return1 / 100
-    r2 = exp_return2 / 100
-    s1 = std_dev1 / 100
-    s2 = std_dev2 / 100
-    rho = correlation
-    rf = risk_free_rate / 100
-    esg1 = esg_score1 / 100
-    esg2 = esg_score2 / 100
+    # Audit-aligned interpretation of the builder problem:
+    # - x is the vector of risky-asset weights and does not need to sum to one.
+    # - the remaining wealth is implicitly held in the risk-free asset.
+    # - the risky-sleeve ESG score is the average ESG score of risky positions only.
+    # - the optimisation objective is evaluated above the risk-free baseline.
+    r1 = float(exp_return1) / 100.0
+    r2 = float(exp_return2) / 100.0
+    s1 = max(float(std_dev1), 0.0) / 100.0
+    s2 = max(float(std_dev2), 0.0) / 100.0
+    rho = float(np.clip(correlation, -1.0, 1.0))
+    rf = float(risk_free_rate) / 100.0
+    esg1 = float(esg_score1) / 100.0
+    esg2 = float(esg_score2) / 100.0
 
-    gamma = 11 - risk_tolerance
-    weights = np.linspace(0, 1, 600)
+    mu_excess = np.array([r1 - rf, r2 - rf], dtype=float)
+    sigma = np.array(
+        [
+            [s1 ** 2, rho * s1 * s2],
+            [rho * s1 * s2, s2 ** 2],
+        ],
+        dtype=float,
+    )
+    esg_vector = np.array([esg1, esg2], dtype=float)
 
-    portfolio_returns = []
-    portfolio_risks = []
-    portfolio_esg = []
-    portfolio_sharpes = []
-    portfolio_utility = []
+    gamma = float(max(1, 11 - int(risk_tolerance)))
+    lambda_pref = float(max(esg_slider, 0.0))
 
-    for w1 in weights:
-        w2 = 1 - w1
-        port_return = w1 * r1 + w2 * r2
-        port_variance = (
-            (w1 ** 2) * (s1 ** 2)
-            + (w2 ** 2) * (s2 ** 2)
-            + 2 * w1 * w2 * s1 * s2 * rho
-        )
-        port_risk = np.sqrt(max(port_variance, 0))
-        port_esg = w1 * esg1 + w2 * esg2
-        sharpe = (port_return - rf) / port_risk if port_risk > 0 else 0.0
-        utility = port_return - 0.5 * gamma * port_variance + esg_slider * port_esg
-
-        portfolio_returns.append(port_return)
-        portfolio_risks.append(port_risk)
-        portfolio_esg.append(port_esg)
-        portfolio_sharpes.append(sharpe)
-        portfolio_utility.append(utility)
-
-    portfolio_returns = np.array(portfolio_returns)
-    portfolio_risks = np.array(portfolio_risks)
-    portfolio_esg = np.array(portfolio_esg)
-    portfolio_sharpes = np.array(portfolio_sharpes)
-    portfolio_utility = np.array(portfolio_utility)
-
+    # Full-investment risky portfolios are still used to draw the two efficient frontiers.
+    weights = np.linspace(0.0, 1.0, 600)
+    weights_w2 = 1.0 - weights
+    portfolio_returns = weights * r1 + weights_w2 * r2
+    portfolio_variance = (
+        (weights ** 2) * (s1 ** 2)
+        + (weights_w2 ** 2) * (s2 ** 2)
+        + 2.0 * weights * weights_w2 * s1 * s2 * rho
+    )
+    portfolio_risks = np.sqrt(np.maximum(portfolio_variance, 0.0))
+    portfolio_esg = weights * esg1 + weights_w2 * esg2
+    portfolio_sharpes = np.divide(
+        portfolio_returns - rf,
+        portfolio_risks,
+        out=np.full_like(portfolio_returns, -np.inf),
+        where=portfolio_risks > 1e-12,
+    )
     max_sharpe_idx = int(np.argmax(portfolio_sharpes))
-    optimal_idx = int(np.argmax(portfolio_utility))
 
-    esg_preference_fraction = float(np.clip(esg_slider / 0.10, 0.0, 1.0))
+    esg_preference_fraction = float(np.clip(lambda_pref / 0.10, 0.0, 1.0))
     required_esg = float(np.min(portfolio_esg) + esg_preference_fraction * (np.max(portfolio_esg) - np.min(portfolio_esg)))
     esg_constrained_mask = portfolio_esg >= (required_esg - 1e-12)
 
@@ -3312,8 +3379,59 @@ def compute_builder_result(
     frontiers_share_points = bool(frontier_overlap > 0.0)
     frontiers_need_visual_separation = bool(frontier_overlap >= 0.20)
 
-    opt_w1 = float(weights[optimal_idx])
-    opt_w2 = float(1 - opt_w1)
+    # Search the risky-asset weights directly, allowing the leftover wealth to sit in the risk-free asset.
+    # The grid also permits total risky exposure above 100%, which corresponds to borrowing at the risk-free rate.
+    try:
+        analytic_hint = np.linalg.pinv(sigma) @ mu_excess / max(gamma, 1e-9)
+        positive_hint = np.maximum(analytic_hint, 0.0)
+        gross_hint = float(np.sum(positive_hint))
+        max_weight = max(1.50, gross_hint * 2.25, float(np.max(positive_hint)) * 2.50)
+    except Exception:
+        max_weight = 1.50
+    max_weight = float(np.clip(max_weight, 1.50, 3.00))
+
+    risky_grid = np.linspace(0.0, max_weight, 401)
+    x1_grid, x2_grid = np.meshgrid(risky_grid, risky_grid, indexing="ij")
+    risky_sum_grid = x1_grid + x2_grid
+
+    excess_return_grid = x1_grid * mu_excess[0] + x2_grid * mu_excess[1]
+    variance_grid = (
+        (x1_grid ** 2) * sigma[0, 0]
+        + (x2_grid ** 2) * sigma[1, 1]
+        + 2.0 * x1_grid * x2_grid * sigma[0, 1]
+    )
+    risk_grid = np.sqrt(np.maximum(variance_grid, 0.0))
+
+    numerator_esg_grid = x1_grid * esg_vector[0] + x2_grid * esg_vector[1]
+    avg_esg_grid = np.divide(
+        numerator_esg_grid,
+        risky_sum_grid,
+        out=np.zeros_like(numerator_esg_grid),
+        where=risky_sum_grid > 1e-12,
+    )
+
+    utility_grid = excess_return_grid - 0.5 * gamma * variance_grid + lambda_pref * avg_esg_grid
+    utility_grid = np.where(risky_sum_grid > 1e-12, utility_grid, 0.0)
+
+    optimal_flat_idx = int(np.argmax(utility_grid))
+    opt_row, opt_col = np.unravel_index(optimal_flat_idx, utility_grid.shape)
+    opt_x1 = float(x1_grid[opt_row, opt_col])
+    opt_x2 = float(x2_grid[opt_row, opt_col])
+    opt_risky_share = float(risky_sum_grid[opt_row, opt_col])
+    opt_rf_weight = float(1.0 - opt_risky_share)
+    opt_excess_return = float(excess_return_grid[opt_row, opt_col])
+    opt_return = float(rf + opt_excess_return)
+    opt_risk = float(risk_grid[opt_row, opt_col])
+    opt_esg = float(avg_esg_grid[opt_row, opt_col])
+    opt_sharpe = float(opt_excess_return / opt_risk) if opt_risk > 1e-12 else 0.0
+    opt_objective = float(utility_grid[opt_row, opt_col])
+
+    if opt_risky_share > 1e-12:
+        opt_w1 = float(opt_x1 / opt_risky_share)
+        opt_w2 = float(opt_x2 / opt_risky_share)
+    else:
+        opt_w1 = 0.0
+        opt_w2 = 0.0
 
     return {
         "asset1": asset1,
@@ -3326,6 +3444,8 @@ def compute_builder_result(
         "esg_score2_input": float(esg_score2),
         "correlation": float(correlation),
         "risk_free_rate_input": float(risk_free_rate),
+        "gamma": gamma,
+        "lambda_pref": lambda_pref,
         "esg_preference_fraction": esg_preference_fraction,
         "weights": weights,
         "portfolio_returns": portfolio_returns,
@@ -3333,21 +3453,27 @@ def compute_builder_result(
         "portfolio_esg": portfolio_esg,
         "portfolio_sharpes": portfolio_sharpes,
         "max_sharpe_idx": max_sharpe_idx,
-        "optimal_idx": optimal_idx,
         "efficient_idx_without_esg_full": efficient_idx_without_esg_full,
         "efficient_idx_without_esg_display": efficient_idx_without_esg_display,
         "efficient_idx_with_esg": efficient_idx_with_esg,
+        "esg_constrained_mask": esg_constrained_mask,
         "frontier_overlap_ratio": frontier_overlap,
         "frontiers_share_points": frontiers_share_points,
         "frontiers_need_visual_separation": frontiers_need_visual_separation,
         "required_esg": required_esg,
+        "opt_x1": opt_x1,
+        "opt_x2": opt_x2,
         "opt_w1": opt_w1,
         "opt_w2": opt_w2,
-        "opt_return": float(portfolio_returns[optimal_idx]),
-        "opt_risk": float(portfolio_risks[optimal_idx]),
-        "opt_esg": float(portfolio_esg[optimal_idx]),
-        "opt_sharpe": float(portfolio_sharpes[optimal_idx]),
+        "opt_risky_share": opt_risky_share,
+        "opt_rf_weight": opt_rf_weight,
+        "opt_return": opt_return,
+        "opt_risk": opt_risk,
+        "opt_esg": opt_esg,
+        "opt_sharpe": opt_sharpe,
+        "opt_objective": opt_objective,
     }
+
 
 
 # -------------------------------------------------
@@ -3714,7 +3840,7 @@ def render_builder_popup() -> None:
             ax.set_xlim(left=0.0, right=float(np.max(all_x) + 0.07 * x_span))
             ax.set_ylim(bottom=float(min(rf_y, np.min(all_y)) - 0.08 * y_span), top=float(np.max(all_y) + 0.08 * y_span))
             ax.set_xlabel("Portfolio Risk (%)")
-            ax.set_ylabel("Portfolio Performance (%)")
+            ax.set_ylabel("Expected Return (%)")
             ax.set_title("Efficient Frontiers")
             style_modern_axes(ax)
             st.pyplot(fig)
