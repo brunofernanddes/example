@@ -2680,20 +2680,12 @@ def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     """
 
 
-def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float, risk_free_weight: float) -> str:
-    risk_free_copy = ""
-    if risk_free_weight > 1e-9:
-        risk_free_copy = f"The remaining {risk_free_weight:.2%} stays in the risk-free asset."
-    elif risk_free_weight < -1e-9:
-        risk_free_copy = f"This allocation implies {abs(risk_free_weight):.2%} borrowing at the risk-free rate."
-    else:
-        risk_free_copy = "The full allocation is invested across the two risky assets."
-
+def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float) -> str:
     return f"""
     <div class="allocation-summary">
-        <p class="allocation-summary-label">Asset Weighting</p>
+        <p class="allocation-summary-label">Recommended Allocation</p>
         <p class="allocation-summary-title">{asset1}: {weight1:.2%} &nbsp;•&nbsp; {asset2}: {weight2:.2%}</p>
-        <p class="allocation-summary-copy">These bubbles show how the generated portfolio splits the risky allocation between your two assets. {risk_free_copy}</p>
+        <p class="allocation-summary-copy">The live portfolio recommendation keeps the allocation visible in one clean summary block, while the key performance metrics remain easy to scan below.</p>
         <div class="allocation-chip-row">
             <span class="allocation-chip">{asset1}: {weight1:.2%}</span>
             <span class="allocation-chip">{asset2}: {weight2:.2%}</span>
@@ -4175,36 +4167,6 @@ def render_builder_popup() -> None:
                 st.markdown(result_tile("Portfolio ESG Score", f'{display_esg_pct:.2f}/100'), unsafe_allow_html=True)
             with metric_c4:
                 st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
-
-            st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-            st.markdown(
-                allocation_summary_html(
-                    str(result.get("asset1", "Asset 1")),
-                    float(result.get("opt_w1", 0.0)),
-                    str(result.get("asset2", "Asset 2")),
-                    float(result.get("opt_w2", 0.0)),
-                    float(result.get("opt_rf_weight", 0.0)),
-                ),
-                unsafe_allow_html=True,
-            )
-
-            weight_c1, weight_c2 = st.columns(2, gap="small")
-            with weight_c1:
-                st.markdown(
-                    result_tile(
-                        f'{str(result.get("asset1", "Asset 1"))} Weight',
-                        f'{float(result.get("opt_w1", 0.0)) * 100.0:.2f}%'
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with weight_c2:
-                st.markdown(
-                    result_tile(
-                        f'{str(result.get("asset2", "Asset 2"))} Weight',
-                        f'{float(result.get("opt_w2", 0.0)) * 100.0:.2f}%'
-                    ),
-                    unsafe_allow_html=True,
-                )
 
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
