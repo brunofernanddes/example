@@ -2681,33 +2681,22 @@ def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
 
 
 def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float, risk_free_weight: float) -> str:
-    safe_asset1 = str(asset1).strip() or "Asset 1"
-    safe_asset2 = str(asset2).strip() or "Asset 2"
-    total_risky_weight = max(weight1 + weight2, 0.0)
-
-    if total_risky_weight > 1e-12:
-        display_weight1 = weight1 / total_risky_weight
-        display_weight2 = weight2 / total_risky_weight
-    else:
-        display_weight1 = 0.0
-        display_weight2 = 0.0
-
     risk_free_copy = ""
     if risk_free_weight > 1e-9:
-        risk_free_copy = f"Total risky exposure is {total_risky_weight:.2%} of wealth, with the remaining {risk_free_weight:.2%} held in the risk-free asset."
+        risk_free_copy = f"The remaining {risk_free_weight:.2%} stays in the risk-free asset."
     elif risk_free_weight < -1e-9:
-        risk_free_copy = f"Total risky exposure is {total_risky_weight:.2%} of wealth, which implies {abs(risk_free_weight):.2%} borrowing at the risk-free rate."
+        risk_free_copy = f"This allocation implies {abs(risk_free_weight):.2%} borrowing at the risk-free rate."
     else:
-        risk_free_copy = f"The full portfolio is allocated to risky assets, with total risky exposure of {total_risky_weight:.2%}."
+        risk_free_copy = "The full allocation is invested across the two risky assets."
 
     return f"""
     <div class="allocation-summary">
         <p class="allocation-summary-label">Asset Weighting</p>
-        <p class="allocation-summary-title">{safe_asset1}: {display_weight1:.2%} &nbsp;•&nbsp; {safe_asset2}: {display_weight2:.2%}</p>
-        <p class="allocation-summary-copy">These bubbles show the split inside the risky sleeve, so the two asset weights add to 100%. {risk_free_copy}</p>
+        <p class="allocation-summary-title">{asset1}: {weight1:.2%} &nbsp;•&nbsp; {asset2}: {weight2:.2%}</p>
+        <p class="allocation-summary-copy">These bubbles show how the generated portfolio splits the risky allocation between your two assets. {risk_free_copy}</p>
         <div class="allocation-chip-row">
-            <span class="allocation-chip">{safe_asset1}: {display_weight1:.2%}</span>
-            <span class="allocation-chip">{safe_asset2}: {display_weight2:.2%}</span>
+            <span class="allocation-chip">{asset1}: {weight1:.2%}</span>
+            <span class="allocation-chip">{asset2}: {weight2:.2%}</span>
         </div>
     </div>
     """
@@ -4187,25 +4176,13 @@ def render_builder_popup() -> None:
             with metric_c4:
                 st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
 
-            safe_asset1_name = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
-            safe_asset2_name = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
-            safe_opt_w1 = max(float(result.get("opt_w1", 0.0)), 0.0)
-            safe_opt_w2 = max(float(result.get("opt_w2", 0.0)), 0.0)
-            total_risky_weight = safe_opt_w1 + safe_opt_w2
-            if total_risky_weight > 1e-12:
-                display_weight1 = safe_opt_w1 / total_risky_weight
-                display_weight2 = safe_opt_w2 / total_risky_weight
-            else:
-                display_weight1 = 0.0
-                display_weight2 = 0.0
-
             st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
             st.markdown(
                 allocation_summary_html(
-                    safe_asset1_name,
-                    safe_opt_w1,
-                    safe_asset2_name,
-                    safe_opt_w2,
+                    str(result.get("asset1", "Asset 1")),
+                    float(result.get("opt_w1", 0.0)),
+                    str(result.get("asset2", "Asset 2")),
+                    float(result.get("opt_w2", 0.0)),
                     float(result.get("opt_rf_weight", 0.0)),
                 ),
                 unsafe_allow_html=True,
@@ -4215,16 +4192,16 @@ def render_builder_popup() -> None:
             with weight_c1:
                 st.markdown(
                     result_tile(
-                        f'{safe_asset1_name} Weight',
-                        f'{display_weight1 * 100.0:.2f}%'
+                        f'{str(result.get("asset1", "Asset 1"))} Weight',
+                        f'{float(result.get("opt_w1", 0.0)) * 100.0:.2f}%'
                     ),
                     unsafe_allow_html=True,
                 )
             with weight_c2:
                 st.markdown(
                     result_tile(
-                        f'{safe_asset2_name} Weight',
-                        f'{display_weight2 * 100.0:.2f}%'
+                        f'{str(result.get("asset2", "Asset 2"))} Weight',
+                        f'{float(result.get("opt_w2", 0.0)) * 100.0:.2f}%'
                     ),
                     unsafe_allow_html=True,
                 )
