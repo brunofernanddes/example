@@ -2680,95 +2680,15 @@ def result_tile(label: str, value: str, tooltip: str | None = None) -> str:
     """
 
 
-def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float, risk_free_weight: float) -> str:
-    safe_asset1 = str(asset1).strip() or "Asset 1"
-    safe_asset2 = str(asset2).strip() or "Asset 2"
-
-    safe_weight1 = max(float(weight1), 0.0)
-    safe_weight2 = max(float(weight2), 0.0)
-    total_risky_weight = max(safe_weight1 + safe_weight2, 0.0)
-
-    if total_risky_weight > 1e-12:
-        sleeve_weight1 = safe_weight1 / total_risky_weight
-        sleeve_weight2 = safe_weight2 / total_risky_weight
-    else:
-        sleeve_weight1 = 0.0
-        sleeve_weight2 = 0.0
-
-    if risk_free_weight > 1e-9:
-        risk_free_copy = (
-            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}. "
-            f"That leaves {risk_free_weight:.2%} in the risk-free asset."
-        )
-        risk_free_chip = f"Risk-Free Holding: {risk_free_weight:.2%}"
-    elif risk_free_weight < -1e-9:
-        risk_free_copy = (
-            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}. "
-            f"Total risky exposure is {total_risky_weight:.2%}, so the portfolio is borrowing {abs(risk_free_weight):.2%} at the risk-free rate."
-        )
-        risk_free_chip = f"Risk-Free Borrowing: {abs(risk_free_weight):.2%}"
-    else:
-        risk_free_copy = (
-            f"The optimiser allocates {safe_weight1:.2%} of wealth to {safe_asset1} and {safe_weight2:.2%} to {safe_asset2}, "
-            f"with the full portfolio invested in risky assets."
-        )
-        risk_free_chip = "Risk-Free Holding: 0.00%"
-
-    sleeve_copy = (
-        f"Inside the risky sleeve, the split is {safe_asset1}: {sleeve_weight1:.2%} and {safe_asset2}: {sleeve_weight2:.2%}. "
-        f"These sleeve weights add to 100%, while the total portfolio weights above follow the audit definition of x."
-    )
-
+def allocation_summary_html(asset1: str, weight1: float, asset2: str, weight2: float) -> str:
     return f"""
     <div class="allocation-summary">
-        <p class="allocation-summary-label">Asset Weighting</p>
-        <p class="allocation-summary-title">{safe_asset1}: {safe_weight1:.2%} &nbsp;•&nbsp; {safe_asset2}: {safe_weight2:.2%}</p>
-        <p class="allocation-summary-copy">{risk_free_copy}</p>
-        <p class="allocation-summary-copy" style="margin-top:-0.25rem;">{sleeve_copy}</p>
+        <p class="allocation-summary-label">Recommended Allocation</p>
+        <p class="allocation-summary-title">{asset1}: {weight1:.2%} &nbsp;•&nbsp; {asset2}: {weight2:.2%}</p>
+        <p class="allocation-summary-copy">The live portfolio recommendation keeps the allocation visible in one clean summary block, while the key performance metrics remain easy to scan below.</p>
         <div class="allocation-chip-row">
-            <span class="allocation-chip">{safe_asset1} Sleeve: {sleeve_weight1:.2%}</span>
-            <span class="allocation-chip">{safe_asset2} Sleeve: {sleeve_weight2:.2%}</span>
-            <span class="allocation-chip">{risk_free_chip}</span>
-        </div>
-    </div>
-    """
-
-
-def asset_weights_summary_html(asset1: str, weight1: float, asset2: str, weight2: float, risk_free_weight: float) -> str:
-    safe_asset1 = str(asset1).strip() or "Asset 1"
-    safe_asset2 = str(asset2).strip() or "Asset 2"
-
-    risky_weight1 = float(weight1)
-    risky_weight2 = float(weight2)
-    total_risky_weight = risky_weight1 + risky_weight2
-
-    if abs(total_risky_weight) > 1e-12:
-        risky_weight1 = risky_weight1 / total_risky_weight
-        risky_weight2 = risky_weight2 / total_risky_weight
-    else:
-        risky_weight1 = 0.0
-        risky_weight2 = 0.0
-
-    if risk_free_weight > 1e-9:
-        capital_copy = f"Under standard portfolio theory, these are the optimal weights of the two risky assets inside the risky portfolio and they sum to 100.00%. Separately, the app allocates {risk_free_weight:.2%} to the risk-free asset."
-    elif risk_free_weight < -1e-9:
-        capital_copy = f"Under standard portfolio theory, these are the optimal weights of the two risky assets inside the risky portfolio and they sum to 100.00%. Separately, the app borrows {abs(risk_free_weight):.2%} at the risk-free rate to lever that risky portfolio."
-    else:
-        capital_copy = "Under standard portfolio theory, these are the optimal weights of the two risky assets inside the portfolio and they sum to 100.00%."
-
-    return f"""
-    <div class="allocation-summary">
-        <p class="allocation-summary-label">Asset Weights</p>
-        <p class="allocation-summary-title">{safe_asset1}: {risky_weight1:.2%} &nbsp;•&nbsp; {safe_asset2}: {risky_weight2:.2%}</p>
-        <p class="allocation-summary-copy">These weights are the optimal two-asset risky-portfolio weights computed from the entered expected returns, standard deviations, and correlation coefficient.</p>
-        <p class="allocation-summary-copy" style="margin-top:-0.25rem;">{capital_copy}</p>
-        <div class="allocation-chip-row">
-            <span class="allocation-chip">{safe_asset1}: {risky_weight1:.2%}</span>
-            <span class="allocation-chip">{safe_asset2}: {risky_weight2:.2%}</span>
-        </div>
-        <div class="allocation-chip-row" style="margin-top:0.55rem;">
-            <span class="allocation-chip">Weights sum: {(risky_weight1 + risky_weight2):.2%}</span>
-            <span class="allocation-chip">Risk-Free Allocation: {risk_free_weight:.2%}</span>
+            <span class="allocation-chip">{asset1}: {weight1:.2%}</span>
+            <span class="allocation-chip">{asset2}: {weight2:.2%}</span>
         </div>
     </div>
     """
@@ -3283,13 +3203,13 @@ def build_dual_frontier_display(result: dict) -> dict:
     without_curve_risks = np.array(risky_risks_pct, dtype=float)
     without_curve_returns = np.array(risky_returns_pct, dtype=float)
     without_tangency_point = (
-        float(without_curve_risks[without_tangency_idx]),
-        float(without_curve_returns[without_tangency_idx]),
+        float(result.get('current_non_esg_risk_pct', float(without_curve_risks[without_tangency_idx]))),
+        float(result.get('current_non_esg_return_pct', float(without_curve_returns[without_tangency_idx]))),
     )
-    without_tangency_esg = float(risky_esg_scores_pct[without_tangency_idx])
-    without_tangency_sharpe = 0.0
-    if without_tangency_point[0] > 1e-9:
-        without_tangency_sharpe = float((without_tangency_point[1] - rf_pct) / without_tangency_point[0])
+    without_tangency_esg = float(result.get('current_non_esg_esg_pct', float(risky_esg_scores_pct[without_tangency_idx])))
+    without_tangency_sharpe = float(result.get('current_non_esg_sharpe', 0.0))
+    if without_tangency_point[0] <= 1e-9 and float(without_curve_risks[without_tangency_idx]) > 1e-9:
+        without_tangency_sharpe = float((float(without_curve_returns[without_tangency_idx]) - rf_pct) / float(without_curve_risks[without_tangency_idx]))
 
     esg_preference_fraction = float(result.get('esg_preference_fraction', 0.0))
     min_esg_pct = float(np.min(risky_esg_scores_pct))
@@ -3329,13 +3249,13 @@ def build_dual_frontier_display(result: dict) -> dict:
     )
 
     with_tangency_point = (
-        float(with_curve_risks[with_tangency_local_idx]),
-        float(with_curve_returns[with_tangency_local_idx]),
+        float(result.get('opt_risk', 0.0) * 100.0),
+        float(result.get('opt_return', 0.0) * 100.0),
     )
-    with_tangency_esg = float(risky_esg_scores_pct[esg_slice][with_tangency_local_idx])
-    with_tangency_sharpe = 0.0
-    if with_tangency_point[0] > 1e-9:
-        with_tangency_sharpe = float((with_tangency_point[1] - rf_pct) / with_tangency_point[0])
+    with_tangency_esg = float(result.get('opt_esg', float(risky_esg_scores_pct[esg_slice][with_tangency_local_idx])))
+    with_tangency_sharpe = float(result.get('opt_sharpe', 0.0))
+    if with_tangency_point[0] <= 1e-9 and float(with_curve_risks[with_tangency_local_idx]) > 1e-9:
+        with_tangency_sharpe = float((float(with_curve_returns[with_tangency_local_idx]) - rf_pct) / float(with_curve_risks[with_tangency_local_idx]))
 
     without_frontier_risks, without_frontier_returns = _extract_upper_branch_from_full_curve(
         without_curve_risks,
@@ -3632,7 +3552,7 @@ def _builder_risky_mix_statistics(
     risky_mix_variances = np.maximum(risky_mix_variances, 0.0)
     risky_mix_risks = np.sqrt(risky_mix_variances)
     risky_mix_esg = risky_mix_grid * esg1 + (1.0 - risky_mix_grid) * esg2
-    risky_mix_sharpes = np.where(risky_mix_risks > 1e-12, risky_mix_excess / risky_mix_risks, 0.0)
+    risky_mix_sharpes = np.divide(risky_mix_excess, risky_mix_risks, out=np.zeros_like(risky_mix_excess), where=risky_mix_risks > 1e-12)
     return {
         "risky_mix_grid": risky_mix_grid,
         "risky_mix_returns": risky_mix_returns,
@@ -3687,7 +3607,7 @@ def _builder_candidate_portfolios_for_gamma(
     portfolio_risks = np.sqrt(portfolio_variances)
     portfolio_excess_returns = portfolio_returns - rf
     portfolio_esg = np.where(total_risky > 1e-12, risky_mix_esg, 0.0)
-    portfolio_sharpes = np.where(portfolio_risks > 1e-12, portfolio_excess_returns / portfolio_risks, 0.0)
+    portfolio_sharpes = np.divide(portfolio_excess_returns, portfolio_risks, out=np.zeros_like(portfolio_excess_returns), where=portfolio_risks > 1e-12)
 
     return {
         "portfolio_returns": portfolio_returns,
@@ -3886,14 +3806,18 @@ def compute_builder_result(
     total_risky_positions = np.array(current_candidates["total_risky"], dtype=float)
     risky_mix_positions = np.array(current_candidates["risky_mix"], dtype=float)
 
-    current_non_esg_utility = _builder_objective_values(
-        portfolio_excess_returns,
-        portfolio_variances,
-        np.zeros_like(portfolio_esg),
-        gamma,
-        0.0,
-    )
-    current_non_esg_opt_idx = int(np.argmax(current_non_esg_utility))
+    tangency_sharpes = np.full(risky_mix_returns.shape, -np.inf, dtype=float)
+    tangency_valid_risk = risky_mix_risks > 1e-12
+    tangency_sharpes[tangency_valid_risk] = risky_mix_excess[tangency_valid_risk] / risky_mix_risks[tangency_valid_risk]
+
+    tangency_zero_risk = ~tangency_valid_risk
+    tangency_sharpes[tangency_zero_risk & (risky_mix_excess > 1e-12)] = np.inf
+    tangency_sharpes[tangency_zero_risk & (np.abs(risky_mix_excess) <= 1e-12)] = 0.0
+
+    if np.any(np.isfinite(tangency_sharpes)) or np.any(np.isposinf(tangency_sharpes)):
+        current_non_esg_opt_idx = int(np.argmax(tangency_sharpes))
+    else:
+        current_non_esg_opt_idx = int(np.argmax(risky_mix_returns))
 
     current_esg_utility = _builder_objective_values(
         portfolio_excess_returns,
@@ -3903,6 +3827,16 @@ def compute_builder_result(
         lambda_taste,
     )
     optimal_idx = int(np.argmax(current_esg_utility))
+
+    symmetric_case = (
+        np.isclose(r1, r2, atol=1e-12, rtol=0.0)
+        and np.isclose(s1, s2, atol=1e-12, rtol=0.0)
+        and np.isclose(esg1, esg2, atol=1e-12, rtol=0.0)
+    )
+    if symmetric_case:
+        symmetric_idx = int(np.argmin(np.abs(risky_mix_grid - 0.5)))
+        current_non_esg_opt_idx = symmetric_idx
+        optimal_idx = symmetric_idx
 
     family_without = _builder_selected_family_curve(
         risky_mix_grid,
@@ -3949,8 +3883,6 @@ def compute_builder_result(
     opt_x1 = float(x1_positions[optimal_idx])
     opt_x2 = float(x2_positions[optimal_idx])
     opt_rf_weight = float(rf_positions[optimal_idx])
-    opt_risky_mix_weight1 = float(risky_mix_positions[optimal_idx])
-    opt_risky_mix_weight2 = float(1.0 - risky_mix_positions[optimal_idx])
 
     return {
         "asset1": asset1,
@@ -4000,21 +3932,25 @@ def compute_builder_result(
         "with_curve_risks_pct": with_curve_risks_pct,
         "with_curve_returns_pct": with_curve_returns_pct,
         "max_sharpe_idx": current_non_esg_opt_idx,
-        "max_sharpe_risk_pct": float(portfolio_risks[current_non_esg_opt_idx] * 100.0),
-        "max_sharpe_return_pct": float(portfolio_returns[current_non_esg_opt_idx] * 100.0),
-        "max_sharpe_esg_pct": float(portfolio_esg[current_non_esg_opt_idx]),
+        "max_sharpe_risk_pct": float(risky_mix_risks[current_non_esg_opt_idx] * 100.0),
+        "max_sharpe_return_pct": float(risky_mix_returns[current_non_esg_opt_idx] * 100.0),
+        "max_sharpe_esg_pct": float(risky_mix_esg[current_non_esg_opt_idx]),
+        "max_sharpe_sharpe": float(tangency_sharpes[current_non_esg_opt_idx]) if np.isfinite(tangency_sharpes[current_non_esg_opt_idx]) else 0.0,
+        "max_sharpe_w1": float(risky_mix_grid[current_non_esg_opt_idx]),
+        "max_sharpe_w2": float(1.0 - risky_mix_grid[current_non_esg_opt_idx]),
         "esg_tangency_idx": optimal_idx,
         "esg_tangency_risk_pct": float(portfolio_risks[optimal_idx] * 100.0),
         "esg_tangency_return_pct": float(portfolio_returns[optimal_idx] * 100.0),
         "esg_tangency_esg_pct": float(portfolio_esg[optimal_idx]),
-        "current_non_esg_return_pct": float(portfolio_returns[current_non_esg_opt_idx] * 100.0),
-        "current_non_esg_risk_pct": float(portfolio_risks[current_non_esg_opt_idx] * 100.0),
-        "current_non_esg_esg_pct": float(portfolio_esg[current_non_esg_opt_idx]),
+        "current_non_esg_return_pct": float(risky_mix_returns[current_non_esg_opt_idx] * 100.0),
+        "current_non_esg_risk_pct": float(risky_mix_risks[current_non_esg_opt_idx] * 100.0),
+        "current_non_esg_esg_pct": float(risky_mix_esg[current_non_esg_opt_idx]),
+        "current_non_esg_sharpe": float(tangency_sharpes[current_non_esg_opt_idx]) if np.isfinite(tangency_sharpes[current_non_esg_opt_idx]) else 0.0,
+        "current_non_esg_w1": float(risky_mix_grid[current_non_esg_opt_idx]),
+        "current_non_esg_w2": float(1.0 - risky_mix_grid[current_non_esg_opt_idx]),
         "opt_w1": opt_x1,
         "opt_w2": opt_x2,
         "opt_rf_weight": opt_rf_weight,
-        "opt_risky_mix_weight1": opt_risky_mix_weight1,
-        "opt_risky_mix_weight2": opt_risky_mix_weight2,
         "opt_return": float(portfolio_returns[optimal_idx]),
         "opt_risk": float(portfolio_risks[optimal_idx]),
         "opt_esg": float(portfolio_esg[optimal_idx]),
@@ -4218,10 +4154,10 @@ def render_builder_popup() -> None:
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             frontier_display = build_dual_frontier_display(result)
-            display_return_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[1])
-            display_risk_pct = float(frontier_display.get("with_tangency_point", (0.0, 0.0))[0])
-            display_esg_pct = float(frontier_display.get("with_tangency_esg", result.get("opt_esg", 0.0)))
-            display_sharpe = float(frontier_display.get("with_tangency_sharpe", result.get("opt_sharpe", 0.0)))
+            display_return_pct = float(result.get("opt_return", 0.0) * 100.0)
+            display_risk_pct = float(result.get("opt_risk", 0.0) * 100.0)
+            display_esg_pct = float(result.get("opt_esg", 0.0))
+            display_sharpe = float(result.get("opt_sharpe", 0.0))
 
             display_result = dict(result)
             display_result.update({
@@ -4229,10 +4165,10 @@ def render_builder_popup() -> None:
                 "display_portfolio_risk_pct": display_risk_pct,
                 "display_portfolio_esg_pct": display_esg_pct,
                 "display_sharpe_ratio": display_sharpe,
-                "display_without_esg_return_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[1]),
-                "display_without_esg_risk_pct": float(frontier_display.get("without_tangency_point", (0.0, 0.0))[0]),
-                "display_without_esg_esg_pct": float(frontier_display.get("without_tangency_esg", result.get("current_non_esg_esg_pct", 0.0))),
-                "display_without_esg_sharpe": float(frontier_display.get("without_tangency_sharpe", result.get("current_non_esg_sharpe", 0.0))),
+                "display_without_esg_return_pct": float(result.get("current_non_esg_return_pct", frontier_display.get("without_tangency_point", (0.0, 0.0))[1])),
+                "display_without_esg_risk_pct": float(result.get("current_non_esg_risk_pct", frontier_display.get("without_tangency_point", (0.0, 0.0))[0])),
+                "display_without_esg_esg_pct": float(result.get("current_non_esg_esg_pct", frontier_display.get("without_tangency_esg", 0.0))),
+                "display_without_esg_sharpe": float(result.get("current_non_esg_sharpe", frontier_display.get("without_tangency_sharpe", 0.0))),
             })
 
             metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4, gap="small")
@@ -4252,224 +4188,194 @@ def render_builder_popup() -> None:
             with metric_c4:
                 st.markdown(result_tile("Sharpe Ratio", f'{display_sharpe:.2f}'), unsafe_allow_html=True)
 
-            safe_asset1_name = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
-            safe_asset2_name = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
-            raw_opt_w1 = float(result.get("opt_w1", 0.0))
-            raw_opt_w2 = float(result.get("opt_w2", 0.0))
-            risk_free_weight = float(result.get("opt_rf_weight", 0.0))
-            display_weight1 = float(np.clip(result.get("opt_risky_mix_weight1", 0.0), 0.0, 1.0))
-            display_weight2 = float(np.clip(result.get("opt_risky_mix_weight2", 0.0), 0.0, 1.0))
-            total_risky_exposure = max(raw_opt_w1 + raw_opt_w2, 0.0)
+            asset1_weight_pct = float(result.get("opt_w1", 0.0) * 100.0)
+            asset2_weight_pct = float(result.get("opt_w2", 0.0) * 100.0)
+            st.markdown(
+                f'''
+                <div class="allocation-chip-row">
+                    <span class="allocation-chip">Asset 1 Weight: {asset1_weight_pct:.2f}%</span>
+                    <span class="allocation-chip">Asset 2 Weight: {asset2_weight_pct:.2f}%</span>
+                </div>
+                ''',
+                unsafe_allow_html=True,
+            )
 
-            asset_weights_tab, summary_tab, frontier_tab = st.tabs(["Asset Weights", "Summary", "Efficient Frontiers"])
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
 
-            with summary_tab:
-                st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-                st.markdown(
-                    allocation_summary_html(
-                        safe_asset1_name,
-                        raw_opt_w1,
-                        safe_asset2_name,
-                        raw_opt_w2,
-                        risk_free_weight,
-                    ),
-                    unsafe_allow_html=True,
+            fig, ax = plt.subplots(figsize=(9.6, 5.6), dpi=180, constrained_layout=True)
+            fig.patch.set_facecolor("white")
+
+            without_curve_risks = frontier_display["without_curve_risks"]
+            without_curve_returns = frontier_display["without_curve_returns"]
+            without_frontier_risks = frontier_display["without_frontier_risks"]
+            without_frontier_returns = frontier_display["without_frontier_returns"]
+            with_curve_risks = frontier_display["with_curve_risks"]
+            with_curve_returns = frontier_display["with_curve_returns"]
+            with_frontier_risks = frontier_display["with_frontier_risks"]
+            with_frontier_returns = frontier_display["with_frontier_returns"]
+            rf_x, rf_y = frontier_display["rf_point"]
+            without_tangency_x, without_tangency_y = frontier_display["without_tangency_point"]
+            with_tangency_x, with_tangency_y = frontier_display["with_tangency_point"]
+
+            if len(without_curve_risks) > 0:
+                ax.plot(
+                    without_curve_risks,
+                    without_curve_returns,
+                    linewidth=5.4,
+                    color="white",
+                    alpha=0.98,
+                    zorder=1,
+                )
+                ax.plot(
+                    without_curve_risks,
+                    without_curve_returns,
+                    linewidth=2.8,
+                    color="#2563eb",
+                    alpha=0.96,
+                    zorder=2,
                 )
 
-                input_c1, input_c2 = st.columns(2, gap="small")
-                with input_c1:
-                    st.markdown(
-                        result_tile(
-                            f'{safe_asset1_name} Total Position',
-                            f'{raw_opt_w1 * 100.0:.2f}%'
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                with input_c2:
-                    st.markdown(
-                        result_tile(
-                            f'{safe_asset2_name} Total Position',
-                            f'{raw_opt_w2 * 100.0:.2f}%'
-                        ),
-                        unsafe_allow_html=True,
-                    )
-
-            with asset_weights_tab:
-                st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
-                st.markdown(
-                    asset_weights_summary_html(
-                        safe_asset1_name,
-                        display_weight1,
-                        safe_asset2_name,
-                        display_weight2,
-                        risk_free_weight,
-                    ),
-                    unsafe_allow_html=True,
+            if len(with_curve_risks) > 0:
+                ax.plot(
+                    with_curve_risks,
+                    with_curve_returns,
+                    linewidth=5.6,
+                    color="white",
+                    alpha=0.98,
+                    zorder=2,
                 )
-                st.caption("This tab shows the standard two-asset risky-portfolio weights only. The Summary tab separately shows any leverage or cash position through the risk-free asset.")
-                weights_c1, weights_c2 = st.columns(2, gap="small")
-                with weights_c1:
-                    st.markdown(
-                        result_tile(
-                            f'{safe_asset1_name} Optimal Weight',
-                            f'{display_weight1 * 100.0:.2f}%'
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                with weights_c2:
-                    st.markdown(
-                        result_tile(
-                            f'{safe_asset2_name} Optimal Weight',
-                            f'{display_weight2 * 100.0:.2f}%'
-                        ),
-                        unsafe_allow_html=True,
-                    )
+                ax.plot(
+                    with_curve_risks,
+                    with_curve_returns,
+                    linewidth=2.9,
+                    color="#16a34a",
+                    alpha=0.96,
+                    zorder=3,
+                )
 
-            with frontier_tab:
-                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-                st.markdown('<div class="mini-header">Efficient Frontiers</div>', unsafe_allow_html=True)
+            if len(without_frontier_risks) > 0:
+                ax.plot(
+                    without_frontier_risks,
+                    without_frontier_returns,
+                    linewidth=3.2,
+                    color="#2563eb",
+                    zorder=4,
+                )
 
-                fig, ax = plt.subplots(figsize=(9.6, 5.6), dpi=180, constrained_layout=True)
-                fig.patch.set_facecolor("white")
+            if len(with_frontier_risks) > 0:
+                ax.plot(
+                    with_frontier_risks,
+                    with_frontier_returns,
+                    linewidth=3.4,
+                    color="#16a34a",
+                    linestyle=(0, (8, 4)),
+                    zorder=5,
+                )
 
-                without_curve_risks = frontier_display["without_curve_risks"]
-                without_curve_returns = frontier_display["without_curve_returns"]
-                without_frontier_risks = frontier_display["without_frontier_risks"]
-                without_frontier_returns = frontier_display["without_frontier_returns"]
-                with_curve_risks = frontier_display["with_curve_risks"]
-                with_curve_returns = frontier_display["with_curve_returns"]
-                with_frontier_risks = frontier_display["with_frontier_risks"]
-                with_frontier_returns = frontier_display["with_frontier_returns"]
-                rf_x, rf_y = frontier_display["rf_point"]
-                without_tangency_x, without_tangency_y = frontier_display["without_tangency_point"]
-                with_tangency_x, with_tangency_y = frontier_display["with_tangency_point"]
+            ax.plot(
+                [rf_x, without_tangency_x],
+                [rf_y, without_tangency_y],
+                linestyle=(0, (3, 3)),
+                linewidth=1.8,
+                color="#2563eb",
+                alpha=0.9,
+                zorder=2,
+            )
+            ax.plot(
+                [rf_x, with_tangency_x],
+                [rf_y, with_tangency_y],
+                linestyle=(0, (3, 3)),
+                linewidth=1.8,
+                color="#14b8a6",
+                alpha=0.9,
+                zorder=2,
+            )
 
-                if len(without_curve_risks) > 0:
-                    ax.plot(
-                        without_curve_risks,
-                        without_curve_returns,
-                        linewidth=5.4,
-                        color="white",
-                        alpha=0.98,
-                        zorder=1,
-                    )
-                    ax.plot(
-                        without_curve_risks,
-                        without_curve_returns,
-                        linewidth=2.8,
-                        color="#2563eb",
-                        alpha=0.96,
-                        zorder=2,
-                    )
+            ax.scatter(rf_x, rf_y, s=38, color="#94a3b8", edgecolors="white", linewidths=0.8, zorder=5)
+            ax.scatter(
+                without_tangency_x,
+                without_tangency_y,
+                s=84,
+                color="#2563eb",
+                edgecolors="white",
+                linewidths=1.0,
+                zorder=6,
+            )
+            ax.scatter(
+                with_tangency_x,
+                with_tangency_y,
+                s=84,
+                color="#16a34a",
+                edgecolors="white",
+                linewidths=1.0,
+                zorder=6,
+            )
 
-                if len(with_curve_risks) > 0:
-                    ax.plot(
-                        with_curve_risks,
-                        with_curve_returns,
-                        linewidth=5.6,
-                        color="white",
-                        alpha=0.98,
-                        zorder=2,
-                    )
-                    ax.plot(
-                        with_curve_risks,
-                        with_curve_returns,
-                        linewidth=2.9,
-                        color="#16a34a",
-                        alpha=0.96,
-                        zorder=3,
-                    )
-
-                if len(without_frontier_risks) > 0:
-                    ax.plot(
-                        without_frontier_risks,
-                        without_frontier_returns,
-                        linewidth=3.2,
-                        color="#2563eb",
-                        linestyle=(0, (5.0, 4.0)),
-                        alpha=0.92,
-                        zorder=4,
-                    )
-
-                if len(with_frontier_risks) > 0:
-                    ax.plot(
-                        with_frontier_risks,
-                        with_frontier_returns,
-                        linewidth=3.2,
-                        color="#16a34a",
-                        linestyle=(0, (5.0, 4.0)),
-                        alpha=0.92,
-                        zorder=5,
-                    )
-
-                ax.scatter(rf_x, rf_y, s=95, color="#111827", edgecolor="white", linewidth=0.9, zorder=9)
-                ax.scatter(without_tangency_x, without_tangency_y, s=110, color="#2563eb", edgecolor="white", linewidth=1.0, zorder=10)
-                ax.scatter(with_tangency_x, with_tangency_y, s=118, color="#16a34a", edgecolor="white", linewidth=1.0, zorder=11)
-
-                if len(without_curve_risks) > 0:
-                    without_label_idx = min(len(without_curve_risks) - 1, max(0, int(len(without_curve_risks) * 0.38)))
-                    ax.annotate(
-                        "Mean-Variance Frontier\n(Without ESG)",
-                        (without_curve_risks[without_label_idx], without_curve_returns[without_label_idx]),
-                        xytext=(-92, 18),
-                        textcoords="offset points",
-                        fontsize=8.6,
-                        color="#1d4ed8",
-                        weight="bold",
-                        bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bfdbfe", alpha=0.98),
-                        arrowprops=dict(arrowstyle="-", color="#2563eb", lw=1.05, alpha=0.95),
-                    )
-
-                if len(with_frontier_risks) > 0:
-                    with_label_idx = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.68)))
-                    ax.annotate(
-                        "Mean-Variance Frontier\n(With Given ESG)",
-                        (with_frontier_risks[with_label_idx], with_frontier_returns[with_label_idx]),
-                        xytext=(20, -34),
-                        textcoords="offset points",
-                        fontsize=8.6,
-                        color="#15803d",
-                        weight="bold",
-                        bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bbf7d0", alpha=0.98),
-                        arrowprops=dict(arrowstyle="-", color="#16a34a", lw=1.05, alpha=0.95),
-                    )
-
+            if len(without_frontier_risks) > 0:
+                without_label_idx = min(len(without_frontier_risks) - 1, max(0, int(len(without_frontier_risks) * 0.58)))
                 ax.annotate(
-                    "Tangency Portfolio\n(Without ESG)",
-                    (without_tangency_x, without_tangency_y),
-                    xytext=(-118, 12),
+                    "Mean-Variance Frontier\n(Without ESG)",
+                    (without_frontier_risks[without_label_idx], without_frontier_returns[without_label_idx]),
+                    xytext=(26, 18),
                     textcoords="offset points",
-                    fontsize=8.5,
+                    fontsize=8.6,
                     color="#1d4ed8",
                     weight="bold",
-                    bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bfdbfe", alpha=0.98),
-                    arrowprops=dict(arrowstyle="->", color="#2563eb", lw=1.0, alpha=0.9),
-                )
-                ax.annotate(
-                    "Tangency Portfolio\n(With Given ESG)",
-                    (with_tangency_x, with_tangency_y),
-                    xytext=(12, -34),
-                    textcoords="offset points",
-                    fontsize=8.5,
-                    color="#15803d",
-                    weight="bold",
-                    bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
-                    arrowprops=dict(arrowstyle="->", color="#16a34a", lw=1.0, alpha=0.9),
+                    bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bfdbfe", alpha=0.98),
+                    arrowprops=dict(arrowstyle="-", color="#2563eb", lw=1.05, alpha=0.95),
                 )
 
-                all_x = np.concatenate([without_curve_risks, with_curve_risks, np.array([rf_x])]) if len(without_curve_risks) + len(with_curve_risks) > 0 else np.array([0.0])
-                all_y = np.concatenate([without_curve_returns, with_curve_returns, np.array([rf_y])]) if len(without_curve_returns) + len(with_curve_returns) > 0 else np.array([0.0])
-                x_span = max(float(np.max(all_x) - np.min(all_x)), 1.0)
-                y_span = max(float(np.max(all_y) - np.min(all_y)), 1.0)
-                ax.set_xlim(left=0.0, right=float(np.max(all_x) + 0.07 * x_span))
-                ax.set_ylim(bottom=float(min(rf_y, np.min(all_y)) - 0.08 * y_span), top=float(np.max(all_y) + 0.08 * y_span))
-                ax.set_xlabel("Portfolio Risk (%)")
-                ax.set_ylabel("Expected Return (%)")
-                ax.set_title("Efficient Frontiers")
-                style_modern_axes(ax)
-                st.pyplot(fig)
-                plt.close(fig)
-                st.markdown(build_frontier_interpretation(display_result), unsafe_allow_html=True)
+            if len(with_frontier_risks) > 0:
+                with_label_idx = min(len(with_frontier_risks) - 1, max(0, int(len(with_frontier_risks) * 0.68)))
+                ax.annotate(
+                    "Mean-Variance Frontier\n(With Given ESG)",
+                    (with_frontier_risks[with_label_idx], with_frontier_returns[with_label_idx]),
+                    xytext=(20, -34),
+                    textcoords="offset points",
+                    fontsize=8.6,
+                    color="#15803d",
+                    weight="bold",
+                    bbox=dict(boxstyle="round,pad=0.30", fc="white", ec="#bbf7d0", alpha=0.98),
+                    arrowprops=dict(arrowstyle="-", color="#16a34a", lw=1.05, alpha=0.95),
+                )
+
+            ax.annotate(
+                "Tangency Portfolio\n(Without ESG)",
+                (without_tangency_x, without_tangency_y),
+                xytext=(-118, 12),
+                textcoords="offset points",
+                fontsize=8.5,
+                color="#1d4ed8",
+                weight="bold",
+                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bfdbfe", alpha=0.98),
+                arrowprops=dict(arrowstyle="->", color="#2563eb", lw=1.0, alpha=0.9),
+            )
+            ax.annotate(
+                "Tangency Portfolio\n(With Given ESG)",
+                (with_tangency_x, with_tangency_y),
+                xytext=(12, -34),
+                textcoords="offset points",
+                fontsize=8.5,
+                color="#15803d",
+                weight="bold",
+                bbox=dict(boxstyle="round,pad=0.28", fc="white", ec="#bbf7d0", alpha=0.98),
+                arrowprops=dict(arrowstyle="->", color="#16a34a", lw=1.0, alpha=0.9),
+            )
+
+            all_x = np.concatenate([without_curve_risks, with_curve_risks, np.array([rf_x])]) if len(without_curve_risks) + len(with_curve_risks) > 0 else np.array([0.0])
+            all_y = np.concatenate([without_curve_returns, with_curve_returns, np.array([rf_y])]) if len(without_curve_returns) + len(with_curve_returns) > 0 else np.array([0.0])
+            x_span = max(float(np.max(all_x) - np.min(all_x)), 1.0)
+            y_span = max(float(np.max(all_y) - np.min(all_y)), 1.0)
+            ax.set_xlim(left=0.0, right=float(np.max(all_x) + 0.07 * x_span))
+            ax.set_ylim(bottom=float(min(rf_y, np.min(all_y)) - 0.08 * y_span), top=float(np.max(all_y) + 0.08 * y_span))
+            ax.set_xlabel("Portfolio Risk (%)")
+            ax.set_ylabel("Expected Return (%)")
+            ax.set_title("Efficient Frontiers")
+            style_modern_axes(ax)
+            st.pyplot(fig)
+            plt.close(fig)
+            st.markdown(build_frontier_interpretation(display_result), unsafe_allow_html=True)
 
 
 
@@ -4817,38 +4723,19 @@ def render_builder_screen() -> None:
     st.markdown('<div class="section-label">Step 1</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Enter Asset Assumptions</div>', unsafe_allow_html=True)
 
-    asset1_tab, asset2_tab, correlation_tab = st.tabs(["Asset 1", "Asset 2", "Correlation Coefficient"])
-
-    with asset1_tab:
+    col1, col2 = st.columns(2, gap="large")
+    with col1:
         asset1_value = st.text_input("Asset 1 Name", key="builder_asset1")
         asset1_name_prefix = asset1_value.strip() if asset1_value.strip() else "Asset 1"
         st.number_input(f"{asset1_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return1")
         st.number_input(f"{asset1_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev1")
         st.number_input(f"{asset1_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score1")
-
-    with asset2_tab:
+    with col2:
         asset2_value = st.text_input("Asset 2 Name", key="builder_asset2")
         asset2_name_prefix = asset2_value.strip() if asset2_value.strip() else "Asset 2"
         st.number_input(f"{asset2_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return2")
         st.number_input(f"{asset2_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev2")
         st.number_input(f"{asset2_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
-
-    with correlation_tab:
-        st.markdown(
-            """
-            <div class="tool-note">
-                Enter the correlation coefficient between the two assets. Negative correlation strengthens diversification, while a high positive correlation means the assets tend to move together.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.slider(
-            f"Correlation between {st.session_state.builder_asset1} and {st.session_state.builder_asset2}",
-            min_value=-1.0,
-            max_value=1.0,
-            step=0.01,
-            key="builder_correlation",
-        )
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Step 2</div>', unsafe_allow_html=True)
@@ -4856,6 +4743,13 @@ def render_builder_screen() -> None:
 
     pref_left, pref_right = st.columns(2, gap="large")
     with pref_left:
+        st.slider(
+            f"Correlation between {st.session_state.builder_asset1} and {st.session_state.builder_asset2}",
+            min_value=-1.0,
+            max_value=1.0,
+            step=0.01,
+            key="builder_correlation",
+        )
         render_label_with_tooltip(
             "Risk-Free Rate",
             "Standard rate of 4.84% as per the UK 10 year bond yield since it represents a safe, long-term investment alternative",
