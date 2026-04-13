@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-APP_NAME = "Leaf It To Us"A
+APP_NAME = "Leaf It To Us"
 APP_TAGLINE = "Sustainable investing, built around you."
 
 LEAF_LOGO_BASE64 = """
