@@ -3204,14 +3204,10 @@ def compute_builder_result(
     esg_frontier = _compute_esg_frontier_and_optimum(mu, cov, esg_scores, rf, gamma, lambda_taste)
     current_esg = esg_frontier["optimal"]
 
-    without_curve_risks_pct, without_curve_returns_pct = _sort_curve_points(
-        np.array(standard_risks * 100.0, dtype=float),
-        np.array(standard_returns * 100.0, dtype=float),
-    )
-    with_curve_risks_pct, with_curve_returns_pct = _sort_curve_points(
-        np.array(esg_frontier["risks"] * 100.0, dtype=float),
-        np.array(esg_frontier["returns"] * 100.0, dtype=float),
-    )
+    without_curve_risks_pct = np.array(standard_risks * 100.0, dtype=float)
+    without_curve_returns_pct = np.array(standard_returns * 100.0, dtype=float)
+    with_curve_risks_pct = np.array(esg_frontier["risks"] * 100.0, dtype=float)
+    with_curve_returns_pct = np.array(esg_frontier["returns"] * 100.0, dtype=float)
 
     portfolio_returns = np.array([standard_solution["return"], current_esg["return"]], dtype=float)
     portfolio_risks = np.array([standard_solution["risk"], current_esg["risk"]], dtype=float)
@@ -3337,6 +3333,74 @@ def compute_builder_result(
         "display_without_esg_esg_pct": display_without_esg_esg_pct,
         "display_without_esg_sharpe": display_without_esg_sharpe,
     }
+
+
+def build_frontier_interpretation(result: dict) -> str:
+    asset1 = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
+    asset2 = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
+
+    opt_x1 = float(result.get("opt_w1", 0.0))
+    opt_x2 = float(result.get("opt_w2", 0.0))
+    opt_rf_weight = float(result.get("opt_rf_weight", 1.0 - opt_x1 - opt_x2))
+
+    chart_return = float(result.get("display_expected_return_pct", result.get("opt_return", 0.0) * 100.0))
+    chart_risk = float(result.get("display_portfolio_risk_pct", result.get("opt_risk", 0.0) * 100.0))
+    chart_esg = float(result.get("display_portfolio_esg_pct", result.get("opt_esg", 0.0)))
+    chart_sharpe = float(result.get("display_sharpe_ratio", result.get("opt_sharpe", 0.0)))
+
+    base_return = float(result.get("display_without_esg_return_pct", result.get("current_non_esg_return_pct", chart_return)))
+    base_risk = float(result.get("display_without_esg_risk_pct", result.get("current_non_esg_risk_pct", chart_risk)))
+    base_esg = float(result.get("display_without_esg_esg_pct", result.get("current_non_esg_esg_pct", chart_esg)))
+    correlation = float(result.get("correlation", 0.0))
+
+    if opt_x1 + opt_x2 <= 1e-12:
+        allocation_sentence = "Under the current inputs, the optimisation is effectively staying in the risk-free asset rather than taking meaningful risky exposure."
+    elif opt_x1 >= max(0.70, opt_x2 + 0.10):
+        allocation_sentence = f"Most of the risky allocation is going into <strong>{asset1}</strong>, with a smaller position in <strong>{asset2}</strong>."
+    elif opt_x2 >= max(0.70, opt_x1 + 0.10):
+        allocation_sentence = f"Most of the risky allocation is going into <strong>{asset2}</strong>, with a smaller position in <strong>{asset1}</strong>."
+    else:
+        allocation_sentence = f"The risky allocation is being shared across both <strong>{asset1}</strong> and <strong>{asset2}</strong>."
+
+    capital_sentence = "Under the standard two-asset setup, the full portfolio is invested across the two risky assets and the weights sum to 100%."
+
+    performance_sentence = f"On the frontier chart, the highlighted ESG-aware portfolio is showing <strong>{chart_return:.2f}% expected return</strong> at <strong>{chart_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{chart_sharpe:.2f}</strong>."
+
+    esg_lift = chart_esg - base_esg
+    return_gap = chart_return - base_return
+    risk_gap = chart_risk - base_risk
+    esg_sentence = f"That highlighted portfolio has a risky-sleeve ESG score of <strong>{chart_esg:.2f}/100</strong>."
+
+    if abs(esg_lift) < 0.10 and abs(return_gap) < 0.15 and abs(risk_gap) < 0.15:
+        tradeoff_sentence = "Compared with the non-ESG solution, the recommendation is financially very similar, so ESG is not changing the portfolio much at these settings."
+    elif esg_lift > 0.10 and return_gap < -0.15:
+        tradeoff_sentence = f"Compared with the non-ESG solution, the portfolio is giving up some expected return in exchange for a greener risky sleeve that is <strong>{esg_lift:.2f}</strong> points higher on ESG."
+    elif esg_lift > 0.10 and risk_gap > 0.15:
+        tradeoff_sentence = f"Compared with the non-ESG solution, the portfolio is taking on more risk to reach a greener risky sleeve that is <strong>{esg_lift:.2f}</strong> points higher on ESG."
+    elif esg_lift > 0.10:
+        tradeoff_sentence = f"Compared with the non-ESG solution, the portfolio is greener by <strong>{esg_lift:.2f}</strong> ESG points without a large financial sacrifice."
+    else:
+        tradeoff_sentence = "Compared with the non-ESG solution, the portfolio remains close to the same overall risk-return profile."
+
+    if correlation <= -0.20:
+        diversification_sentence = "The two risky assets move differently enough that diversification is helping reduce risk in a meaningful way."
+    elif correlation <= 0.35:
+        diversification_sentence = "The two risky assets still provide some diversification, which helps smooth the portfolio's overall risk."
+    else:
+        diversification_sentence = "The two risky assets are moving quite similarly, so diversification benefits are more limited under the current assumptions."
+
+    return f"""
+    <div class="interpretation-card"> 
+        <p class="interpretation-title">Portfolio Analysis</p>
+        <p class="interpretation-subtitle">This summary updates live as your portfolio inputs change.</p>
+        <div class="interpretation-divider"></div>
+        <p class="interpretation-copy">{allocation_sentence} {capital_sentence}</p>
+        <p class="interpretation-copy">{performance_sentence}</p>
+        <p class="interpretation-copy">{esg_sentence} {tradeoff_sentence}</p>
+        <p class="interpretation-copy">{diversification_sentence}</p>
+    </div>
+    """
+
 
 # Company search helpers
 
