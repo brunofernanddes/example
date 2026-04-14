@@ -3509,6 +3509,134 @@ ASSET_DATA_LOOKUP = {
 }
 
 
+def build_frontier_interpretation(result: dict) -> str:
+    asset1 = str(result.get("asset1", "Asset 1")).strip() or "Asset 1"
+    asset2 = str(result.get("asset2", "Asset 2")).strip() or "Asset 2"
+
+    opt_x1 = float(result.get("opt_w1", 0.0))
+    opt_x2 = float(result.get("opt_w2", 0.0))
+    opt_rf_weight = float(result.get("opt_rf_weight", 1.0 - opt_x1 - opt_x2))
+
+    chart_return = float(result.get("display_expected_return_pct", result.get("opt_return", 0.0) * 100.0))
+    chart_risk = float(result.get("display_portfolio_risk_pct", result.get("opt_risk", 0.0) * 100.0))
+    chart_esg = float(result.get("display_portfolio_esg_pct", result.get("opt_esg", 0.0)))
+    chart_sharpe = float(result.get("display_sharpe_ratio", result.get("opt_sharpe", 0.0)))
+
+    base_return = float(result.get("display_without_esg_return_pct", result.get("current_non_esg_return_pct", chart_return)))
+    base_risk = float(result.get("display_without_esg_risk_pct", result.get("current_non_esg_risk_pct", chart_risk)))
+    base_esg = float(result.get("display_without_esg_esg_pct", result.get("current_non_esg_esg_pct", chart_esg)))
+    correlation = float(result.get("correlation", 0.0))
+
+    if opt_x1 + opt_x2 <= 1e-12:
+        allocation_sentence = "Under the current inputs, the optimisation is effectively staying in the risk-free asset rather than taking meaningful risky exposure."
+    elif opt_x1 >= max(0.70, opt_x2 + 0.10):
+        allocation_sentence = f"Most of the risky allocation is going into <strong>{asset1}</strong>, with a smaller position in <strong>{asset2}</strong>."
+    elif opt_x2 >= max(0.70, opt_x1 + 0.10):
+        allocation_sentence = f"Most of the risky allocation is going into <strong>{asset2}</strong>, with a smaller position in <strong>{asset1}</strong>."
+    else:
+        allocation_sentence = f"The risky allocation is being shared across both <strong>{asset1}</strong> and <strong>{asset2}</strong>."
+
+    capital_sentence = "Under the standard two-asset setup, the full portfolio is invested across the two risky assets and the weights sum to 100%."
+
+    performance_sentence = f"On the frontier chart, the highlighted ESG-aware portfolio is showing <strong>{chart_return:.2f}% expected return</strong> at <strong>{chart_risk:.2f}% risk</strong>. Its Sharpe ratio is <strong>{chart_sharpe:.2f}</strong>."
+
+    esg_lift = chart_esg - base_esg
+    return_gap = chart_return - base_return
+    risk_gap = chart_risk - base_risk
+    esg_sentence = f"That highlighted portfolio has a risky-sleeve ESG score of <strong>{chart_esg:.2f}/100</strong>."
+
+    if abs(esg_lift) < 0.10 and abs(return_gap) < 0.15 and abs(risk_gap) < 0.15:
+        tradeoff_sentence = "Compared with the non-ESG solution, the recommendation is financially very similar, so ESG is not changing the portfolio much at these settings."
+    elif esg_lift > 0.10 and return_gap < -0.15:
+        tradeoff_sentence = f"Compared with the non-ESG solution, the portfolio is giving up some expected return in exchange for a greener risky sleeve that is <strong>{esg_lift:.2f}</strong> points higher on ESG."
+    elif esg_lift > 0.10 and risk_gap > 0.15:
+        tradeoff_sentence = f"Compared with the non-ESG solution, the portfolio is taking on more risk to reach a greener risky sleeve that is <strong>{esg_lift:.2f}</strong> points higher on ESG."
+    elif esg_lift > 0.10:
+        tradeoff_sentence = f"Compared with the non-ESG solution, the portfolio is greener by <strong>{esg_lift:.2f}</strong> ESG points without a large financial sacrifice."
+    else:
+        tradeoff_sentence = "Compared with the non-ESG solution, the portfolio remains close to the same overall risk-return profile."
+
+    if correlation <= -0.20:
+        diversification_sentence = "The two risky assets move differently enough that diversification is helping reduce risk in a meaningful way."
+    elif correlation <= 0.35:
+        diversification_sentence = "The two risky assets still provide some diversification, which helps smooth the portfolio's overall risk."
+    else:
+        diversification_sentence = "The two risky assets are moving quite similarly, so diversification benefits are more limited under the current assumptions."
+
+    return f"""
+    <div class="interpretation-card"> 
+        <p class="interpretation-title">Portfolio Analysis</p>
+        <p class="interpretation-subtitle">This summary updates live as your portfolio inputs change.</p>
+        <div class="interpretation-divider"></div>
+        <p class="interpretation-copy">{allocation_sentence} {capital_sentence}</p>
+        <p class="interpretation-copy">{performance_sentence}</p>
+        <p class="interpretation-copy">{esg_sentence} {tradeoff_sentence}</p>
+        <p class="interpretation-copy">{diversification_sentence}</p>
+    </div>
+    """
+
+
+def risk_level_from_score(risk_tolerance: int) -> str:
+    if 1 <= risk_tolerance <= 4:
+        return "Low"
+    if 5 <= risk_tolerance <= 7:
+        return "Medium"
+    return "High"
+
+
+def compute_recommendation(priority_label: str, risk_tolerance: int, esg_aspect: str) -> dict:
+    investment_priority_map = {
+        "Balanced return and sustainability": "1",
+        "Prioritise financial growth": "2",
+        "Prioritise sustainability": "3",
+    }
+
+    investment_priority_key = investment_priority_map[priority_label]
+    risk_level = risk_level_from_score(risk_tolerance)
+
+    asset1, asset2 = RECOMMENDATIONS[investment_priority_key][risk_level][esg_aspect]
+
+    def lookup(asset_label: str):
+        ticker = asset_label.split("(")[-1].replace(")", "").strip().lower()
+        for row in COMPANY_DATA:
+            if row[0] == ticker:
+                return row
+        return None
+
+    row1 = lookup(asset1)
+    row2 = lookup(asset2)
+    exp_return1 = ASSET_DATA_LOOKUP.get(asset1, {"expected_return": 0.0, "std_dev": 0.0})["expected_return"]
+    std_dev1 = ASSET_DATA_LOOKUP.get(asset1, {"expected_return": 0.0, "std_dev": 0.0})["std_dev"]
+    exp_return2 = ASSET_DATA_LOOKUP.get(asset2, {"expected_return": 0.0, "std_dev": 0.0})["expected_return"]
+    std_dev2 = ASSET_DATA_LOOKUP.get(asset2, {"expected_return": 0.0, "std_dev": 0.0})["std_dev"]
+
+    rho = 0.30
+    w1 = 0.5
+    w2 = 0.5
+    s1 = std_dev1 / 100
+    s2 = std_dev2 / 100
+    portfolio_return = w1 * exp_return1 + w2 * exp_return2
+    portfolio_std_dev = (
+        np.sqrt((w1 ** 2) * (s1 ** 2) + (w2 ** 2) * (s2 ** 2) + 2 * w1 * w2 * s1 * s2 * rho) * 100
+    )
+
+    return {
+        "investment_priority_label": priority_label,
+        "risk_level": risk_level,
+        "esg_aspect": esg_aspect,
+        "asset1": asset1,
+        "asset2": asset2,
+        "exp_return1": exp_return1,
+        "std_dev1": std_dev1,
+        "exp_return2": exp_return2,
+        "std_dev2": std_dev2,
+        "portfolio_return": portfolio_return,
+        "portfolio_std_dev": portfolio_std_dev,
+        "company_row1": row1,
+        "company_row2": row2,
+    }
+
+
 # -------------------------------------------------
 # Company search helpers
 # -------------------------------------------------
