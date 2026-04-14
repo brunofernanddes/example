@@ -2992,21 +2992,19 @@ def _portfolio_metrics_total(x: np.ndarray, mu: np.ndarray, cov: np.ndarray, esg
 def _objective_from_sleeve_weight(w1: float, mu: np.ndarray, cov: np.ndarray, esg_scores: np.ndarray, rf: float, gamma: float, lambda_taste: float) -> tuple:
     w1 = float(np.clip(w1, 0.0, 1.0))
     sleeve = np.array([w1, 1.0 - w1], dtype=float)
-    excess_mu = mu - rf
-    sleeve_excess = float(np.dot(sleeve, excess_mu))
+    sleeve_return = float(np.dot(sleeve, mu))
     sleeve_variance = float(np.dot(sleeve, cov @ sleeve))
     sleeve_variance = max(sleeve_variance, 1e-12)
     sleeve_esg = float(np.dot(sleeve, esg_scores))
 
-    total_risky = max(sleeve_excess / (max(float(gamma), 1e-8) * sleeve_variance), 0.0)
-    x = total_risky * sleeve
-    utility = (total_risky * sleeve_excess) - (0.5 * float(gamma) * (total_risky ** 2) * sleeve_variance) + float(lambda_taste) * (sleeve_esg / 100.0)
+    x = sleeve.copy()
+    utility = sleeve_return - (0.5 * max(float(gamma), 1e-8) * sleeve_variance) + float(lambda_taste) * (sleeve_esg / 100.0)
     metrics = _portfolio_metrics_total(x, mu, cov, esg_scores, rf)
     metrics["utility"] = float(utility)
     metrics["sleeve_esg"] = sleeve_esg
     metrics["sleeve_weight1"] = float(sleeve[0])
     metrics["sleeve_weight2"] = float(sleeve[1])
-    return metrics, sleeve_variance, sleeve_excess
+    return metrics, sleeve_variance, sleeve_return - rf
 
 
 def _select_best_candidate(candidates: list) -> dict:
@@ -3037,36 +3035,25 @@ def _solve_total_portfolio(mu: np.ndarray, cov: np.ndarray, esg_scores: np.ndarr
     weights_grid = np.linspace(0.0, 1.0, 1001, dtype=float)
     w1 = weights_grid
     w2 = 1.0 - w1
-    excess_mu = mu - rf
 
-    sleeve_excess = (w1 * excess_mu[0]) + (w2 * excess_mu[1])
-    sleeve_variance = (
+    portfolio_return = (w1 * mu[0]) + (w2 * mu[1])
+    portfolio_variance = (
         (w1 ** 2) * cov[0, 0]
         + (w2 ** 2) * cov[1, 1]
         + (2.0 * w1 * w2 * cov[0, 1])
     )
-    sleeve_variance = np.maximum(sleeve_variance, 1e-12)
+    portfolio_variance = np.maximum(portfolio_variance, 0.0)
+    portfolio_risk = np.sqrt(portfolio_variance)
     sleeve_esg = (w1 * esg_scores[0]) + (w2 * esg_scores[1])
 
     gamma_safe = max(float(gamma), 1e-8)
-    total_risky = np.maximum(sleeve_excess / (gamma_safe * sleeve_variance), 0.0)
-    x1 = total_risky * w1
-    x2 = total_risky * w2
-    portfolio_return = rf + (x1 * excess_mu[0]) + (x2 * excess_mu[1])
-    portfolio_variance = (
-        (x1 ** 2) * cov[0, 0]
-        + (x2 ** 2) * cov[1, 1]
-        + (2.0 * x1 * x2 * cov[0, 1])
-    )
-    portfolio_variance = np.maximum(portfolio_variance, 0.0)
-    portfolio_risk = np.sqrt(portfolio_variance)
     sharpe = np.divide(
         portfolio_return - rf,
         portfolio_risk,
         out=np.zeros_like(portfolio_risk),
         where=portfolio_risk > 1e-12,
     )
-    utility = (total_risky * sleeve_excess) - (0.5 * gamma_safe * (total_risky ** 2) * sleeve_variance) + float(lambda_taste) * (sleeve_esg / 100.0)
+    utility = portfolio_return - (0.5 * gamma_safe * portfolio_variance) + float(lambda_taste) * (sleeve_esg / 100.0)
 
     max_utility = float(np.max(utility))
     best_mask = np.abs(utility - max_utility) <= 1e-10
@@ -3074,13 +3061,12 @@ def _solve_total_portfolio(mu: np.ndarray, cov: np.ndarray, esg_scores: np.ndarr
     tie_break = np.abs(w1[candidate_idx] - 0.5)
     best_idx = int(candidate_idx[np.argmin(tie_break)])
 
-    best_total_risky = float(total_risky[best_idx])
-    best_x = np.array([float(x1[best_idx]), float(x2[best_idx])], dtype=float)
+    best_x = np.array([float(w1[best_idx]), float(w2[best_idx])], dtype=float)
     return {
         "x": best_x,
-        "rf_weight": float(1.0 - best_total_risky),
-        "total_risky": best_total_risky,
-        "risky_mix": np.array([float(w1[best_idx]), float(w2[best_idx])], dtype=float),
+        "rf_weight": 0.0,
+        "total_risky": 1.0,
+        "risky_mix": best_x.copy(),
         "return": float(portfolio_return[best_idx]),
         "variance": float(portfolio_variance[best_idx]),
         "risk": float(portfolio_risk[best_idx]),
@@ -3323,6 +3309,7 @@ def build_dual_frontier_display(result: dict) -> dict:
         "with_tangency_esg": float(result.get("display_portfolio_esg_pct", result.get("opt_esg", 0.0))),
         "without_tangency_sharpe": float(result.get("display_without_esg_sharpe", result.get("current_non_esg_sharpe", 0.0))),
         "with_tangency_sharpe": float(result.get("display_sharpe_ratio", result.get("opt_sharpe", 0.0))),
+        "rf_point": (0.0, rf_pct),
         "risk_free_rate_pct": rf_pct,
     }
 
