@@ -3167,20 +3167,21 @@ def compute_builder_result(
     correlation: float,
     risk_free_rate: float,
     risk_tolerance: int,
-    lambda_taste: float,
+    esg_slider: float,
 ) -> dict:
     mu = np.array([float(exp_return1), float(exp_return2)], dtype=float) / 100.0
     esg_scores = np.array([float(esg_score1), float(esg_score2)], dtype=float)
     rf = float(risk_free_rate) / 100.0
     gamma = gamma_from_risk_tolerance(risk_tolerance)
     cov = _two_asset_covariance(std_dev1, std_dev2, correlation)
-    esg_preference_fraction = float(lambda_taste) / 100.0
+    lambda_taste = float(esg_slider)
+    esg_preference_fraction = lambda_taste / 100.0
 
     current_non_esg = _solve_total_portfolio(mu, cov, esg_scores, rf, gamma, 0.0)
-    current_esg = _solve_total_portfolio(mu, cov, esg_scores, rf, gamma, float(lambda_taste))
+    current_esg = _solve_total_portfolio(mu, cov, esg_scores, rf, gamma, lambda_taste)
 
     family_without = _build_gamma_family(mu, cov, esg_scores, rf, 0.0, gamma)
-    family_with = _build_gamma_family(mu, cov, esg_scores, rf, float(lambda_taste), gamma)
+    family_with = _build_gamma_family(mu, cov, esg_scores, rf, lambda_taste, gamma)
 
     without_curve_risks_pct = np.array(family_without["risks_pct"], dtype=float)
     without_curve_returns_pct = np.array(family_without["returns_pct"], dtype=float)
