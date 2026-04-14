@@ -4812,38 +4812,52 @@ def render_builder_screen() -> None:
     st.markdown('<div class="section-label">Step 1</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Enter Asset Assumptions</div>', unsafe_allow_html=True)
 
-    asset1_tab, asset2_tab, correlation_tab = st.tabs(["Asset 1", "Asset 2", "Correlation Coefficient"])
+    st.markdown(
+        """
+        <div class="tool-note">
+            Enter both assets side by side, then set the correlation coefficient directly underneath.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    with asset1_tab:
+    assumption_left, assumption_right = st.columns(2, gap="large")
+
+    with assumption_left:
+        st.markdown('<div class="section-label">Asset 1</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-note">Enter the core return, risk and ESG assumptions for the first asset.</div>', unsafe_allow_html=True)
         asset1_value = st.text_input("Asset 1 Name", key="builder_asset1")
         asset1_name_prefix = asset1_value.strip() if asset1_value.strip() else "Asset 1"
         st.number_input(f"{asset1_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return1")
         st.number_input(f"{asset1_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev1")
         st.number_input(f"{asset1_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score1")
 
-    with asset2_tab:
+    with assumption_right:
+        st.markdown('<div class="section-label">Asset 2</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tool-note">Enter the core return, risk and ESG assumptions for the second asset.</div>', unsafe_allow_html=True)
         asset2_value = st.text_input("Asset 2 Name", key="builder_asset2")
         asset2_name_prefix = asset2_value.strip() if asset2_value.strip() else "Asset 2"
         st.number_input(f"{asset2_name_prefix} Expected Return (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_exp_return2")
         st.number_input(f"{asset2_name_prefix} Standard Deviation (%)", min_value=0.0, max_value=100.0, step=0.1, key="builder_std_dev2")
         st.number_input(f"{asset2_name_prefix} ESG Score (0–100)", min_value=0.0, max_value=100.0, step=1.0, key="builder_esg_score2")
 
-    with correlation_tab:
-        st.markdown(
-            """
-            <div class="tool-note">
-                Enter the correlation coefficient between the two assets. Negative correlation strengthens diversification, while a high positive correlation means the assets tend to move together.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.slider(
-            f"Correlation between {st.session_state.builder_asset1} and {st.session_state.builder_asset2}",
-            min_value=-1.0,
-            max_value=1.0,
-            step=0.01,
-            key="builder_correlation",
-        )
+    st.markdown("<div style='height:0.35rem;'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Correlation Coefficient</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="tool-note">
+            Enter the correlation coefficient between the two assets. Negative correlation strengthens diversification, while a high positive correlation means the assets tend to move together.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.slider(
+        f"Correlation between {st.session_state.builder_asset1} and {st.session_state.builder_asset2}",
+        min_value=-1.0,
+        max_value=1.0,
+        step=0.01,
+        key="builder_correlation",
+    )
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Step 2</div>', unsafe_allow_html=True)
