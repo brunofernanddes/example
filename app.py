@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize
 
 # -------------------------------------------------
 # Page config
@@ -2994,7 +2993,7 @@ def _portfolio_metrics_from_x(
     }
 
 
-def _negative_optimisation_objective(
+def _objective_from_x(
     x: np.ndarray,
     mu_excess: np.ndarray,
     sigma_matrix: np.ndarray,
@@ -3008,91 +3007,78 @@ def _negative_optimisation_objective(
     esg_term = 0.0
     if total_risky > 1e-12:
         esg_term = float(np.dot(x, esg_vector) / total_risky)
-    utility = mean_variance_term + float(lambda_taste) * esg_term
-    return -float(utility)
+    return float(mean_variance_term + float(lambda_taste) * esg_term)
 
 
-def _negative_optimisation_gradient(
-    x: np.ndarray,
+def _objective_components_from_mix(
+    q1: float,
+    mu_excess: np.ndarray,
+    sigma_matrix: np.ndarray,
+    esg_vector: np.ndarray,
+):
+    q1 = float(np.clip(q1, 0.0, 1.0))
+    mix = np.array([q1, 1.0 - q1], dtype=float)
+    a_value = float(np.dot(mix, mu_excess))
+    b_value = float(np.dot(mix, sigma_matrix @ mix))
+    c_value = float(np.dot(mix, esg_vector))
+    return mix, a_value, max(b_value, 1e-16), c_value
+
+
+def _candidate_q_values(
     mu_excess: np.ndarray,
     sigma_matrix: np.ndarray,
     esg_vector: np.ndarray,
     gamma: float,
     lambda_taste: float,
-) -> np.ndarray:
-    x = np.clip(np.array(x, dtype=float), 0.0, None)
-    gradient = np.array(mu_excess - gamma * (sigma_matrix @ x), dtype=float)
-    total_risky = float(np.sum(x))
-    if total_risky > 1e-12:
-        esg_numerator = float(np.dot(x, esg_vector))
-        esg_gradient = (esg_vector * total_risky - esg_numerator) / (total_risky ** 2)
-        gradient = gradient + float(lambda_taste) * esg_gradient
-    return -np.array(gradient, dtype=float)
-
-
-def _generate_starting_points(
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    gamma: float,
-    warm_start=None,
-    frontier_mode: bool = False,
 ) -> list:
-    starts = []
-    if warm_start is not None:
-        starts.append(np.clip(np.array(warm_start, dtype=float), 0.0, None))
+    sigma11 = float(sigma_matrix[0, 0])
+    sigma22 = float(sigma_matrix[1, 1])
+    sigma12 = float(sigma_matrix[0, 1])
+
+    alpha1 = float(mu_excess[0] - mu_excess[1])
+    alpha0 = float(mu_excess[1])
+    beta2 = float(sigma11 + sigma22 - 2.0 * sigma12)
+    beta1 = float(2.0 * (sigma12 - sigma22))
+    beta0 = float(sigma22)
+    delta = float(esg_vector[0] - esg_vector[1])
+
+    candidates = {0.0, 1.0, 0.5}
+
+    a_poly = np.poly1d([alpha1, alpha0])
+    b_poly = np.poly1d([beta2, beta1, beta0])
+    b_prime = np.polyder(b_poly)
+    derivative_poly = 2.0 * alpha1 * a_poly * b_poly - (a_poly ** 2) * b_prime + 2.0 * float(gamma) * float(lambda_taste) * delta * (b_poly ** 2)
+
+    coeffs = np.array(derivative_poly.c, dtype=float)
+    if coeffs.size > 0:
+        coeffs = np.trim_zeros(coeffs, trim="f")
+    if coeffs.size > 1:
+        for root in np.roots(coeffs):
+            if abs(root.imag) <= 1e-8:
+                real_root = float(root.real)
+                if -1e-8 <= real_root <= 1.0 + 1e-8:
+                    candidates.add(float(np.clip(real_root, 0.0, 1.0)))
+
+    if abs(alpha1) > 1e-12:
+        zero_a = -alpha0 / alpha1
+        if -1e-8 <= zero_a <= 1.0 + 1e-8:
+            candidates.add(float(np.clip(zero_a, 0.0, 1.0)))
 
     try:
-        closed_form = np.linalg.pinv(sigma_matrix) @ mu_excess / max(float(gamma), 1e-12)
+        unconstrained = np.linalg.pinv(sigma_matrix) @ mu_excess
+        unconstrained = np.clip(np.array(unconstrained, dtype=float), 0.0, None)
+        total_unconstrained = float(np.sum(unconstrained))
+        if total_unconstrained > 1e-12:
+            candidates.add(float(unconstrained[0] / total_unconstrained))
     except Exception:
-        closed_form = np.zeros(2, dtype=float)
-    closed_form = np.clip(np.array(closed_form, dtype=float), 0.0, None)
+        pass
 
-    if frontier_mode:
-        starts.extend([
-            closed_form,
-            0.5 * closed_form,
-            np.array([0.5, 0.5], dtype=float),
-            np.array([0.0, 0.0], dtype=float),
-        ])
-    else:
-        starts.extend([
-            closed_form,
-            0.5 * closed_form,
-            np.array([0.5, 0.5], dtype=float),
-            np.array([1.0, 0.0], dtype=float),
-            np.array([0.0, 1.0], dtype=float),
-            np.array([0.0, 0.0], dtype=float),
-        ])
-
-    unique_starts = []
-    seen = set()
-    for start in starts:
-        cleaned = np.clip(np.array(start, dtype=float), 0.0, None)
-        key = tuple(np.round(cleaned, 10))
-        if key not in seen:
-            seen.add(key)
-            unique_starts.append(cleaned)
-    return unique_starts
-
-
-def _run_minimizer(
-    start: np.ndarray,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    gamma: float,
-    lambda_taste: float,
-    method: str,
-):
-    return minimize(
-        _negative_optimisation_objective,
-        x0=np.maximum(np.array(start, dtype=float), 1e-10),
-        args=(mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste),
-        jac=_negative_optimisation_gradient,
-        method=method,
-        bounds=[(0.0, None), (0.0, None)],
-        options={"maxiter": 300, "ftol": 1e-10, "disp": False},
-    )
+    ordered = sorted(float(np.clip(value, 0.0, 1.0)) for value in candidates)
+    deduped = []
+    for value in ordered:
+        if not deduped or abs(value - deduped[-1]) > 1e-9:
+            deduped.append(value)
+    return deduped
 
 
 def _solve_portfolio_optimisation(
@@ -3106,78 +3092,40 @@ def _solve_portfolio_optimisation(
     warm_start=None,
     frontier_mode: bool = False,
 ) -> dict:
-    best_metrics = None
-    best_objective = -np.inf
-    starts = _generate_starting_points(
-        mu_excess=mu_excess,
-        sigma_matrix=sigma_matrix,
-        gamma=gamma,
-        warm_start=warm_start,
-        frontier_mode=frontier_mode,
+    del warm_start, frontier_mode
+
+    best_x = np.zeros(2, dtype=float)
+    best_utility = _objective_from_x(best_x, mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
+
+    q_candidates = _candidate_q_values(mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
+
+    for q1 in q_candidates:
+        mix, a_value, b_value, _ = _objective_components_from_mix(q1, mu_excess, sigma_matrix, esg_vector)
+        total_risky = max(a_value / (float(gamma) * b_value), 0.0)
+        x_candidate = total_risky * mix
+        utility = _objective_from_x(x_candidate, mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
+        if utility > best_utility + 1e-12:
+            best_utility = float(utility)
+            best_x = np.array(x_candidate, dtype=float)
+
+    if float(lambda_taste) > 0.0:
+        high_esg_mix = np.array([1.0, 0.0], dtype=float) if esg_vector[0] >= esg_vector[1] else np.array([0.0, 1.0], dtype=float)
+        epsilon_exposure = 1e-8
+        epsilon_candidate = epsilon_exposure * high_esg_mix
+        epsilon_utility = _objective_from_x(epsilon_candidate, mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
+        if epsilon_utility > best_utility + 1e-12:
+            best_utility = float(epsilon_utility)
+            best_x = np.array(epsilon_candidate, dtype=float)
+
+    metrics = _portfolio_metrics_from_x(
+        best_x,
+        mu_total,
+        mu_excess,
+        sigma_matrix,
+        esg_vector,
+        risk_free_rate,
     )
-
-    methods = ["SLSQP"] if frontier_mode else ["SLSQP", "L-BFGS-B"]
-
-    for start in starts:
-        candidate_vectors = [np.clip(np.array(start, dtype=float), 0.0, None)]
-        for method in methods:
-            try:
-                result = _run_minimizer(
-                    start=start,
-                    mu_excess=mu_excess,
-                    sigma_matrix=sigma_matrix,
-                    esg_vector=esg_vector,
-                    gamma=gamma,
-                    lambda_taste=lambda_taste,
-                    method=method,
-                )
-                if np.all(np.isfinite(result.x)):
-                    candidate_vectors.append(np.clip(np.array(result.x, dtype=float), 0.0, None))
-            except Exception:
-                pass
-
-        for vector in candidate_vectors:
-            objective_value = -_negative_optimisation_objective(
-                vector,
-                mu_excess,
-                sigma_matrix,
-                esg_vector,
-                gamma,
-                lambda_taste,
-            )
-            if not np.isfinite(objective_value):
-                continue
-            metrics = _portfolio_metrics_from_x(
-                vector,
-                mu_total,
-                mu_excess,
-                sigma_matrix,
-                esg_vector,
-                risk_free_rate,
-            )
-            if best_metrics is None or objective_value > best_objective + 1e-12:
-                best_metrics = metrics
-                best_objective = float(objective_value)
-
-    if best_metrics is None:
-        best_metrics = _portfolio_metrics_from_x(
-            np.zeros(2, dtype=float),
-            mu_total,
-            mu_excess,
-            sigma_matrix,
-            esg_vector,
-            risk_free_rate,
-        )
-        best_objective = -_negative_optimisation_objective(
-            np.zeros(2, dtype=float),
-            mu_excess,
-            sigma_matrix,
-            esg_vector,
-            gamma,
-            lambda_taste,
-        )
-
-    return {**best_metrics, "objective": float(best_objective)}
+    return {**metrics, "objective": float(best_utility)}
 
 
 def _solve_frontier_family(
@@ -3190,6 +3138,8 @@ def _solve_frontier_family(
     lambda_taste: float,
     initial_warm_start=None,
 ) -> dict:
+    del initial_warm_start
+
     family_gamma = []
     family_risks = []
     family_returns = []
@@ -3201,7 +3151,6 @@ def _solve_frontier_family(
     family_total_risky = []
     family_risky_mix = []
 
-    warm_start = None if initial_warm_start is None else np.array(initial_warm_start, dtype=float)
     for gamma in np.array(gamma_values, dtype=float):
         solution = _solve_portfolio_optimisation(
             mu_total=mu_total,
@@ -3211,11 +3160,8 @@ def _solve_frontier_family(
             risk_free_rate=risk_free_rate,
             gamma=float(gamma),
             lambda_taste=float(lambda_taste),
-            warm_start=warm_start,
-            frontier_mode=True,
         )
         x = np.array(solution["x"], dtype=float)
-        warm_start = x
 
         family_gamma.append(float(gamma))
         family_risks.append(float(solution["risk"]))
@@ -3249,6 +3195,7 @@ def _compute_standard_tangency_solution(
     esg_vector: np.ndarray,
     risk_free_rate: float,
 ) -> dict:
+    del mu_excess
     ones = np.ones(len(mu_total), dtype=float)
     try:
         raw_weights = np.linalg.pinv(sigma_matrix) @ (mu_total - risk_free_rate * ones)
@@ -3267,7 +3214,7 @@ def _compute_standard_tangency_solution(
     return _portfolio_metrics_from_x(
         tangency_weights,
         mu_total,
-        mu_excess,
+        mu_total - risk_free_rate,
         sigma_matrix,
         esg_vector,
         risk_free_rate,
@@ -3410,7 +3357,6 @@ def compute_builder_result(
         risk_free_rate=risk_free_decimal,
         gamma=gamma,
         lambda_taste=lambda_taste,
-        warm_start=standard_solution["x"],
     )
     standard_tangency = _compute_standard_tangency_solution(
         mu_total=mu_total,
@@ -3428,7 +3374,6 @@ def compute_builder_result(
         esg_vector=esg_vector,
         risk_free_rate=risk_free_decimal,
         lambda_taste=0.0,
-        initial_warm_start=standard_solution["x"],
     )
     family_with = _solve_frontier_family(
         gamma_values=gamma_values,
@@ -3438,7 +3383,6 @@ def compute_builder_result(
         esg_vector=esg_vector,
         risk_free_rate=risk_free_decimal,
         lambda_taste=lambda_taste,
-        initial_warm_start=current_esg["x"],
     )
 
     without_curve_risks_pct, without_curve_returns_pct = _sort_curve_points(
