@@ -2944,281 +2944,143 @@ def gamma_from_risk_tolerance(risk_tolerance: int) -> float:
     return float(11 - clipped_value)
 
 
-def gamma_sweep_values(current_gamma: float) -> np.ndarray:
-    sweep = np.linspace(0.80, 14.00, 120)
-    sweep = np.concatenate((sweep, np.array([float(current_gamma)], dtype=float)))
-    sweep = np.unique(np.round(sweep, 8))
-    return np.sort(sweep)
-
-
-def _safe_portfolio_esg(x: np.ndarray, esg_vector: np.ndarray) -> float:
-    total_risky = float(np.sum(x))
-    if total_risky <= 1e-12:
+def _safe_sharpe(portfolio_return: float, risk_free_rate: float, portfolio_risk: float) -> float:
+    if float(portfolio_risk) <= 1e-12:
         return 0.0
-    return float(np.dot(x, esg_vector) / total_risky)
+    return float((portfolio_return - risk_free_rate) / portfolio_risk)
 
 
-def _portfolio_metrics_from_x(
-    x: np.ndarray,
-    mu_total: np.ndarray,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    risk_free_rate: float,
-) -> dict:
-    x = np.clip(np.array(x, dtype=float), 0.0, None)
-    total_risky = float(np.sum(x))
-    variance = float(np.dot(x, sigma_matrix @ x))
+def _safe_portfolio_metrics(weights: np.ndarray, mu: np.ndarray, cov: np.ndarray, esg_scores: np.ndarray, rf: float) -> dict:
+    weights = np.array(weights, dtype=float).reshape(-1)
+    portfolio_return = float(weights @ mu)
+    variance = float(weights @ cov @ weights)
     variance = max(variance, 0.0)
-    risk = float(np.sqrt(variance))
-    risky_return = float(np.dot(x, mu_total))
-    excess_return = float(np.dot(x, mu_excess))
-    total_return = float(risk_free_rate * (1.0 - total_risky) + risky_return)
-    esg_score = _safe_portfolio_esg(x, esg_vector)
-    sharpe = float((total_return - risk_free_rate) / risk) if risk > 1e-12 else 0.0
-    risky_mix_weight1 = float(x[0] / total_risky) if total_risky > 1e-12 else 0.5
-    risky_mix_weight2 = float(x[1] / total_risky) if total_risky > 1e-12 else 0.5
+    portfolio_risk = float(np.sqrt(variance))
+    total_weight = float(np.sum(weights))
+    if abs(total_weight) <= 1e-12:
+        portfolio_esg = 0.0
+    else:
+        portfolio_esg = float((weights @ esg_scores) / total_weight)
+
     return {
-        "x": x,
-        "total_risky": total_risky,
-        "rf_weight": float(1.0 - total_risky),
-        "return": total_return,
-        "excess_return": excess_return,
+        "x": np.array(weights, dtype=float),
+        "return": portfolio_return,
         "variance": variance,
-        "risk": risk,
-        "esg": esg_score,
-        "sharpe": sharpe,
-        "risky_mix_weight1": risky_mix_weight1,
-        "risky_mix_weight2": risky_mix_weight2,
+        "risk": portfolio_risk,
+        "esg": portfolio_esg,
+        "sharpe": _safe_sharpe(portfolio_return, rf, portfolio_risk),
+        "rf_weight": 0.0,
+        "total_risky": float(total_weight),
+        "risky_mix_weight1": float(weights[0]) if len(weights) > 0 else 0.0,
+        "risky_mix_weight2": float(weights[1]) if len(weights) > 1 else 0.0,
     }
 
 
-def _objective_from_x(
-    x: np.ndarray,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    gamma: float,
-    lambda_taste: float,
-) -> float:
-    x = np.clip(np.array(x, dtype=float), 0.0, None)
-    total_risky = float(np.sum(x))
-    mean_variance_term = float(np.dot(x, mu_excess) - 0.5 * gamma * np.dot(x, sigma_matrix @ x))
-    esg_term = 0.0
-    if total_risky > 1e-12:
-        esg_term = float(np.dot(x, esg_vector) / total_risky)
-    return float(mean_variance_term + float(lambda_taste) * esg_term)
-
-
-def _objective_components_from_mix(
-    q1: float,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-):
-    q1 = float(np.clip(q1, 0.0, 1.0))
-    mix = np.array([q1, 1.0 - q1], dtype=float)
-    a_value = float(np.dot(mix, mu_excess))
-    b_value = float(np.dot(mix, sigma_matrix @ mix))
-    c_value = float(np.dot(mix, esg_vector))
-    return mix, a_value, max(b_value, 1e-16), c_value
-
-
-def _candidate_q_values(
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    gamma: float,
-    lambda_taste: float,
-) -> list:
-    sigma11 = float(sigma_matrix[0, 0])
-    sigma22 = float(sigma_matrix[1, 1])
-    sigma12 = float(sigma_matrix[0, 1])
-
-    alpha1 = float(mu_excess[0] - mu_excess[1])
-    alpha0 = float(mu_excess[1])
-    beta2 = float(sigma11 + sigma22 - 2.0 * sigma12)
-    beta1 = float(2.0 * (sigma12 - sigma22))
-    beta0 = float(sigma22)
-    delta = float(esg_vector[0] - esg_vector[1])
-
-    candidates = {0.0, 1.0, 0.5}
-
-    a_poly = np.poly1d([alpha1, alpha0])
-    b_poly = np.poly1d([beta2, beta1, beta0])
-    b_prime = np.polyder(b_poly)
-    derivative_poly = 2.0 * alpha1 * a_poly * b_poly - (a_poly ** 2) * b_prime + 2.0 * float(gamma) * float(lambda_taste) * delta * (b_poly ** 2)
-
-    coeffs = np.array(derivative_poly.c, dtype=float)
-    if coeffs.size > 0:
-        coeffs = np.trim_zeros(coeffs, trim="f")
-    if coeffs.size > 1:
-        for root in np.roots(coeffs):
-            if abs(root.imag) <= 1e-8:
-                real_root = float(root.real)
-                if -1e-8 <= real_root <= 1.0 + 1e-8:
-                    candidates.add(float(np.clip(real_root, 0.0, 1.0)))
-
-    if abs(alpha1) > 1e-12:
-        zero_a = -alpha0 / alpha1
-        if -1e-8 <= zero_a <= 1.0 + 1e-8:
-            candidates.add(float(np.clip(zero_a, 0.0, 1.0)))
+def _compute_standard_tangency_portfolio(mu: np.ndarray, cov: np.ndarray, rf: float, gamma: float, esg_scores: np.ndarray) -> dict:
+    del gamma
+    ones = np.ones(len(mu), dtype=float)
+    excess_mu = mu - rf * ones
 
     try:
-        unconstrained = np.linalg.pinv(sigma_matrix) @ mu_excess
-        unconstrained = np.clip(np.array(unconstrained, dtype=float), 0.0, None)
-        total_unconstrained = float(np.sum(unconstrained))
-        if total_unconstrained > 1e-12:
-            candidates.add(float(unconstrained[0] / total_unconstrained))
+        inv_cov = np.linalg.pinv(cov)
     except Exception:
-        pass
+        inv_cov = np.eye(len(mu), dtype=float)
 
-    ordered = sorted(float(np.clip(value, 0.0, 1.0)) for value in candidates)
-    deduped = []
-    for value in ordered:
-        if not deduped or abs(value - deduped[-1]) > 1e-9:
-            deduped.append(value)
-    return deduped
+    x_mv = inv_cov @ excess_mu
+    scale = float(np.sum(np.abs(x_mv)))
+
+    if not np.isfinite(scale) or scale <= 1e-12:
+        best_idx = int(np.argmax(excess_mu)) if np.any(np.isfinite(excess_mu)) else 0
+        w_mv = np.zeros(len(mu), dtype=float)
+        w_mv[best_idx] = 1.0
+    else:
+        w_mv = np.array(x_mv / scale, dtype=float)
+
+    if not np.all(np.isfinite(w_mv)):
+        w_mv = np.array([0.5, 0.5], dtype=float)
+
+    metrics = _safe_portfolio_metrics(w_mv, mu, cov, esg_scores, rf)
+    return {**metrics, "x": np.array(w_mv, dtype=float)}
 
 
-def _solve_portfolio_optimisation(
-    mu_total: np.ndarray,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    risk_free_rate: float,
+def _compute_standard_frontier(mu: np.ndarray, cov: np.ndarray) -> tuple:
+    ones = np.ones(len(mu), dtype=float)
+    try:
+        inv_cov = np.linalg.pinv(cov)
+    except Exception:
+        inv_cov = np.eye(len(mu), dtype=float)
+
+    A = float(ones @ inv_cov @ ones)
+    B = float(ones @ inv_cov @ mu)
+    C = float(mu @ inv_cov @ mu)
+    D = float(A * C - B ** 2)
+
+    target_returns = np.linspace(float(np.min(mu) * 0.8), float(np.max(mu) * 1.2), 200)
+
+    if not np.isfinite(D) or abs(D) <= 1e-12:
+        weights_range = np.linspace(0.001, 0.999, 200)
+        frontier_returns = []
+        frontier_risks = []
+        for w1 in weights_range:
+            weights = np.array([w1, 1.0 - w1], dtype=float)
+            metrics = _safe_portfolio_metrics(weights, mu, cov, np.array([0.0, 0.0], dtype=float), 0.0)
+            frontier_returns.append(metrics["return"])
+            frontier_risks.append(metrics["risk"])
+        return np.array(frontier_returns, dtype=float), np.array(frontier_risks, dtype=float)
+
+    risk_values = []
+    for target_return in target_returns:
+        var = (A * target_return ** 2 - 2.0 * B * target_return + C) / D
+        risk_values.append(float(np.sqrt(max(var, 0.0))))
+
+    return np.array(target_returns, dtype=float), np.array(risk_values, dtype=float)
+
+
+def _compute_esg_frontier_and_optimum(
+    mu: np.ndarray,
+    cov: np.ndarray,
+    esg_scores: np.ndarray,
+    rf: float,
     gamma: float,
     lambda_taste: float,
-    warm_start=None,
-    frontier_mode: bool = False,
 ) -> dict:
-    del warm_start, frontier_mode
+    weights_range = np.linspace(0.001, 0.999, 200)
 
-    best_x = np.zeros(2, dtype=float)
-    best_utility = _objective_from_x(best_x, mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
+    returns_list = []
+    risks_list = []
+    esg_list = []
+    utilities = []
 
-    q_candidates = _candidate_q_values(mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
+    for w1 in weights_range:
+        weights = np.array([float(w1), float(1.0 - w1)], dtype=float)
+        metrics = _safe_portfolio_metrics(weights, mu, cov, esg_scores, rf)
+        utility = float(metrics["return"] - 0.5 * float(gamma) * metrics["variance"] + float(lambda_taste) * (metrics["esg"] / 100.0))
 
-    for q1 in q_candidates:
-        mix, a_value, b_value, _ = _objective_components_from_mix(q1, mu_excess, sigma_matrix, esg_vector)
-        total_risky = max(a_value / (float(gamma) * b_value), 0.0)
-        x_candidate = total_risky * mix
-        utility = _objective_from_x(x_candidate, mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
-        if utility > best_utility + 1e-12:
-            best_utility = float(utility)
-            best_x = np.array(x_candidate, dtype=float)
+        returns_list.append(metrics["return"])
+        risks_list.append(metrics["risk"])
+        esg_list.append(metrics["esg"])
+        utilities.append(utility)
 
-    if float(lambda_taste) > 0.0:
-        high_esg_mix = np.array([1.0, 0.0], dtype=float) if esg_vector[0] >= esg_vector[1] else np.array([0.0, 1.0], dtype=float)
-        epsilon_exposure = 1e-8
-        epsilon_candidate = epsilon_exposure * high_esg_mix
-        epsilon_utility = _objective_from_x(epsilon_candidate, mu_excess, sigma_matrix, esg_vector, gamma, lambda_taste)
-        if epsilon_utility > best_utility + 1e-12:
-            best_utility = float(epsilon_utility)
-            best_x = np.array(epsilon_candidate, dtype=float)
+    returns_arr = np.array(returns_list, dtype=float)
+    risks_arr = np.array(risks_list, dtype=float)
+    esg_arr = np.array(esg_list, dtype=float)
+    utilities_arr = np.array(utilities, dtype=float)
 
-    metrics = _portfolio_metrics_from_x(
-        best_x,
-        mu_total,
-        mu_excess,
-        sigma_matrix,
-        esg_vector,
-        risk_free_rate,
-    )
-    return {**metrics, "objective": float(best_utility)}
-
-
-def _solve_frontier_family(
-    gamma_values: np.ndarray,
-    mu_total: np.ndarray,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    risk_free_rate: float,
-    lambda_taste: float,
-    initial_warm_start=None,
-) -> dict:
-    del initial_warm_start
-
-    family_gamma = []
-    family_risks = []
-    family_returns = []
-    family_esg = []
-    family_sharpes = []
-    family_x1 = []
-    family_x2 = []
-    family_rf = []
-    family_total_risky = []
-    family_risky_mix = []
-
-    for gamma in np.array(gamma_values, dtype=float):
-        solution = _solve_portfolio_optimisation(
-            mu_total=mu_total,
-            mu_excess=mu_excess,
-            sigma_matrix=sigma_matrix,
-            esg_vector=esg_vector,
-            risk_free_rate=risk_free_rate,
-            gamma=float(gamma),
-            lambda_taste=float(lambda_taste),
-        )
-        x = np.array(solution["x"], dtype=float)
-
-        family_gamma.append(float(gamma))
-        family_risks.append(float(solution["risk"]))
-        family_returns.append(float(solution["return"]))
-        family_esg.append(float(solution["esg"]))
-        family_sharpes.append(float(solution["sharpe"]))
-        family_x1.append(float(x[0]))
-        family_x2.append(float(x[1]))
-        family_rf.append(float(solution["rf_weight"]))
-        family_total_risky.append(float(solution["total_risky"]))
-        family_risky_mix.append(float(solution["risky_mix_weight1"]))
+    opt_idx = int(np.nanargmax(utilities_arr)) if utilities_arr.size else 0
+    opt_w1 = float(weights_range[opt_idx]) if weights_range.size else 0.5
+    opt_w2 = float(1.0 - opt_w1)
+    optimal_weights = np.array([opt_w1, opt_w2], dtype=float)
+    optimal_metrics = _safe_portfolio_metrics(optimal_weights, mu, cov, esg_scores, rf)
 
     return {
-        "gamma": np.array(family_gamma, dtype=float),
-        "risks": np.array(family_risks, dtype=float),
-        "returns": np.array(family_returns, dtype=float),
-        "esg": np.array(family_esg, dtype=float),
-        "sharpes": np.array(family_sharpes, dtype=float),
-        "x1": np.array(family_x1, dtype=float),
-        "x2": np.array(family_x2, dtype=float),
-        "risk_free_weight": np.array(family_rf, dtype=float),
-        "total_risky": np.array(family_total_risky, dtype=float),
-        "risky_mix": np.array(family_risky_mix, dtype=float),
+        "weights_range": np.array(weights_range, dtype=float),
+        "returns": returns_arr,
+        "risks": risks_arr,
+        "esg": esg_arr,
+        "utilities": utilities_arr,
+        "opt_idx": opt_idx,
+        "optimal": {**optimal_metrics, "x": optimal_weights},
     }
-
-
-def _compute_standard_tangency_solution(
-    mu_total: np.ndarray,
-    mu_excess: np.ndarray,
-    sigma_matrix: np.ndarray,
-    esg_vector: np.ndarray,
-    risk_free_rate: float,
-) -> dict:
-    del mu_excess
-    ones = np.ones(len(mu_total), dtype=float)
-    try:
-        raw_weights = np.linalg.pinv(sigma_matrix) @ (mu_total - risk_free_rate * ones)
-    except Exception:
-        raw_weights = np.zeros(len(mu_total), dtype=float)
-
-    raw_weights = np.clip(np.array(raw_weights, dtype=float), 0.0, None)
-    total_raw = float(np.sum(raw_weights))
-    if total_raw <= 1e-12:
-        best_asset = int(np.argmax(mu_total - risk_free_rate))
-        raw_weights = np.zeros(len(mu_total), dtype=float)
-        raw_weights[best_asset] = 1.0
-        total_raw = 1.0
-
-    tangency_weights = raw_weights / total_raw
-    return _portfolio_metrics_from_x(
-        tangency_weights,
-        mu_total,
-        mu_total - risk_free_rate,
-        sigma_matrix,
-        esg_vector,
-        risk_free_rate,
-    )
 
 
 def _sort_curve_points(risks_pct: np.ndarray, returns_pct: np.ndarray):
@@ -3320,101 +3182,83 @@ def compute_builder_result(
     risk_tolerance: int,
     esg_slider: float,
 ) -> dict:
-    mu_total = np.array([float(exp_return1), float(exp_return2)], dtype=float) / 100.0
+    mu = np.array([float(exp_return1), float(exp_return2)], dtype=float) / 100.0
     sigma_values = np.array([float(std_dev1), float(std_dev2)], dtype=float) / 100.0
     rho = float(np.clip(float(correlation), -0.999999, 0.999999))
-    risk_free_decimal = float(risk_free_rate) / 100.0
-    esg_vector = np.array([float(esg_score1), float(esg_score2)], dtype=float)
+    rf = float(risk_free_rate) / 100.0
+    esg_scores = np.array([float(esg_score1), float(esg_score2)], dtype=float)
+    gamma = float(gamma_from_risk_tolerance(risk_tolerance))
+    lambda_taste = float(esg_slider)
+    esg_preference_fraction = float(np.clip(lambda_taste / 0.10, 0.0, 1.0))
 
-    sigma_matrix = np.array(
+    cov = np.array(
         [
             [sigma_values[0] ** 2, rho * sigma_values[0] * sigma_values[1]],
             [rho * sigma_values[0] * sigma_values[1], sigma_values[1] ** 2],
         ],
         dtype=float,
     )
-    mu_excess = mu_total - risk_free_decimal
 
-    gamma = gamma_from_risk_tolerance(risk_tolerance)
-    gamma_values = gamma_sweep_values(gamma)
-    lambda_taste = float(esg_slider)
-    esg_preference_fraction = float(np.clip(lambda_taste / 0.10, 0.0, 1.0))
-
-    standard_solution = _solve_portfolio_optimisation(
-        mu_total=mu_total,
-        mu_excess=mu_excess,
-        sigma_matrix=sigma_matrix,
-        esg_vector=esg_vector,
-        risk_free_rate=risk_free_decimal,
-        gamma=gamma,
-        lambda_taste=0.0,
-    )
-    current_esg = _solve_portfolio_optimisation(
-        mu_total=mu_total,
-        mu_excess=mu_excess,
-        sigma_matrix=sigma_matrix,
-        esg_vector=esg_vector,
-        risk_free_rate=risk_free_decimal,
-        gamma=gamma,
-        lambda_taste=lambda_taste,
-    )
-    standard_tangency = _compute_standard_tangency_solution(
-        mu_total=mu_total,
-        mu_excess=mu_excess,
-        sigma_matrix=sigma_matrix,
-        esg_vector=esg_vector,
-        risk_free_rate=risk_free_decimal,
-    )
-
-    family_without = _solve_frontier_family(
-        gamma_values=gamma_values,
-        mu_total=mu_total,
-        mu_excess=mu_excess,
-        sigma_matrix=sigma_matrix,
-        esg_vector=esg_vector,
-        risk_free_rate=risk_free_decimal,
-        lambda_taste=0.0,
-    )
-    family_with = _solve_frontier_family(
-        gamma_values=gamma_values,
-        mu_total=mu_total,
-        mu_excess=mu_excess,
-        sigma_matrix=sigma_matrix,
-        esg_vector=esg_vector,
-        risk_free_rate=risk_free_decimal,
-        lambda_taste=lambda_taste,
-    )
+    standard_solution = _compute_standard_tangency_portfolio(mu, cov, rf, gamma, esg_scores)
+    standard_returns, standard_risks = _compute_standard_frontier(mu, cov)
+    esg_frontier = _compute_esg_frontier_and_optimum(mu, cov, esg_scores, rf, gamma, lambda_taste)
+    current_esg = esg_frontier["optimal"]
 
     without_curve_risks_pct, without_curve_returns_pct = _sort_curve_points(
-        np.array(family_without["risks"] * 100.0, dtype=float),
-        np.array(family_without["returns"] * 100.0, dtype=float),
+        np.array(standard_risks * 100.0, dtype=float),
+        np.array(standard_returns * 100.0, dtype=float),
     )
     with_curve_risks_pct, with_curve_returns_pct = _sort_curve_points(
-        np.array(family_with["risks"] * 100.0, dtype=float),
-        np.array(family_with["returns"] * 100.0, dtype=float),
+        np.array(esg_frontier["risks"] * 100.0, dtype=float),
+        np.array(esg_frontier["returns"] * 100.0, dtype=float),
     )
 
     portfolio_returns = np.array([standard_solution["return"], current_esg["return"]], dtype=float)
     portfolio_risks = np.array([standard_solution["risk"], current_esg["risk"]], dtype=float)
     portfolio_variances = np.array([standard_solution["variance"], current_esg["variance"]], dtype=float)
-    portfolio_excess_returns = np.array([standard_solution["excess_return"], current_esg["excess_return"]], dtype=float)
+    portfolio_excess_returns = np.array([standard_solution["return"] - rf, current_esg["return"] - rf], dtype=float)
     portfolio_esg = np.array([standard_solution["esg"], current_esg["esg"]], dtype=float)
     portfolio_sharpes = np.array([standard_solution["sharpe"], current_esg["sharpe"]], dtype=float)
     x1_positions = np.array([standard_solution["x"][0], current_esg["x"][0]], dtype=float)
     x2_positions = np.array([standard_solution["x"][1], current_esg["x"][1]], dtype=float)
-    rf_positions = np.array([standard_solution["rf_weight"], current_esg["rf_weight"]], dtype=float)
-    total_risky_positions = np.array([standard_solution["total_risky"], current_esg["total_risky"]], dtype=float)
-    risky_mix_positions = np.array([standard_solution["risky_mix_weight1"], current_esg["risky_mix_weight1"]], dtype=float)
+    rf_positions = np.array([0.0, 0.0], dtype=float)
+    total_risky_positions = np.array([float(np.sum(standard_solution["x"])), 1.0], dtype=float)
+    risky_mix_positions = np.array([standard_solution["x"][0], current_esg["x"][0]], dtype=float)
 
     display_expected_return_pct = float(current_esg["return"] * 100.0)
     display_portfolio_risk_pct = float(current_esg["risk"] * 100.0)
     display_portfolio_esg_pct = float(current_esg["esg"])
     display_sharpe_ratio = float(current_esg["sharpe"])
 
-    display_without_esg_return_pct = float(standard_tangency["return"] * 100.0)
-    display_without_esg_risk_pct = float(standard_tangency["risk"] * 100.0)
-    display_without_esg_esg_pct = float(standard_tangency["esg"])
-    display_without_esg_sharpe = float(standard_tangency["sharpe"])
+    display_without_esg_return_pct = float(standard_solution["return"] * 100.0)
+    display_without_esg_risk_pct = float(standard_solution["risk"] * 100.0)
+    display_without_esg_esg_pct = float(standard_solution["esg"])
+    display_without_esg_sharpe = float(standard_solution["sharpe"])
+
+    family_without = {
+        "gamma": np.array([gamma], dtype=float),
+        "risks": np.array(standard_risks, dtype=float),
+        "returns": np.array(standard_returns, dtype=float),
+        "esg": np.full_like(np.array(standard_returns, dtype=float), float(standard_solution["esg"])),
+        "sharpes": np.full_like(np.array(standard_returns, dtype=float), float(standard_solution["sharpe"])),
+        "x1": np.full_like(np.array(standard_returns, dtype=float), float(standard_solution["x"][0])),
+        "x2": np.full_like(np.array(standard_returns, dtype=float), float(standard_solution["x"][1])),
+        "risk_free_weight": np.zeros_like(np.array(standard_returns, dtype=float)),
+        "total_risky": np.ones_like(np.array(standard_returns, dtype=float)),
+        "risky_mix": np.full_like(np.array(standard_returns, dtype=float), float(standard_solution["x"][0])),
+    }
+    family_with = {
+        "gamma": np.array([gamma], dtype=float),
+        "risks": np.array(esg_frontier["risks"], dtype=float),
+        "returns": np.array(esg_frontier["returns"], dtype=float),
+        "esg": np.array(esg_frontier["esg"], dtype=float),
+        "sharpes": np.array([_safe_sharpe(ret, rf, risk) for ret, risk in zip(esg_frontier["returns"], esg_frontier["risks"])], dtype=float),
+        "x1": np.array(esg_frontier["weights_range"], dtype=float),
+        "x2": np.array(1.0 - esg_frontier["weights_range"], dtype=float),
+        "risk_free_weight": np.zeros_like(np.array(esg_frontier["weights_range"], dtype=float)),
+        "total_risky": np.ones_like(np.array(esg_frontier["weights_range"], dtype=float)),
+        "risky_mix": np.array(esg_frontier["weights_range"], dtype=float),
+    }
 
     return {
         "asset1": asset1,
@@ -3443,11 +3287,11 @@ def compute_builder_result(
         "portfolio_total_risky": total_risky_positions,
         "portfolio_risky_mix": risky_mix_positions,
         "current_non_esg_opt_idx": 0,
-        "optimal_idx": 1,
+        "optimal_idx": int(esg_frontier["opt_idx"]),
         "family_without_curve": family_without,
         "family_with_curve": family_with,
-        "family_without_indices": np.arange(len(family_without["gamma"]), dtype=int),
-        "family_with_indices": np.arange(len(family_with["gamma"]), dtype=int),
+        "family_without_indices": np.arange(len(without_curve_risks_pct), dtype=int),
+        "family_with_indices": np.arange(len(with_curve_risks_pct), dtype=int),
         "efficient_idx_without_esg_full": np.arange(len(without_curve_risks_pct), dtype=int),
         "efficient_idx_without_esg_display": np.arange(len(without_curve_risks_pct), dtype=int),
         "efficient_idx_with_esg": np.arange(len(with_curve_risks_pct), dtype=int),
@@ -3467,7 +3311,7 @@ def compute_builder_result(
         "max_sharpe_risk_pct": display_without_esg_risk_pct,
         "max_sharpe_return_pct": display_without_esg_return_pct,
         "max_sharpe_esg_pct": display_without_esg_esg_pct,
-        "esg_tangency_idx": 1,
+        "esg_tangency_idx": int(esg_frontier["opt_idx"]),
         "esg_tangency_risk_pct": display_portfolio_risk_pct,
         "esg_tangency_return_pct": display_expected_return_pct,
         "esg_tangency_esg_pct": display_portfolio_esg_pct,
@@ -3477,9 +3321,9 @@ def compute_builder_result(
         "current_non_esg_sharpe": display_without_esg_sharpe,
         "opt_w1": float(current_esg["x"][0]),
         "opt_w2": float(current_esg["x"][1]),
-        "opt_rf_weight": float(current_esg["rf_weight"]),
-        "opt_risky_mix_weight1": float(current_esg["risky_mix_weight1"]),
-        "opt_risky_mix_weight2": float(current_esg["risky_mix_weight2"]),
+        "opt_rf_weight": 0.0,
+        "opt_risky_mix_weight1": float(current_esg["x"][0]),
+        "opt_risky_mix_weight2": float(current_esg["x"][1]),
         "opt_return": float(current_esg["return"]),
         "opt_risk": float(current_esg["risk"]),
         "opt_esg": float(current_esg["esg"]),
@@ -3493,7 +3337,6 @@ def compute_builder_result(
         "display_without_esg_esg_pct": display_without_esg_esg_pct,
         "display_without_esg_sharpe": display_without_esg_sharpe,
     }
-
 
 # Company search helpers
 
