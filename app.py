@@ -3896,16 +3896,52 @@ def render_builder_popup() -> None:
                 arrowprops=dict(arrowstyle="->", color="#16a34a", lw=1.0, alpha=0.9),
             )
 
-            all_x = np.concatenate([without_curve_risks, with_curve_risks, np.array([rf_x])]) if len(without_curve_risks) + len(with_curve_risks) > 0 else np.array([0.0])
-            all_y = np.concatenate([without_curve_returns, with_curve_returns, np.array([rf_y])]) if len(without_curve_returns) + len(with_curve_returns) > 0 else np.array([0.0])
-            x_span = max(float(np.max(all_x) - np.min(all_x)), 1.0)
-            y_span = max(float(np.max(all_y) - np.min(all_y)), 1.0)
-            ax.set_xlim(left=0.0, right=float(np.max(all_x) + 0.07 * x_span))
-            ax.set_ylim(bottom=float(min(rf_y, np.min(all_y)) - 0.08 * y_span), top=float(np.max(all_y) + 0.08 * y_span))
+            focus_x_parts = [np.array([rf_x, without_tangency_x, with_tangency_x], dtype=float)]
+            focus_y_parts = [np.array([rf_y, without_tangency_y, with_tangency_y], dtype=float)]
+
+            if len(without_frontier_risks) > 0:
+                focus_x_parts.append(np.array(without_frontier_risks, dtype=float))
+                focus_y_parts.append(np.array(without_frontier_returns, dtype=float))
+            elif len(without_curve_risks) > 0:
+                focus_x_parts.append(np.array(without_curve_risks, dtype=float))
+                focus_y_parts.append(np.array(without_curve_returns, dtype=float))
+
+            if len(with_frontier_risks) > 0:
+                focus_x_parts.append(np.array(with_frontier_risks, dtype=float))
+                focus_y_parts.append(np.array(with_frontier_returns, dtype=float))
+            elif len(with_curve_risks) > 0:
+                focus_x_parts.append(np.array(with_curve_risks, dtype=float))
+                focus_y_parts.append(np.array(with_curve_returns, dtype=float))
+
+            focus_x = np.concatenate(focus_x_parts) if focus_x_parts else np.array([0.0], dtype=float)
+            focus_y = np.concatenate(focus_y_parts) if focus_y_parts else np.array([0.0], dtype=float)
+            focus_x = focus_x[np.isfinite(focus_x)]
+            focus_y = focus_y[np.isfinite(focus_y)]
+
+            if focus_x.size == 0:
+                focus_x = np.array([0.0], dtype=float)
+            if focus_y.size == 0:
+                focus_y = np.array([0.0], dtype=float)
+
+            x_min = max(0.0, float(np.min(focus_x)))
+            x_max = float(np.max(focus_x))
+            y_min = float(np.min(focus_y))
+            y_max = float(np.max(focus_y))
+
+            x_span = max(x_max - x_min, 1.0)
+            y_span = max(y_max - y_min, 1.0)
+
+            x_pad_left = 0.04 * x_span
+            x_pad_right = 0.10 * x_span
+            y_pad = 0.10 * y_span
+
+            ax.set_xlim(left=max(0.0, x_min - x_pad_left), right=x_max + x_pad_right)
+            ax.set_ylim(bottom=min(rf_y, y_min) - y_pad, top=y_max + y_pad)
             ax.set_xlabel("Portfolio Risk (%)")
             ax.set_ylabel("Expected Return (%)")
             ax.set_title("Efficient Frontiers")
             style_modern_axes(ax)
+            fig.tight_layout(pad=1.15)
             st.pyplot(fig)
             plt.close(fig)
             st.markdown(build_frontier_interpretation(display_result), unsafe_allow_html=True)
