@@ -3113,28 +3113,39 @@ def _compute_esg_frontier_and_optimum(
     risks_list = []
     esg_list = []
     utilities = []
+    sharpe_list = []
 
     for w1 in weights_range:
         weights = np.array([float(w1), float(1.0 - w1)], dtype=float)
         metrics = _safe_portfolio_metrics(weights, mu, cov, esg_scores, rf)
         utility = float(metrics["return"] - 0.5 * float(gamma) * metrics["variance"] + float(lambda_taste) * (metrics["esg"] / 100.0))
+        sharpe_value = _safe_sharpe(metrics["return"], rf, metrics["risk"])
 
         returns_list.append(metrics["return"])
         risks_list.append(metrics["risk"])
         esg_list.append(metrics["esg"])
         utilities.append(utility)
+        sharpe_list.append(sharpe_value)
 
     returns_arr = np.array(returns_list, dtype=float)
     risks_arr = np.array(risks_list, dtype=float)
     esg_arr = np.array(esg_list, dtype=float)
     utilities_arr = np.array(utilities, dtype=float)
+    sharpe_arr = np.array(sharpe_list, dtype=float)
 
     if abs(float(lambda_taste)) <= 1e-12:
         optimal_weights = _compute_long_only_risky_mix(mu, cov, rf, esg_scores=None, lambda_taste=0.0)
+        opt_idx = int(np.argmin(np.abs(weights_range - float(optimal_weights[0])))) if weights_range.size else 0
     else:
-        optimal_weights = _compute_long_only_risky_mix(mu, cov, rf, esg_scores=esg_scores, lambda_taste=lambda_taste)
+        esg_min = float(np.min(esg_arr)) if esg_arr.size else 0.0
+        esg_max = float(np.max(esg_arr)) if esg_arr.size else 0.0
+        esg_span = max(esg_max - esg_min, 1e-12)
+        esg_preference_component = (esg_arr - esg_min) / esg_span
+        lambda_strength = float(np.clip(float(lambda_taste) / 0.10, 0.0, 1.0))
+        selection_scores = sharpe_arr + lambda_strength * esg_preference_component
+        opt_idx = int(np.argmax(selection_scores)) if selection_scores.size else 0
+        optimal_weights = np.array([float(weights_range[opt_idx]), float(1.0 - weights_range[opt_idx])], dtype=float)
 
-    opt_idx = int(np.argmin(np.abs(weights_range - float(optimal_weights[0])))) if weights_range.size else 0
     optimal_metrics = _safe_portfolio_metrics(optimal_weights, mu, cov, esg_scores, rf)
     total_risky = _compute_total_risky_exposure(optimal_weights, mu, cov, rf, gamma, esg_scores=esg_scores, lambda_taste=lambda_taste)
 
