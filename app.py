@@ -3510,6 +3510,110 @@ ASSET_DATA_LOOKUP = {
 
 
 # -------------------------------------------------
+# Company search helpers
+# -------------------------------------------------
+def company_option_label(company_tuple) -> str:
+    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+    return f"{name} ({ticker.upper()})"
+
+
+def company_search_score(query: str, company_tuple) -> int:
+    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+    q = query.strip().lower()
+    if not q:
+        return -1
+
+    ticker_l = str(ticker).lower()
+    name_l = str(name).lower()
+    industry_l = str(industry).lower()
+    exchange_l = str(exchange).lower()
+    combined = f"{name_l} {ticker_l} {industry_l} {exchange_l}"
+
+    if q == ticker_l:
+        return 5000
+    if q == name_l:
+        return 4900
+    if ticker_l.startswith(q):
+        return 4000 - len(name_l)
+    if name_l.startswith(q):
+        return 3500 - len(name_l)
+    if q in name_l:
+        return 2500 - name_l.find(q)
+    if q in ticker_l:
+        return 2200 - ticker_l.find(q)
+    if q in industry_l:
+        return 1500 - industry_l.find(q)
+    if q in exchange_l:
+        return 1200 - exchange_l.find(q)
+
+    parts = [p for p in q.split() if p]
+    if parts and all(p in combined for p in parts):
+        return 1000 - len(name_l)
+
+    return -1
+
+
+def get_company_matches(query: str, limit: int = 30):
+    q = query.strip()
+    if not q:
+        return []
+
+    scored = []
+    for company in COMPANY_DATA:
+        score = company_search_score(q, company)
+        if score >= 0:
+            scored.append((score, company_option_label(company), company))
+
+    scored.sort(key=lambda item: (-item[0], item[1].lower()))
+    return [item[2] for item in scored[:limit]]
+
+
+def get_company_by_option_label(label: str):
+    if not label:
+        return None
+    for company in COMPANY_DATA:
+        if company_option_label(company) == label:
+            return company
+    return None
+
+
+def render_company_profile(company_tuple) -> None:
+    if company_tuple is None:
+        return
+
+    ticker, name, industry, exchange, e_grade, e_level, s_grade, s_level, g_grade, g_level, total_grade, total_level, e_score, s_score, g_score, total_score = company_tuple
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="mini-header">Company ESG Profile</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        f"""
+        <div class="asset-card">
+            <div class="asset-card-title">{name} ({ticker.upper()})</div>
+            <p class="asset-card-copy">
+                Industry: {industry}<br>
+                Exchange: {exchange}<br>
+                Overall ESG Grade: <strong>{total_grade}</strong> · {total_level}
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+
+    m1, m2, m3, m4 = st.columns(4, gap="small")
+    with m1:
+        st.markdown(result_tile("Environmental", f"{e_grade} · {e_level}"), unsafe_allow_html=True)
+    with m2:
+        st.markdown(result_tile("Social", f"{s_grade} · {s_level}"), unsafe_allow_html=True)
+    with m3:
+        st.markdown(result_tile("Governance", f"{g_grade} · {g_level}"), unsafe_allow_html=True)
+    with m4:
+        st.markdown(result_tile("Total ESG", f"{total_grade} · {total_level}"), unsafe_allow_html=True)
+
+
+# -------------------------------------------------
 # Live popup renderers
 # -------------------------------------------------
 def render_recommendation_popup() -> None:
